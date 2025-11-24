@@ -7,4 +7,5 @@
 *.so
 *.uid
 *.g.dart
+*.import
 .env
