@@ -1,3 +1,18 @@
-[gd_scene format=3 uid="uid://dgpvq7pmfx6gw"]
+[gd_scene load_steps=4 format=3 uid="uid://dgpvq7pmfx6gw"]
 
-[node name="Main" type="Node2D"]
+[ext_resource type="Script" uid="uid://cxghgh3005jcx" path="res://src/lib/app_root.dart" id="1_h2yge"]
+[ext_resource type="Script" uid="uid://nxhnv3fk8x0t" path="res://src/lib/isomap_grid.dart" id="2_h2yge"]
+[ext_resource type="Script" uid="uid://dn0ffoo874e5d" path="res://src/lib/menu_overlay.dart" id="3_1bvp3"]
+
+[node name="AppRoot" type="Node"]
+script = ExtResource("1_h2yge")
+
+[node name="IsoMapGrid" type="Node2D" parent="."]
+script = ExtResource("2_h2yge")
+
+[node name="MenuOverlay" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("3_1bvp3")

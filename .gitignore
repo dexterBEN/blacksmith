@@ -1,7 +1,10 @@
 .pub-cache
 .cache
+.godot
 *.log
 *.dll
 *.dylib
 *.so
+*.uid
+*.g.dart
 .env
