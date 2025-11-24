@@ -1,5 +1,5 @@
-name: src
-description: A sample command-line application.
+name: blacksmith_frontend
+description: godot_dart poc
 version: 1.0.0
 # repository: https://github.com/my_org/my_repo
 
