@@ -1,7 +1,10 @@
 {
     "name": "devcontainer: blacksmith_front",
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
-    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "workspaceFolder": "/workspaces/frontend",
+    "mounts": [
+        "type=bind,source=${localWorkspaceFolder},target=/workspaces/frontend"
+    ],
     "customizations": {
         "vscode": {
             "extensions": [

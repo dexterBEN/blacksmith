@@ -1,0 +1,6 @@
+.pub-cache
+.cache
+*.log
+*.dll
+*.dylib
+*.so

@@ -1,15 +1,17 @@
-name: blacksmith_frontend
-description: godot_dart poc
+name: godot_dart_example
+description: An example of using Dart in Godot
 version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+publish_to: none
 
 environment:
-  sdk: ^3.8.1
+  sdk: '>=3.6.0 <4.0.0'
 
-# Add regular dependencies here.
 dependencies:
-  # path: ^1.8.0
+  ffi: ^2.0.1
+  godot_dart: ^0.11.0
+  collection: ^1.17.2
 
 dev_dependencies:
-  lints: ^5.0.0
-  test: ^1.24.0
+  lints: ^2.0.0
+  build_runner: ^2.3.3
+  godot_dart_build: ^0.9.0
