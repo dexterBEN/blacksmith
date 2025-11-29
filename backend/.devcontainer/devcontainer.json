@@ -1,10 +1,14 @@
 {
     "name": "devcontainer: blacksmith_back",
     "image": "mcr.microsoft.com/dotnet/sdk:8.0",
-    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-    "forwardPorts": [5003],
-    "features": {
-    },
+    "workspaceFolder": "/workspaces/backend",
+    "mounts": [
+        "type=bind,source=${localWorkspaceFolder},target=/workspaces/backend"
+    ],
+    "forwardPorts": [
+        5003
+    ],
+    "features": {},
     "customizations": {
         "vscode": {
             "settings": {
@@ -18,9 +22,6 @@
             ]
         }
     },
-    "mounts": [
-        "source=${localWorkspaceFolder},target=/workspace,type=bind"
-    ],
-    "postCreateCommand": "bash /workspaces/${localWorkspaceFolderBasename}/scripts/install_dependencies.sh",
+    "postCreateCommand": "bash scripts/install_dependencies.sh",
     "remoteUser": "root"
 }

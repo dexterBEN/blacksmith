@@ -1,11 +1,105 @@
-.pub-cache
-.cache
-.godot
+########################################
+# GLOBAL / OS
+########################################
+.DS_Store
+Thumbs.db
+desktop.ini
+
+########################################
+# SECRETS
+########################################
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+
+########################################
+# LOGS / CACHE
+########################################
 *.log
-*.dll
-*.dylib
-*.so
+.cache/
+.pub-cache/
+
+########################################
+# GODOT 4
+########################################
+.godot/
+.import/
+*.import
 *.uid
 *.g.dart
-*.import
-.env
+
+########################################
+# DART / FLUTTER
+########################################
+.dart_tool/
+.packages
+.pub/
+build/
+coverage/
+.dartpad/
+*.snap
+
+########################################
+# GODOT + DART EXTENSION
+########################################
+godot_dart/
+libgodot_dart.*
+godot_dart.dll
+godot_dart.so
+godot_dart.dylib
+
+########################################
+# .NET / C#
+########################################
+# Build outputs
+bin/
+obj/
+
+# User & IDE
+*.user
+*.suo
+*.userprefs
+*.rsuser
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# ASP.NET runtime generated
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+
+########################################
+# DEVCONTAINER / DOCKER
+########################################
+.vscode-server/
+.vscode-server-insiders/
+devcontainer.json.bak
+
+########################################
+# VS CODE
+########################################
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+
+########################################
+# TEST / TEMP
+########################################
+TestResults/
+coverage.cobertura.xml
+
+########################################
+# CLOUD / CLI CACHE
+########################################
+.gcloud/
+.azure/
+.aws/
