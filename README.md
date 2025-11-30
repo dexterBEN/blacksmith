@@ -15,11 +15,6 @@ The main goals of this project are:
 - Expose a **modular cloud backend API**
 - Execute **real cloud operations** (currently: Google Cloud Storage bucket creation)
 - Validate a **portable development workflow using devcontainers**
-- Prepare a foundation for **multi-cloud support (GCP / AWS / Azure)**
-
-This project serves both as:
-- A **technical proof of concept**
-- A **long-term experimentation platform** for cloud + frontend + system integration
 
 ---
 
