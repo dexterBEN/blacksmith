@@ -6,8 +6,12 @@
         "type=bind,source=${localWorkspaceFolder},target=/workspaces/backend"
     ],
     "forwardPorts": [
-        5003
+        5100
     ],
+    "containerEnv": {
+        "ASPNETCORE_URLS": "http://0.0.0.0:5100",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/workspaces/backend/.devcontainer/gcp-service-account.json"
+    },
     "features": {},
     "customizations": {
         "vscode": {
