@@ -1,8 +1,8 @@
   # Blacksmith
 
-A Proof of Concep(POC) to test building application with the game engine (GODOT)[https://godotengine.org/fr/].
+A Proof of Concep(POC) to test building application with the game engine [GODOT](https://godotengine.org/fr/).
 
-I'm using the package (godot_dart)[https://github.com/fuzzybinary/godot_dart]
+I'm using the package [godot_dart](https://github.com/fuzzybinary/godot_dart)
 
 ---
 
