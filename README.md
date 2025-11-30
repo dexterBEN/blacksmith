@@ -20,6 +20,7 @@ The main goals of this project are:
 
 ## 🧱 Global Architecture Overview
 
-Blacksmith follows a layered architecture:
+<img width="1024" height="1536" alt="image" src="https://github.com/user-attachments/assets/fabe8b5e-746d-4cfc-a46f-41fc0b10e33c" />
+
 
 
