@@ -22,5 +22,28 @@ The main goals of this project are:
 
 <img width="1024" height="1536" alt="image" src="https://github.com/user-attachments/assets/fabe8b5e-746d-4cfc-a46f-41fc0b10e33c" />
 
+## 🐳 Devcontainers
+
+Both frontend and backend are fully containerized using **VS Code devcontainers**:
+
+### Frontend Devcontainer
+- Dart SDK
+- Godot integration
+- GetIt / build_runner
+- Portable across Linux / Windows / WSL / VM
+
+### Backend Devcontainer
+- .NET 8 SDK
+- Google Cloud SDK
+- Environment variables:
+  - `ASPNETCORE_URLS`
+  - `GOOGLE_APPLICATION_CREDENTIALS`
+- Automatic dependency installation through `postCreateCommand`
+
+This ensures:
+- Identical environments across machines
+- No local dependency pollution
+- Easy onboarding for new contributors
+
 
 
