@@ -1,4 +1,4 @@
-  # Blacksmith
+# Blacksmith
 
 A Proof of Concep(POC) to test building application with the game engine [GODOT](https://godotengine.org/fr/).
 
@@ -16,7 +16,11 @@ The main goals of this project are:
 - Validate a **portable development workflow using devcontainers**
 
 ---
+## 🎥 Preview (sample)
 
+https://github.com/user-attachments/assets/6a8570f7-8b87-4de8-8a9c-fb4c8ad4aaca
+
+---
 ## 🧱 Global Architecture Overview
 
 <img width="1024" height="1536" alt="image" src="https://github.com/user-attachments/assets/fabe8b5e-746d-4cfc-a46f-41fc0b10e33c" />
