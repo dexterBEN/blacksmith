@@ -50,6 +50,9 @@ libgodot_dart.*
 godot_dart.dll
 godot_dart.so
 godot_dart.dylib
+*.dll
+*.dylib
+*.so
 
 ########################################
 # .NET / C#
