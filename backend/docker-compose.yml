@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:16
+    container_name: blacksmith_db_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: azerty1234
+      POSTGRES_DB: blacksmith_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - blacksmith_pgdata:/var/lib/postgresql/data
+  
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: blacksmith-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@local.dev
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+
+volumes:
+  blacksmith_pgdata:
