@@ -60,6 +60,7 @@ class AppRoot extends Node2D {
       // on écoute le stream pour redessiner la grille
       _bloc!.stream.listen((IsomapGridState state) {
         _grid.render(state);
+        _menu.setEnabled(state.selected != null);
       });
 
       // rendu initial
@@ -78,30 +79,37 @@ class AppRoot extends Node2D {
   void onMenuItemChosen(String kind) {
     GD.print(Variant('[AppRoot] onMenuItemChosen: $kind'));
 
-    String? path;
-    switch (kind) {
-      case 'gcp:cloud_storage':
-        path = 'res://src/assets/gcp_cloud_storage.png';
-        break;
-      case 'gcp:compute_engine':
-        path = 'res://src/assets/gcp_compute_engine.png';
-        break;
-    }
-
-    if (path == null) {
-      GD.pushWarning(
-        Variant('[AppRoot] unknown resource kind: $kind'),
-      );
-      return;
-    }
-
     if (_bloc != null) {
-      _bloc!.add(PlaceResource(path));
+      // ✅ on envoie le KIND, pas le path
+      _bloc!.add(PlaceResource(kind));
       return;
     }
+
+    // fallback (si jamais pas de BLoC)
+    final path = _texturePathFromKind(kind);
+    if (path == null) return;
 
     GD.pushWarning(Variant('[AppRoot] Pas de BLoC -> fallback direct map'));
     _grid.placeIconOnSelected(path);
+  }
+
+  //TODO: handle with bloc
+  @GodotExport()
+  void onStepperNameSubmitted(String name) {
+    GD.print(Variant('[AppRoot] onStepperNameSubmitted: $name'));
+    _bloc?.add(NameSubmitted(name)); // ✅ envoie au BLoC
+  }
+
+  String? _texturePathFromKind(String kind) {
+    switch (kind) {
+      case 'gcp:cloud_storage':
+        return 'res://src/assets/gcp_cloud_storage.png';
+      case 'gcp:compute_engine':
+        return 'res://src/assets/gcp_compute_engine.png';
+      default:
+        GD.pushWarning(Variant('[AppRoot] unknown resource kind: $kind'));
+        return null;
+    }
   }
 }
 

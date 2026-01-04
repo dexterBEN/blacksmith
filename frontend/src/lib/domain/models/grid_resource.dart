@@ -1,21 +1,5 @@
-import 'grid_position.dart';
-
-// domain/models/resource.dart
 import 'package:equatable/equatable.dart';
-
-class GridResource extends Equatable {
-  final String id;          // interne (uuid ou "gcp:cloud_storage")
-  final String texturePath; // chemin Godot, ex: 'res://src/assets/gcp_cloud_storage.jpeg';
-
-  const GridResource({
-    required this.id,
-    required this.texturePath,
-  });
-
-  @override
-  List<Object?> get props => [id, texturePath];
-}
-
+import 'grid_position.dart';
 
 enum Provider { gcp, aws, azure, generic, none }
 
@@ -25,5 +9,52 @@ enum ResourceType {
   vm,
   loadBalancer,
   cache,
-  // ...
+}
+
+class GridResource extends Equatable {
+  /// set by backend (Guid)
+  final String? id;
+
+  final String name;
+
+  final ResourceType type;
+
+  /// Provider (optional)
+  final Provider? provider;
+
+  /// resource position
+  final GridPos position;
+
+  /// Texture UI Godot
+  final String texturePath;
+
+  const GridResource({
+    this.id,
+    required this.name,
+    required this.type,
+    required this.provider,
+    required this.position,
+    required this.texturePath,
+  });
+
+  GridResource copyWith({
+    String? id,
+    String? name,
+    ResourceType? type,
+    Provider? provider,
+    GridPos? pos,
+    String? texturePath,
+  }) {
+    return GridResource(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      provider: provider ?? this.provider,
+      position: pos ?? this.position,
+      texturePath: texturePath ?? this.texturePath,
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, name, type, provider, position, texturePath];
 }

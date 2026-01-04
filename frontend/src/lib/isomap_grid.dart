@@ -2,12 +2,14 @@ import 'dart:ffi';
 import 'dart:math' as math;
 import 'package:godot_dart/godot_dart.dart';
 
-// 🔗 DI + BLoC + modèles de domaine
+// 🔗 DI + BLoC + model
 import 'package:blacksmith_front/core/di/service_locator.dart';
 import 'package:blacksmith_front/domain/models/grid_position.dart';
 import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_state.dart';
+
+import 'package:blacksmith_front/domain/models/grid_resource.dart';
 
 part 'isomap_grid.g.dart';
 
@@ -26,33 +28,33 @@ class IsoMapGrid extends Node2D {
   IsoMapGrid.withNonNullOwner(Pointer<Void> owner)
       : super.withNonNullOwner(owner);
 
-  // ---- accès BLoC ----
+  // ---- register BLoC ----
   IsomapGridBloc? get _bloc =>
       sl.isRegistered<IsomapGridBloc>() ? sl<IsomapGridBloc>() : null;
 
-  // ---- paramètres ----
+  // ---- params ----
   final int rows = 6;
   final int cols = 6;
   final double tileW = 64.0;
   final double tileH = 32.0;
 
-  // fond de la grille + highlight
-  final Color fillColor    = Color.html('#FFFFFFFF'); // blanc
+  // grid background + highlight
+  final Color fillColor    = Color.html('#FFFFFFFF'); // white
   final Color lineColor    = Color.html('#B0B0B0FF');
-  final Color selectedFill = Color.html('#F1C40FFF'); // léger jaune
+  final Color selectedFill = Color.html('#F1C40FFF'); // yellow
   final Color selectedLine = Color.html('#D4AC0DFF');
 
   late final List<List<Polygon2D>> _tiles;
   late final List<List<Line2D>> _edges;
-  late final List<List<Sprite2D?>> _icons; // sprites posés sur les tuiles
+  late final List<List<Sprite2D?>> _icons; // sprites in tiles
 
-  int _selR = -1; // encore utilisé par placeIconOnSelected (fallback)
+  int _selR = -1; // use by placeIconOnSelected (fallback)
   int _selC = -1;
 
   Vector2? _lastVpSize;
 
   // ======================================================================
-  // Cycle de vie
+  // lifecycle
   // ======================================================================
 
   @override
@@ -65,13 +67,13 @@ class IsoMapGrid extends Node2D {
 
     _recenterByBounds();
 
-    // synchro initiale avec le BLoC si dispo
+    // BLoC initial setup
     final bloc = _bloc;
     if (bloc != null) {
       render(bloc.state);
-      GD.print(Variant('[IsoMapGrid] vReady OK (BLoC présent)'));
+      GD.print(Variant('[IsoMapGrid] (vReady): BLoC is loaded'));
     } else {
-      GD.print(Variant('[IsoMapGrid] vReady OK (BLoC absent, mode local)'));
+      GD.print(Variant('[IsoMapGrid] (vReady): BLoC not loaded'));
     }
   }
 
@@ -122,10 +124,10 @@ class IsoMapGrid extends Node2D {
 
     final bloc = _bloc;
     if (bloc != null) {
-      // 🔁 mode "piloté par le BLoC"
+      // 🔁 driven by the BLoC
       bloc.add(TileClicked(GridPos(r, c)));
     } else {
-      // 🔁 fallback : ancien comportement local
+      // 🔁 fallback
       _selectTile(r, c);
     }
   }
@@ -291,7 +293,7 @@ class IsoMapGrid extends Node2D {
     _edges[r][c].setDefaultColor(selectedLine);
   }
 
-  void _syncIconsWithState(Map<GridPos, String> tilesMap) {
+  void _syncIconsWithState(Map<GridPos, GridResource> tilesMap) {
     // 1) supprimer les sprites qui ne sont plus dans le state
     for (int r = 0; r < rows; r++) {
       for (int c = 0; c < cols; c++) {
@@ -307,16 +309,15 @@ class IsoMapGrid extends Node2D {
     }
 
     // 2) ajouter les sprites manquants
-    tilesMap.forEach((pos, path) {
+    tilesMap.forEach((pos, resource) {
       final r = pos.row;
       final c = pos.col;
 
       if (r < 0 || r >= rows || c < 0 || c >= cols) return;
 
-      // déjà un sprite ? on laisse (c’est le BLoC qui est la vérité)
       if (_icons[r][c] != null) return;
 
-      _placeIconAt(r, c, path);
+      _placeIconAt(r, c, resource.texturePath);
     });
   }
 

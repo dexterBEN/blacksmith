@@ -9,16 +9,16 @@ class CloudStorageRepository {
   Future<String> pingBackend() => _api.ping();
 
   Future<String> createBucket({
-    required String projectId,
+    required String bucketName,
     required int row,
     required int col,
   }) async {
     
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    final bucketName = 'blacksmith-$row-$col-$ts'.toLowerCase();
+    //final ts = DateTime.now().millisecondsSinceEpoch;
+    //final bucketName = 'blacksmith-$row-$col-$ts'.toLowerCase();
 
     return _api.createBucket(
-      projectId: projectId,
+      projectId: 'isometric-app-sample',
       bucketName: bucketName,
     );
   }
