@@ -18,7 +18,7 @@ The main goals of this project are:
 ---
 ## 🎥 Preview (sample)
 
-https://github.com/user-attachments/assets/6a8570f7-8b87-4de8-8a9c-fb4c8ad4aaca
+https://github.com/user-attachments/assets/88b1448a-d153-440e-84a2-566d72d8fe78
 
 ---
 ## 🧱 Global Architecture Overview
