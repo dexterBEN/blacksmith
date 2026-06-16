@@ -21,9 +21,10 @@ The main goals of this project are:
 https://github.com/user-attachments/assets/88b1448a-d153-440e-84a2-566d72d8fe78
 
 ---
-## 🧱 Global Architecture Overview
+## 🧱 Global Architecture Overview (Not final)
 
-<img width="1024" height="1536" alt="image" src="https://github.com/user-attachments/assets/fabe8b5e-746d-4cfc-a46f-41fc0b10e33c" />
+<img width="1619" height="972" alt="image" src="https://github.com/user-attachments/assets/01eff11b-4601-4a82-a44a-5c0c952a6298" />
+
 
 ## 🐳 Devcontainers
 
