@@ -26,7 +26,10 @@ public sealed class ApiContractTests : IDisposable
             BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
         });
         using var scope = _factory.Services.CreateScope();
-        scope.ServiceProvider.GetRequiredService<BlacksmithDbContext>().Database.EnsureCreated();
+        var db = scope.ServiceProvider.GetRequiredService<BlacksmithDbContext>();
+        db.Database.EnsureCreated();
+        db.Designs.Add(new DesignEntity { Id = LegacyDesign.Id, Name = LegacyDesign.Name });
+        db.SaveChanges();
     }
 
     [Fact]
@@ -76,9 +79,9 @@ public sealed class ApiContractTests : IDisposable
     [Fact]
     public async Task Resource_list_is_ordered_by_creation_time_descending()
     {
-        var older = new ResourceEntity { Id = Guid.NewGuid(), Name = "Old", Type = "generic",
+        var older = new ResourceEntity { Id = Guid.NewGuid(), DesignId = LegacyDesign.Id, Name = "Old", Type = "generic",
             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
-        var newer = new ResourceEntity { Id = Guid.NewGuid(), Name = "New", Type = "generic",
+        var newer = new ResourceEntity { Id = Guid.NewGuid(), DesignId = LegacyDesign.Id, Name = "New", Type = "generic",
             CreatedAtUtc = older.CreatedAtUtc.AddDays(1) };
         using (var scope = _factory.Services.CreateScope())
         {

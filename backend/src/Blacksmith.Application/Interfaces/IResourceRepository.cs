@@ -4,6 +4,7 @@ namespace Blacksmith.Application.Interfaces;
 
 public interface IResourceRepository
 {
+    Task<IReadOnlyList<ResourceEntity>> ListByDesignIdAsync(Guid designId, CancellationToken ct);
     /// <summary>Returns resources in descending creation-time order.</summary>
     Task<IReadOnlyList<ResourceEntity>> ListAsync(CancellationToken ct);
     /// <summary>Returned resources participate in the current persistence unit of work.</summary>

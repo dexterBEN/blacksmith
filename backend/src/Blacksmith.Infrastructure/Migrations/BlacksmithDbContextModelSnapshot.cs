@@ -22,6 +22,37 @@ namespace Blacksmith.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Blacksmith.Domain.Entities.DesignEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("designs", (string)null);
+                });
+
             modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -33,6 +64,10 @@ namespace Blacksmith.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc")
                         .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("DesignId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("design_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -54,7 +89,27 @@ namespace Blacksmith.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DesignId")
+                        .HasDatabaseName("IX_resources_design_id");
+
                     b.ToTable("resources", (string)null);
+                });
+
+            modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceEntity", b =>
+                {
+                    b.HasOne("Blacksmith.Domain.Entities.DesignEntity", "Design")
+                        .WithMany("Resources")
+                        .HasForeignKey("DesignId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_resources_designs_design_id");
+
+                    b.Navigation("Design");
+                });
+
+            modelBuilder.Entity("Blacksmith.Domain.Entities.DesignEntity", b =>
+                {
+                    b.Navigation("Resources");
                 });
 #pragma warning restore 612, 618
         }

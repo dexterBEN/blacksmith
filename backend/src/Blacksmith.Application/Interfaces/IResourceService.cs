@@ -4,6 +4,7 @@ namespace Blacksmith.Application.Interfaces;
 
 public interface IResourceService
 {
+    Task<IReadOnlyList<DesignResourceResponse>> ListByDesignIdAsync(Guid designId, CancellationToken ct);
     Task<ResourceResponse> CreateAsync(CreateResourceRequest request, CancellationToken ct);
     Task<IReadOnlyList<ResourceResponse>> ListAsync(CancellationToken ct);
     Task<ResourceResponse?> GetByIdAsync(Guid id, CancellationToken ct);
