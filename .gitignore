@@ -11,6 +11,10 @@ desktop.ini
 .env
 .env.*
 !.env.example
+
+# Local Google Cloud service account credentials
+gcp-service-account.json
+isometric-app-sample-*.json
 *.key
 *.pem
 *.crt

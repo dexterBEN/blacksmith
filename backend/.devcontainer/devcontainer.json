@@ -3,14 +3,15 @@
     "image": "mcr.microsoft.com/dotnet/sdk:8.0",
     "workspaceFolder": "/workspaces/backend",
     "mounts": [
-        "type=bind,source=${localWorkspaceFolder},target=/workspaces/backend"
+        "type=bind,source=${localWorkspaceFolder},target=/workspaces/backend",
+        "type=bind,source=${localEnv:HOME}/.config/blacksmith/gcp-service-account.json,target=/run/secrets/blacksmith/gcp-service-account.json,readonly"
     ],
     "forwardPorts": [
         5100
     ],
     "containerEnv": {
         "ASPNETCORE_URLS": "http://0.0.0.0:5100",
-        "GOOGLE_APPLICATION_CREDENTIALS": "/workspaces/backend/.devcontainer/gcp-service-account.json",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/run/secrets/blacksmith/gcp-service-account.json",
         "ConnectionStrings__BlacksmithDb": "Host=blacksmith_db_postgres;Port=5432;Database=blacksmith_db;Username=admin;Password=azerty1234"
     },
     "runArgs": [
