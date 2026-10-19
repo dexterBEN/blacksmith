@@ -30,6 +30,6 @@
             ]
         }
     },
-    "postCreateCommand": "bash scripts/install_dependencies.sh",
+    "postCreateCommand": "bash scripts/install_dependencies.sh &> install_dependencies.log",
     "remoteUser": "root"
 }
