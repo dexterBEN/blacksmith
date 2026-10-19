@@ -33,5 +33,13 @@ public sealed class EfResourceRepository(BlacksmithDbContext db) : IResourceRepo
             if (resource is null) throw;
             throw new DesignNotFoundException(resource.Entity.DesignId, exception);
         }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+        { SqlState: PostgresErrorCodes.ForeignKeyViolation, ConstraintName: BlacksmithDbContext.ResourceTypeForeignKey })
+        {
+            var resource = db.ChangeTracker.Entries<ResourceEntity>().FirstOrDefault(entry =>
+                (entry.State is EntityState.Added or EntityState.Modified) && entry.Entity.ResourceTypeId.HasValue);
+            if (resource is null) throw;
+            throw new ResourceTypeNotFoundException(resource.Entity.ResourceTypeId!.Value, exception);
+        }
     }
 }

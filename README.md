@@ -1,5 +1,7 @@
 # Blacksmith
 
+Backend architecture, resource type catalog, migrations and tests: [backend documentation](docs/backend/current-architecture.md).
+
 A Proof of Concep(POC) to test building application with the game engine [GODOT](https://godotengine.org/fr/).
 
 I'm using the package [godot_dart](https://github.com/fuzzybinary/godot_dart)
