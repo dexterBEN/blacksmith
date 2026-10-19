@@ -1,6 +1,6 @@
-namespace CloudServices.Api.Dtos;
+namespace Blacksmith.Application.DTOs;
 
-public sealed class UpdateResourceRequest
+public sealed class CreateResourceRequest
 {
     public string Name { get; set; } = string.Empty;
     public int X { get; set; }

@@ -1,8 +1,8 @@
 using CloudServices.Core;
 using Providers.GoogleCloud;
-using Npgsql;
-using CloudServices.Api.Data;
-using Microsoft.EntityFrameworkCore;
+using Blacksmith.Application.Interfaces;
+using Blacksmith.Application.Services;
+using Blacksmith.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,7 +26,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<ICloudStorageService, GoogleCloudStorageService>();
 
 var cs = builder.Configuration.GetConnectionString("BlacksmithDb");
-builder.Services.AddDbContext<BlacksmithDbContext>(opt => opt.UseNpgsql(cs));
+builder.Services.AddBlacksmithInfrastructure(cs);
+builder.Services.AddScoped<IResourceService, ResourceService>();
 
 var app = builder.Build();
 
@@ -45,15 +46,9 @@ app.MapControllers();
 /* ===========================
  * DB PING ENDPOINT (TEST)
  * =========================== */
-app.MapGet("/db/ping", async (IConfiguration config) =>
+app.MapGet("/db/ping", async (IDatabaseHealthCheck database, CancellationToken ct) =>
 {
-    var cs = config.GetConnectionString("BlacksmithDb");
-
-    await using var conn = new NpgsqlConnection(cs);
-    await conn.OpenAsync();
-
-    await using var cmd = new NpgsqlCommand("select now()", conn);
-    var dbTime = await cmd.ExecuteScalarAsync();
+    var dbTime = await database.GetDatabaseTimeAsync(ct);
 
     return Results.Ok(new
     {
@@ -63,3 +58,6 @@ app.MapGet("/db/ping", async (IConfiguration config) =>
 });
 
 app.Run();
+
+// Expose the entry point to the in-process HTTP contract tests.
+public partial class Program { }
