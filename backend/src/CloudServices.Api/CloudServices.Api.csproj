@@ -8,16 +8,16 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.22" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Blacksmith.Application\Blacksmith.Application.csproj" />
+    <ProjectReference Include="..\Blacksmith.Infrastructure\Blacksmith.Infrastructure.csproj" />
     <ProjectReference Include="..\CloudServices.Core\CloudServices.Core.csproj" />
     <ProjectReference Include="..\Providers.GoogleCloud\Providers.GoogleCloud.csproj" />
   </ItemGroup>
