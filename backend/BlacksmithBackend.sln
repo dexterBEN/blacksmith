@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blacksmith.Application.Test
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blacksmith.IntegrationTests", "tests\Blacksmith.IntegrationTests\Blacksmith.IntegrationTests.csproj", "{9B3C554F-E369-4DA1-88C3-53901202D7B8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blacksmith.PostgreSql.Tests", "tests\Blacksmith.PostgreSql.Tests\Blacksmith.PostgreSql.Tests.csproj", "{C6D1DFFB-5EE3-47CC-9875-D2B06B0CE73E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -64,6 +66,10 @@ Global
 		{9B3C554F-E369-4DA1-88C3-53901202D7B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9B3C554F-E369-4DA1-88C3-53901202D7B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9B3C554F-E369-4DA1-88C3-53901202D7B8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6D1DFFB-5EE3-47CC-9875-D2B06B0CE73E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6D1DFFB-5EE3-47CC-9875-D2B06B0CE73E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6D1DFFB-5EE3-47CC-9875-D2B06B0CE73E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6D1DFFB-5EE3-47CC-9875-D2B06B0CE73E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{762E3FB6-3E4E-4217-B203-A93D25CD8160} = {6D5109A3-8269-46C0-ACCD-ACA9DA325594}
@@ -74,5 +80,6 @@ Global
 		{F91BAAFA-2497-4ACD-B0F9-6EB61BEBB21F} = {6D5109A3-8269-46C0-ACCD-ACA9DA325594}
 		{21C8064E-2689-4BF6-B218-92A4D8DEAB2B} = {DE2E01E1-7B25-4C28-8B2C-CB35922F01FF}
 		{9B3C554F-E369-4DA1-88C3-53901202D7B8} = {DE2E01E1-7B25-4C28-8B2C-CB35922F01FF}
+		{C6D1DFFB-5EE3-47CC-9875-D2B06B0CE73E} = {DE2E01E1-7B25-4C28-8B2C-CB35922F01FF}
 	EndGlobalSection
 EndGlobal
