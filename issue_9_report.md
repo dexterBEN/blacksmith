@@ -2,6 +2,12 @@
 
 Implements [Issue #9](https://github.com/dexterBEN/blacksmith/issues/9) on branch `issue_9`, based on updated `master` at `4b535fd`.
 
+## Result
+
+The backend now exposes the six generic resource types through read-only endpoints, classifies exact legacy-code matches, and validates explicit catalog references without changing existing resource response shapes. PostgreSQL enforces code uniqueness and restrictive references. Classification remains independent of provisioning.
+
+The nine-project solution builds successfully inside the backend devcontainer. **All 91 tests pass: 31 application tests, 49 HTTP/model integration tests and 11 PostgreSQL tests, with zero failures and zero skipped tests.**
+
 ## Analysis and implementation plan
 
 The existing backend separates Domain, Application, Infrastructure and API. Resources already belong to a design, while `Resource.Type` is a required free-form string. Existing resource responses have six fields, and the response listing resources by design has seven; both contracts must remain unchanged.
@@ -22,12 +28,6 @@ Generic classification does not select a GCP service or invoke provisioning. In 
 Before switching branches, two pre-existing documentation edits from Issue #7 were saved and byte/hash verified in `/home/dexter/Documents/blacksmith-recovery/2026-10-19-before-issue-9`. The backup contains both files, their patch and a SHA-256 manifest. The separate Issue #4 recovery backup was not modified. No Git stash was created or removed.
 
 The requested pull was executed as `git pull --rebase origin master`, followed by `git switch -c issue_9`. The update was a fast-forward. The architecture page is now updated in English for this issue. The README includes the documentation link with wording extended to cover the catalog; both earlier documents remain recoverable in the backup.
-
-## Result
-
-The backend now exposes the six generic resource types through read-only endpoints, classifies exact legacy-code matches, and validates explicit catalog references without changing existing resource response shapes. PostgreSQL enforces code uniqueness and restrictive references. Classification remains independent of provisioning.
-
-The nine-project solution builds successfully inside the backend devcontainer. **All 91 tests pass: 31 application tests, 49 HTTP/model integration tests and 11 PostgreSQL tests, with zero failures and zero skipped tests.**
 
 ## Changes by layer and affected files
 
@@ -150,7 +150,15 @@ Without `BLACKSMITH_TEST_POSTGRES`, an ordinary `dotnet test` explicitly skips P
 
 ### Committed-source verification
 
-The working tree validation above is complete. A clean export of the implementation commit will be restored, built and tested inside the same devcontainer; its outcome will be recorded before task completion.
+Implementation commit: **`5bc17b53233af2590e088630442c1607512bcb8b`** (`feat(backend): add generic resource type catalog`).
+
+A clean archive generated solely from this commit contained 83 source/documentation files and all nine `.csproj` files, with no local `bin`, `obj`, ignored environment files or untracked source. Archive SHA-256: `199fcd1a45da08b25d5aa89e021895a96a5285ebead7463558a08e4f5e6896e8`.
+
+The archive was extracted as UID/GID 1000 into `/tmp/blacksmith-issue9/committed-source` inside the devcontainer. Restore and a fresh Release build passed with zero warnings/errors. A second private PostgreSQL cluster then ran **all 91 tests successfully: 31 application, 49 integration, 11 PostgreSQL; zero failures and zero skipped tests**. The three TRX counters were also independently parsed and checked on the VM.
+
+Committed-source results remain under `/tmp/blacksmith-issue9/results-committed` inside the container, with a copy at `/tmp/blacksmith-issue9-tools/results-committed` on the VM. The second cluster, `/tmp/blacksmith-pg-tests.3enbYZ7v`, was stopped and its files/logs retained. Both test runs left the development database untouched.
+
+A subsequent documentation-only commit records these results. The backend source, project files and solution remain identical to the verified implementation commit. No push or shared-history rewrite was performed.
 
 ## Observations and remaining limitations
 
