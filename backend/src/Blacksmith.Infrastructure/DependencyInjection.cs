@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddDbContext<BlacksmithDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IResourceRepository, EfResourceRepository>();
         services.AddScoped<IDesignRepository, EfDesignRepository>();
+        services.AddScoped<IResourceTypeRepository, EfResourceTypeRepository>();
         services.AddScoped<IDatabaseHealthCheck, PostgreSqlDatabaseHealthCheck>();
         return services;
     }

@@ -29,6 +29,7 @@ var cs = builder.Configuration.GetConnectionString("BlacksmithDb");
 builder.Services.AddBlacksmithInfrastructure(cs);
 builder.Services.AddScoped<IResourceService, ResourceService>();
 builder.Services.AddScoped<IDesignService, DesignService>();
+builder.Services.AddScoped<IResourceTypeService, ResourceTypeService>();
 
 var app = builder.Build();
 

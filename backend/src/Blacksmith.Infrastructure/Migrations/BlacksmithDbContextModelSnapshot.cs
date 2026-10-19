@@ -74,6 +74,10 @@ namespace Blacksmith.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<Guid?>("ResourceTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_type_id");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -92,7 +96,83 @@ namespace Blacksmith.Infrastructure.Migrations
                     b.HasIndex("DesignId")
                         .HasDatabaseName("IX_resources_design_id");
 
+                    b.HasIndex("ResourceTypeId")
+                        .HasDatabaseName("IX_resources_resource_type_id");
+
                     b.ToTable("resources", (string)null);
+                });
+
+            modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceTypeEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Code")
+                        .HasName("AK_resource_types_Code");
+
+                    b.ToTable("resource_types", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("10000000-0000-0000-0000-000000000001"),
+                            Category = "Compute",
+                            Code = "virtual-machine",
+                            DisplayName = "Virtual Machine"
+                        },
+                        new
+                        {
+                            Id = new Guid("10000000-0000-0000-0000-000000000002"),
+                            Category = "Storage",
+                            Code = "storage",
+                            DisplayName = "Storage"
+                        },
+                        new
+                        {
+                            Id = new Guid("10000000-0000-0000-0000-000000000003"),
+                            Category = "Data",
+                            Code = "database",
+                            DisplayName = "Database"
+                        },
+                        new
+                        {
+                            Id = new Guid("10000000-0000-0000-0000-000000000004"),
+                            Category = "Networking",
+                            Code = "network",
+                            DisplayName = "Network"
+                        },
+                        new
+                        {
+                            Id = new Guid("10000000-0000-0000-0000-000000000005"),
+                            Category = "Networking",
+                            Code = "gateway",
+                            DisplayName = "Gateway"
+                        },
+                        new
+                        {
+                            Id = new Guid("10000000-0000-0000-0000-000000000006"),
+                            Category = "Networking",
+                            Code = "load-balancer",
+                            DisplayName = "Load Balancer"
+                        });
                 });
 
             modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceEntity", b =>
@@ -104,10 +184,23 @@ namespace Blacksmith.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_resources_designs_design_id");
 
+                    b.HasOne("Blacksmith.Domain.Entities.ResourceTypeEntity", "ResourceType")
+                        .WithMany("Resources")
+                        .HasForeignKey("ResourceTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_resources_resource_types_resource_type_id");
+
                     b.Navigation("Design");
+
+                    b.Navigation("ResourceType");
                 });
 
             modelBuilder.Entity("Blacksmith.Domain.Entities.DesignEntity", b =>
+                {
+                    b.Navigation("Resources");
+                });
+
+            modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceTypeEntity", b =>
                 {
                     b.Navigation("Resources");
                 });

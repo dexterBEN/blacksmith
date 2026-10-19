@@ -5,17 +5,20 @@ using Blacksmith.Domain.Entities;
 
 namespace Blacksmith.Application.Services;
 
-public sealed class ResourceService(IResourceRepository repository, IDesignRepository designs) : IResourceService
+public sealed class ResourceService(
+    IResourceRepository repository, IDesignRepository designs, IResourceTypeRepository resourceTypes) : IResourceService
 {
     public async Task<ResourceResponse> CreateAsync(CreateResourceRequest request, CancellationToken ct)
     {
         Validate(request.Name, request.Type);
+        var resourceTypeId = await ResolveResourceTypeAsync(request.Type.Trim(), request.ResourceTypeId, null, ct);
         var designId = request.DesignId ?? LegacyDesign.Id;
         if (request.DesignId is null) await designs.EnsureLegacyDesignAsync(ct);
         else if (!await designs.ExistsAsync(designId, ct)) throw new DesignNotFoundException(designId);
         var resource = new ResourceEntity
         {
             DesignId = designId,
+            ResourceTypeId = resourceTypeId,
             Id = Guid.NewGuid(), Name = request.Name.Trim(), Type = request.Type.Trim(),
             X = request.X, Y = request.Y, CreatedAtUtc = DateTime.UtcNow
         };
@@ -51,12 +54,14 @@ public sealed class ResourceService(IResourceRepository repository, IDesignRepos
         var resource = await repository.GetByIdAsync(id, ct);
         if (resource is null) return null;
 
+        var resourceTypeId = await ResolveResourceTypeAsync(request.Type.Trim(), request.ResourceTypeId, resource, ct);
         if (request.DesignId is Guid designId)
         {
             if (!await designs.ExistsAsync(designId, ct)) throw new DesignNotFoundException(designId);
             resource.DesignId = designId;
         }
         resource.Name = request.Name.Trim();
+        resource.ResourceTypeId = resourceTypeId;
         resource.Type = request.Type.Trim();
         resource.X = request.X;
         resource.Y = request.Y;
@@ -72,6 +77,24 @@ public sealed class ResourceService(IResourceRepository repository, IDesignRepos
         repository.Remove(resource);
         await repository.SaveChangesAsync(ct);
         return true;
+    }
+
+    private async Task<Guid?> ResolveResourceTypeAsync(
+        string legacyType, Guid? requestedId, ResourceEntity? existing, CancellationToken ct)
+    {
+        if (requestedId is Guid id)
+        {
+            var requested = await resourceTypes.GetByIdAsync(id, ct);
+            if (requested is null) throw new ResourceTypeNotFoundException(id);
+            var inferred = await resourceTypes.GetByCodeAsync(legacyType, ct);
+            if (inferred is not null && inferred.Id != id)
+                throw new ResourceValidationException("Type and resourceTypeId refer to different catalog entries");
+            return id;
+        }
+
+        // Older clients must not erase an explicit classification when editing unrelated fields.
+        if (existing?.ResourceTypeId is Guid previous && existing.Type == legacyType) return previous;
+        return (await resourceTypes.GetByCodeAsync(legacyType, ct))?.Id;
     }
 
     private static void Validate(string name, string type)

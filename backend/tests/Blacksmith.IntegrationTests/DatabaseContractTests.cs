@@ -34,9 +34,10 @@ public sealed class DatabaseContractTests
         using var db = CreatePostgreSqlModel();
 
         var migrations = db.Database.GetMigrations().ToArray();
-        Assert.Equal(3, migrations.Length);
+        Assert.Equal(4, migrations.Length);
         Assert.Equal(new[] { "20251229003351_InitialCreate", "20251229011642_AddResourcesTable" }, migrations.Take(2));
         Assert.EndsWith("_AddDesignOwnership", migrations[2]);
+        Assert.EndsWith("_AddResourceTypeCatalog", migrations[3]);
         Assert.False(db.Database.HasPendingModelChanges());
     }
 
@@ -44,7 +45,7 @@ public sealed class DatabaseContractTests
     public void PostgreSql_mapping_keeps_existing_table_columns_and_constraints()
     {
         using var db = CreatePostgreSqlModel();
-        Assert.Equal(2, db.Model.GetEntityTypes().Count());
+        Assert.Equal(3, db.Model.GetEntityTypes().Count());
         var entity = db.Model.FindEntityType(typeof(ResourceEntity))!;
         Assert.Equal(typeof(ResourceEntity), entity.ClrType);
         Assert.Equal("resources", entity.GetTableName());
@@ -52,7 +53,10 @@ public sealed class DatabaseContractTests
         Assert.Equal("Id", Assert.Single(entity.FindPrimaryKey()!.Properties).Name);
         Assert.Equal(200, entity.FindProperty("Name")!.GetMaxLength());
         Assert.Equal(100, entity.FindProperty("Type")!.GetMaxLength());
-        Assert.All(entity.GetProperties(), property => Assert.False(property.IsNullable));
+        Assert.All(entity.GetProperties().Where(property => property.Name != "ResourceTypeId"),
+            property => Assert.False(property.IsNullable));
+        Assert.True(entity.FindProperty("ResourceTypeId")!.IsNullable);
+        Assert.Equal("resource_type_id", entity.FindProperty("ResourceTypeId")!.GetColumnName(table));
         Assert.Equal("x", entity.FindProperty("X")!.GetColumnName(table));
         Assert.Equal("y", entity.FindProperty("Y")!.GetColumnName(table));
         var timestamp = entity.FindProperty("CreatedAtUtc")!;
@@ -60,11 +64,20 @@ public sealed class DatabaseContractTests
         Assert.Equal("timestamp with time zone", timestamp.GetColumnType());
         Assert.Equal("NOW()", timestamp.GetDefaultValueSql());
         Assert.Equal("design_id", entity.FindProperty("DesignId")!.GetColumnName(table));
-        var foreignKey = Assert.Single(entity.GetForeignKeys());
+        Assert.Equal(2, entity.GetForeignKeys().Count());
+        var foreignKey = entity.GetForeignKeys().Single(key => key.PrincipalEntityType.ClrType == typeof(DesignEntity));
         Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior);
         Assert.Equal(typeof(DesignEntity), foreignKey.PrincipalEntityType.ClrType);
         Assert.Equal(BlacksmithDbContext.ResourceDesignForeignKey, foreignKey.GetConstraintName());
-        Assert.Equal("DesignId", Assert.Single(Assert.Single(entity.GetIndexes()).Properties).Name);
+        Assert.Equal(2, entity.GetIndexes().Count());
+        Assert.Contains(entity.GetIndexes(), index => Assert.Single(index.Properties).Name == "DesignId");
+        Assert.Contains(entity.GetIndexes(), index => Assert.Single(index.Properties).Name == "ResourceTypeId");
+        var typeKey = entity.GetForeignKeys().Single(key => key.PrincipalEntityType.ClrType == typeof(ResourceTypeEntity));
+        Assert.Equal(DeleteBehavior.Restrict, typeKey.DeleteBehavior);
+        Assert.Equal(BlacksmithDbContext.ResourceTypeForeignKey, typeKey.GetConstraintName());
+        var type = db.Model.FindEntityType(typeof(ResourceTypeEntity))!;
+        Assert.Equal("resource_types", type.GetTableName());
+        Assert.Contains(type.GetKeys(), key => Assert.Single(key.Properties).Name == "Code");
     }
 
     private static BlacksmithDbContext CreatePostgreSqlModel() => new(

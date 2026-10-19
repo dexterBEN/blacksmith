@@ -13,7 +13,7 @@ public sealed class ResourceServiceTests
     public async Task Create_trims_names_preserves_coordinates_and_saves_without_cloud_work()
     {
         var repository = new MemoryResourceRepository();
-        var service = new ResourceService(repository, new MemoryDesignRepository());
+        var service = new ResourceService(repository, new MemoryDesignRepository(), new MemoryResourceTypeRepository());
         using var cancellation = new CancellationTokenSource();
         var before = DateTime.UtcNow;
 
@@ -43,7 +43,7 @@ public sealed class ResourceServiceTests
     public async Task Invalid_writes_do_not_lookup_or_persist(string name, string type, string expected)
     {
         var repository = new MemoryResourceRepository();
-        var service = new ResourceService(repository, new MemoryDesignRepository());
+        var service = new ResourceService(repository, new MemoryDesignRepository(), new MemoryResourceTypeRepository());
 
         var createError = await Assert.ThrowsAsync<ResourceValidationException>(() =>
             service.CreateAsync(new CreateResourceRequest { Name = name, Type = type }, default));
@@ -64,7 +64,7 @@ public sealed class ResourceServiceTests
         var entity = new ResourceEntity { Id = Guid.NewGuid(), DesignId = Guid.NewGuid(), Name = "Before", Type = "before",
             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
         repository.Resources.Add(entity);
-        var service = new ResourceService(repository, new MemoryDesignRepository());
+        var service = new ResourceService(repository, new MemoryDesignRepository(), new MemoryResourceTypeRepository());
         using var cancellation = new CancellationTokenSource();
 
         var result = await service.UpdateAsync(entity.Id,
@@ -86,7 +86,7 @@ public sealed class ResourceServiceTests
     public async Task Missing_resources_do_not_save_for_update_or_delete()
     {
         var repository = new MemoryResourceRepository();
-        var service = new ResourceService(repository, new MemoryDesignRepository());
+        var service = new ResourceService(repository, new MemoryDesignRepository(), new MemoryResourceTypeRepository());
 
         Assert.Null(await service.UpdateAsync(Guid.NewGuid(),
             new UpdateResourceRequest { Name = "valid", Type = "valid" }, default));
@@ -102,7 +102,7 @@ public sealed class ResourceServiceTests
         repository.Resources.Add(entity);
         using var cancellation = new CancellationTokenSource();
 
-        Assert.True(await new ResourceService(repository, new MemoryDesignRepository()).DeleteAsync(entity.Id, cancellation.Token));
+        Assert.True(await new ResourceService(repository, new MemoryDesignRepository(), new MemoryResourceTypeRepository()).DeleteAsync(entity.Id, cancellation.Token));
 
         Assert.Empty(repository.Resources);
         Assert.Equal(1, repository.Saves);
@@ -115,7 +115,7 @@ public sealed class ResourceServiceTests
         var repository = new MemoryResourceRepository();
         var entity = new ResourceEntity { Id = Guid.NewGuid(), Name = "Before", Type = "generic" };
         repository.Resources.Add(entity);
-        var service = new ResourceService(repository, new MemoryDesignRepository());
+        var service = new ResourceService(repository, new MemoryDesignRepository(), new MemoryResourceTypeRepository());
         using var cancellation = new CancellationTokenSource();
 
         var found = await service.GetByIdAsync(entity.Id, cancellation.Token);
@@ -136,7 +136,7 @@ public sealed class ResourceServiceTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var repository = new MemoryResourceRepository();
-        var service = new ResourceService(repository, new MemoryDesignRepository());
+        var service = new ResourceService(repository, new MemoryDesignRepository(), new MemoryResourceTypeRepository());
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.CreateAsync(
             new CreateResourceRequest { Name = "valid", Type = "valid" }, cancellation.Token));
@@ -152,7 +152,7 @@ public sealed class ResourceServiceTests
         var first = new DesignEntity { Id = Guid.NewGuid(), Name = "First" };
         var second = new DesignEntity { Id = Guid.NewGuid(), Name = "Second" };
         designs.Designs.AddRange([first, second]);
-        var service = new ResourceService(repository, designs);
+        var service = new ResourceService(repository, designs, new MemoryResourceTypeRepository());
         var created = await service.CreateAsync(new CreateResourceRequest
         { Name = "Resource", Type = "generic", DesignId = first.Id }, default);
         var entity = Assert.Single(repository.Resources);
@@ -177,7 +177,7 @@ public sealed class ResourceServiceTests
         designs.Designs.Add(owner);
         var entity = new ResourceEntity { Id = Guid.NewGuid(), DesignId = owner.Id, Name = "Original", Type = "generic" };
         repository.Resources.Add(entity);
-        var service = new ResourceService(repository, designs);
+        var service = new ResourceService(repository, designs, new MemoryResourceTypeRepository());
         var missing = Guid.NewGuid();
         await Assert.ThrowsAsync<DesignNotFoundException>(() => service.CreateAsync(new CreateResourceRequest
         { Name = "New", Type = "generic", DesignId = missing }, default));
@@ -189,6 +189,80 @@ public sealed class ResourceServiceTests
         Assert.Single(repository.Resources);
         Assert.Equal(0, repository.Saves);
         Assert.Equal(0, designs.LegacyEnsures);
+    }
+
+    [Theory]
+    [InlineData("storage", true)]
+    [InlineData(" storage ", true)]
+    [InlineData("gcp.storage.bucket", false)]
+    [InlineData("Storage", false)]
+    [InlineData("custom.type", false)]
+    public async Task Legacy_writes_only_infer_exact_catalog_codes_after_existing_trim(string text, bool classified)
+    {
+        var repository = new MemoryResourceRepository();
+        var types = new MemoryResourceTypeRepository();
+        var storage = new ResourceTypeEntity { Id = Guid.NewGuid(), Code = "storage" };
+        types.Types.Add(storage);
+        var service = new ResourceService(repository, new MemoryDesignRepository(), types);
+        await service.CreateAsync(new CreateResourceRequest { Name = "Resource", Type = text }, default);
+        var resource = Assert.Single(repository.Resources);
+        Assert.Equal(text.Trim(), resource.Type);
+        Assert.Equal(classified ? storage.Id : (Guid?)null, resource.ResourceTypeId);
+    }
+
+    [Fact]
+    public async Task Explicit_classification_survives_legacy_metadata_update_but_is_cleared_when_unknown_type_changes()
+    {
+        var repository = new MemoryResourceRepository();
+        var types = new MemoryResourceTypeRepository();
+        var storage = new ResourceTypeEntity { Id = Guid.NewGuid(), Code = "storage" };
+        types.Types.Add(storage);
+        var service = new ResourceService(repository, new MemoryDesignRepository(), types);
+        var response = await service.CreateAsync(new CreateResourceRequest
+        { Name = "Bucket", Type = "gcp.storage.bucket", ResourceTypeId = storage.Id }, default);
+        var entity = Assert.Single(repository.Resources);
+        Assert.Equal(storage.Id, entity.ResourceTypeId);
+        await service.UpdateAsync(response.Id, new UpdateResourceRequest { Name = "Renamed", Type = "gcp.storage.bucket" }, default);
+        Assert.Equal(storage.Id, entity.ResourceTypeId);
+        await service.UpdateAsync(response.Id, new UpdateResourceRequest { Name = "Changed", Type = "custom.type" }, default);
+        Assert.Null(entity.ResourceTypeId);
+        await service.UpdateAsync(response.Id, new UpdateResourceRequest { Name = "Changed", Type = "storage" }, default);
+        Assert.Equal(storage.Id, entity.ResourceTypeId);
+    }
+
+    [Fact]
+    public async Task Missing_catalog_reference_is_rejected_before_any_mutation_or_legacy_owner_creation()
+    {
+        var repository = new MemoryResourceRepository();
+        var designs = new MemoryDesignRepository();
+        var types = new MemoryResourceTypeRepository();
+        var entity = new ResourceEntity { Id = Guid.NewGuid(), Name = "Original", Type = "generic", DesignId = Guid.NewGuid() };
+        repository.Resources.Add(entity);
+        var service = new ResourceService(repository, designs, types);
+        await Assert.ThrowsAsync<ResourceTypeNotFoundException>(() => service.CreateAsync(new CreateResourceRequest
+        { Name = "New", Type = "generic", ResourceTypeId = Guid.NewGuid() }, default));
+        await Assert.ThrowsAsync<ResourceTypeNotFoundException>(() => service.UpdateAsync(entity.Id, new UpdateResourceRequest
+        { Name = "Changed", Type = "generic", ResourceTypeId = Guid.NewGuid() }, default));
+        Assert.Equal("Original", entity.Name);
+        Assert.Null(entity.ResourceTypeId);
+        Assert.Equal(0, repository.Saves);
+        Assert.Equal(0, designs.LegacyEnsures);
+    }
+
+    [Fact]
+    public async Task Contradictory_known_code_and_explicit_id_are_rejected_without_saving()
+    {
+        var repository = new MemoryResourceRepository();
+        var types = new MemoryResourceTypeRepository();
+        types.Types.Add(new ResourceTypeEntity { Id = Guid.NewGuid(), Code = "storage" });
+        var database = new ResourceTypeEntity { Id = Guid.NewGuid(), Code = "database" };
+        types.Types.Add(database);
+        var service = new ResourceService(repository, new MemoryDesignRepository(), types);
+        var error = await Assert.ThrowsAsync<ResourceValidationException>(() => service.CreateAsync(
+            new CreateResourceRequest { Name = "Resource", Type = "storage", ResourceTypeId = database.Id }, default));
+        Assert.Equal("Type and resourceTypeId refer to different catalog entries", error.Message);
+        Assert.Empty(repository.Resources);
+        Assert.Equal(0, repository.Saves);
     }
 
     private sealed class MemoryResourceRepository : IResourceRepository
