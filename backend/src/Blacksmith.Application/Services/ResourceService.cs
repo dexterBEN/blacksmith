@@ -5,13 +5,17 @@ using Blacksmith.Domain.Entities;
 
 namespace Blacksmith.Application.Services;
 
-public sealed class ResourceService(IResourceRepository repository) : IResourceService
+public sealed class ResourceService(IResourceRepository repository, IDesignRepository designs) : IResourceService
 {
     public async Task<ResourceResponse> CreateAsync(CreateResourceRequest request, CancellationToken ct)
     {
         Validate(request.Name, request.Type);
+        var designId = request.DesignId ?? LegacyDesign.Id;
+        if (request.DesignId is null) await designs.EnsureLegacyDesignAsync(ct);
+        else if (!await designs.ExistsAsync(designId, ct)) throw new DesignNotFoundException(designId);
         var resource = new ResourceEntity
         {
+            DesignId = designId,
             Id = Guid.NewGuid(), Name = request.Name.Trim(), Type = request.Type.Trim(),
             X = request.X, Y = request.Y, CreatedAtUtc = DateTime.UtcNow
         };
@@ -32,6 +36,14 @@ public sealed class ResourceService(IResourceRepository repository) : IResourceS
         return resource is null ? null : ToResponse(resource);
     }
 
+    public async Task<IReadOnlyList<DesignResourceResponse>> ListByDesignIdAsync(Guid designId, CancellationToken ct)
+    {
+        if (!await designs.ExistsAsync(designId, ct)) throw new DesignNotFoundException(designId);
+        return (await repository.ListByDesignIdAsync(designId, ct))
+            .Select(resource => new DesignResourceResponse(resource.Id, resource.DesignId, resource.Name,
+                resource.X, resource.Y, resource.Type, resource.CreatedAtUtc)).ToArray();
+    }
+
     public async Task<ResourceResponse?> UpdateAsync(Guid id, UpdateResourceRequest request, CancellationToken ct)
     {
         // Keep validation before the lookup, including when the id does not exist.
@@ -39,6 +51,11 @@ public sealed class ResourceService(IResourceRepository repository) : IResourceS
         var resource = await repository.GetByIdAsync(id, ct);
         if (resource is null) return null;
 
+        if (request.DesignId is Guid designId)
+        {
+            if (!await designs.ExistsAsync(designId, ct)) throw new DesignNotFoundException(designId);
+            resource.DesignId = designId;
+        }
         resource.Name = request.Name.Trim();
         resource.Type = request.Type.Trim();
         resource.X = request.X;

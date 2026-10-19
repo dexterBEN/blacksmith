@@ -21,6 +21,10 @@ public sealed class ResourcesController(IResourceService resources) : Controller
         {
             return BadRequest(new { error = exception.Message });
         }
+        catch (DesignNotFoundException exception)
+        {
+            return NotFound(new { error = exception.Message });
+        }
     }
 
     [HttpGet]
@@ -44,6 +48,10 @@ public sealed class ResourcesController(IResourceService resources) : Controller
         catch (ResourceValidationException exception)
         {
             return BadRequest(new { error = exception.Message });
+        }
+        catch (DesignNotFoundException exception)
+        {
+            return NotFound(new { error = exception.Message });
         }
     }
 

@@ -33,8 +33,10 @@ public sealed class DatabaseContractTests
     {
         using var db = CreatePostgreSqlModel();
 
-        Assert.Equal(new[] { "20251229003351_InitialCreate", "20251229011642_AddResourcesTable" },
-            db.Database.GetMigrations());
+        var migrations = db.Database.GetMigrations().ToArray();
+        Assert.Equal(3, migrations.Length);
+        Assert.Equal(new[] { "20251229003351_InitialCreate", "20251229011642_AddResourcesTable" }, migrations.Take(2));
+        Assert.EndsWith("_AddDesignOwnership", migrations[2]);
         Assert.False(db.Database.HasPendingModelChanges());
     }
 
@@ -42,7 +44,8 @@ public sealed class DatabaseContractTests
     public void PostgreSql_mapping_keeps_existing_table_columns_and_constraints()
     {
         using var db = CreatePostgreSqlModel();
-        var entity = Assert.Single(db.Model.GetEntityTypes());
+        Assert.Equal(2, db.Model.GetEntityTypes().Count());
+        var entity = db.Model.FindEntityType(typeof(ResourceEntity))!;
         Assert.Equal(typeof(ResourceEntity), entity.ClrType);
         Assert.Equal("resources", entity.GetTableName());
         var table = StoreObjectIdentifier.Table("resources", null);
@@ -56,6 +59,12 @@ public sealed class DatabaseContractTests
         Assert.Equal("created_at_utc", timestamp.GetColumnName(table));
         Assert.Equal("timestamp with time zone", timestamp.GetColumnType());
         Assert.Equal("NOW()", timestamp.GetDefaultValueSql());
+        Assert.Equal("design_id", entity.FindProperty("DesignId")!.GetColumnName(table));
+        var foreignKey = Assert.Single(entity.GetForeignKeys());
+        Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior);
+        Assert.Equal(typeof(DesignEntity), foreignKey.PrincipalEntityType.ClrType);
+        Assert.Equal(BlacksmithDbContext.ResourceDesignForeignKey, foreignKey.GetConstraintName());
+        Assert.Equal("DesignId", Assert.Single(Assert.Single(entity.GetIndexes()).Properties).Name);
     }
 
     private static BlacksmithDbContext CreatePostgreSqlModel() => new(
