@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="ArrayMesh" path="res://scenes/isometric_3d/beveled_tile.tres" id="1_mesh"]
+[ext_resource type="Material" path="res://scenes/isometric_3d/tile_material.tres" id="2_material"]
+
+[node name="BeveledTile" type="MeshInstance3D"]
+mesh = ExtResource("1_mesh")
+material_override = ExtResource("2_material")
