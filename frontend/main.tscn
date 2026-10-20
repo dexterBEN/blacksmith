@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://nxhnv3fk8x0t" path="res://src/lib/isomap_grid.dart" id="2_h2yge"]
 [ext_resource type="Script" uid="uid://dn0ffoo874e5d" path="res://src/lib/menu_overlay.dart" id="3_1bvp3"]
 
-[node name="AppRoot" type="Node"]
+[node name="AppRoot" type="Node2D"]
 script = ExtResource("1_h2yge")
 
 [node name="IsoMapGrid" type="Node2D" parent="."]

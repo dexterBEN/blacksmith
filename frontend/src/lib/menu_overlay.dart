@@ -1,6 +1,6 @@
 import 'dart:ffi';
 import 'package:godot_dart/godot_dart.dart';
-import 'package:blacksmith_front/core/di/service_locator.dart';
+import 'resource_visuals.dart';
 
 part 'menu_overlay.g.dart';
 
@@ -25,7 +25,7 @@ class MenuOverlay extends Control {
   // ---------------------------------------------------------------------------
 
   final double _panelW = 560;
-  final double _panelH = 120;  // un peu plus haut pour respirer
+  final double _panelH = 120; // un peu plus haut pour respirer
   final double _margin = 24;
   final double _gap = 16;
 
@@ -39,6 +39,9 @@ class MenuOverlay extends Control {
   void vReady() {
     // Le Control global
     setAnchorsPreset(ControlLayoutPreset.presetFullRect);
+    // Only the panel intercepts clicks; the full-screen wrapper must not
+    // swallow grid input outside it.
+    setMouseFilter(ControlMouseFilter.ignore);
 
     // --- PANEL ---
     _panel = Panel();
@@ -58,17 +61,9 @@ class MenuOverlay extends Control {
     // Les boutons du menu (MANUELS)
     // -------------------------------------------------------------------------
 
-    _addItem(
-      tooltip: 'GCP · Cloud Storage',
-      path: 'res://src/assets/gcp_cloud_storage.png',
-      kind: 'gcp:cloud_storage',
-    );
-
-    _addItem(
-      tooltip: 'GCP · Compute Engine',
-      path: 'res://src/assets/gcp_compute_engine.png',
-      kind: 'gcp:compute_engine',
-    );
+    for (final visual in resourceVisuals.values) {
+      _addItem(tooltip: visual.tooltip, path: visual.path, kind: visual.code);
+    }
 
     setProcess(true);
     _positionBottomCenter();
@@ -152,7 +147,6 @@ class MenuOverlay extends Control {
         vargs: [Variant(kind)],
       );
     });
-
 
     _buttons.add(btn);
     _hbox.addChild(btn);

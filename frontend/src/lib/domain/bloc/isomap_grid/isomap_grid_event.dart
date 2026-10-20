@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../models/grid_position.dart';
-
+import '../../models/resource_kind.dart';
 
 abstract class IsomapGridEvent extends Equatable {
   const IsomapGridEvent();
@@ -19,12 +19,11 @@ class TileClicked extends IsomapGridEvent {
   List<Object?> get props => [pos];
 }
 
-/// L’utilisateur choisit une ressource dans le menu
-/// `path` = chemin d’asset Godot
+/// A semantic palette choice, independent of its Godot texture.
 class PlaceResource extends IsomapGridEvent {
-  final String path;
-  const PlaceResource(this.path);
+  final ResourceKind kind;
+  const PlaceResource(this.kind);
 
   @override
-  List<Object?> get props => [path];
+  List<Object?> get props => [kind];
 }
