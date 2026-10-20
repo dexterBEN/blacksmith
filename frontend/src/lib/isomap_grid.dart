@@ -1,21 +1,16 @@
 import 'dart:ffi';
-import 'dart:math' as math;
 import 'package:godot_dart/godot_dart.dart';
 
-// 🔗 DI + BLoC + modèles de domaine
-import 'package:blacksmith_front/core/di/service_locator.dart';
-import 'package:blacksmith_front/domain/models/grid_position.dart';
-import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
-import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_event.dart';
-import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_state.dart';
+import 'domain/models/grid_position.dart';
+import 'domain/bloc/isomap_grid/isomap_grid_state.dart';
+import 'resource_visuals.dart';
 
 part 'isomap_grid.g.dart';
 
 @GodotScript()
 class IsoMapGrid extends Node2D {
   @pragma('vm:entry-point')
-  static ExtensionTypeInfo<IsoMapGrid> get sTypeInfo =>
-      _$IsoMapGridTypeInfo();
+  static ExtensionTypeInfo<IsoMapGrid> get sTypeInfo => _$IsoMapGridTypeInfo();
   @override
   ExtensionTypeInfo<IsoMapGrid> get typeInfo => IsoMapGrid.sTypeInfo;
 
@@ -26,28 +21,27 @@ class IsoMapGrid extends Node2D {
   IsoMapGrid.withNonNullOwner(Pointer<Void> owner)
       : super.withNonNullOwner(owner);
 
-  // ---- accès BLoC ----
-  IsomapGridBloc? get _bloc =>
-      sl.isRegistered<IsomapGridBloc>() ? sl<IsomapGridBloc>() : null;
+  void Function(GridPos)? onTileClicked;
 
   // ---- paramètres ----
-  final int rows = 6;
-  final int cols = 6;
+  int _rows = 0;
+  int _cols = 0;
+  int get rows => _rows;
+  int get cols => _cols;
   final double tileW = 64.0;
   final double tileH = 32.0;
 
   // fond de la grille + highlight
-  final Color fillColor    = Color.html('#FFFFFFFF'); // blanc
-  final Color lineColor    = Color.html('#B0B0B0FF');
+  final Color fillColor = Color.html('#FFFFFFFF'); // blanc
+  final Color lineColor = Color.html('#B0B0B0FF');
   final Color selectedFill = Color.html('#F1C40FFF'); // léger jaune
   final Color selectedLine = Color.html('#D4AC0DFF');
 
-  late final List<List<Polygon2D>> _tiles;
-  late final List<List<Line2D>> _edges;
-  late final List<List<Sprite2D?>> _icons; // sprites posés sur les tuiles
-
-  int _selR = -1; // encore utilisé par placeIconOnSelected (fallback)
-  int _selC = -1;
+  List<List<Polygon2D>> _tiles = [];
+  List<List<Line2D>> _edges = [];
+  List<List<Sprite2D?>> _icons = [];
+  // Applied texture paths are a rendering cache, not application state.
+  List<List<String?>> _renderedPaths = [];
 
   Vector2? _lastVpSize;
 
@@ -57,26 +51,14 @@ class IsoMapGrid extends Node2D {
 
   @override
   void vReady() {
-    _buildGrid();
-
     setProcess(true);
-    setProcessInput(true);
+    setProcessInput(false);
     setProcessUnhandledInput(true);
-
-    _recenterByBounds();
-
-    // synchro initiale avec le BLoC si dispo
-    final bloc = _bloc;
-    if (bloc != null) {
-      render(bloc.state);
-      GD.print(Variant('[IsoMapGrid] vReady OK (BLoC présent)'));
-    } else {
-      GD.print(Variant('[IsoMapGrid] vReady OK (BLoC absent, mode local)'));
-    }
   }
 
   @override
   void vProcess(double delta) {
+    if (rows == 0 || cols == 0) return;
     final vp = getViewport();
     if (vp == null) return;
     final size = vp.getVisibleRect().size;
@@ -94,10 +76,6 @@ class IsoMapGrid extends Node2D {
   // ======================================================================
 
   @override
-  void vInput(InputEvent? event) =>
-      _handleClick(event, source: 'vInput');
-
-  @override
   void vUnhandledInput(InputEvent? event) =>
       _handleClick(event, source: 'vUnhandledInput');
 
@@ -110,8 +88,8 @@ class IsoMapGrid extends Node2D {
     final gp = getGlobalPosition();
     final localPos = Vector2(x: global.x - gp.x, y: global.y - gp.y);
 
-    GD.print(Variant(
-        '[IsoMapGrid][$source] click global=$global local=$localPos'));
+    GD.print(
+        Variant('[IsoMapGrid][$source] click global=$global local=$localPos'));
 
     final rc = _localToGrid(localPos);
     if (rc == null) return;
@@ -120,14 +98,7 @@ class IsoMapGrid extends Node2D {
     final c = rc.$2;
     if (r < 0 || r >= rows || c < 0 || c >= cols) return;
 
-    final bloc = _bloc;
-    if (bloc != null) {
-      // 🔁 mode "piloté par le BLoC"
-      bloc.add(TileClicked(GridPos(r, c)));
-    } else {
-      // 🔁 fallback : ancien comportement local
-      _selectTile(r, c);
-    }
+    onTileClicked?.call(GridPos(r, c));
   }
 
   // ======================================================================
@@ -137,8 +108,9 @@ class IsoMapGrid extends Node2D {
   void _buildGrid() {
     _tiles = List.generate(rows, (_) => List.filled(cols, Polygon2D()));
     _edges = List.generate(rows, (_) => List.filled(cols, Line2D()));
-    _icons =
-        List.generate(rows, (_) => List<Sprite2D?>.filled(cols, null));
+    _icons = List.generate(rows, (_) => List<Sprite2D?>.filled(cols, null));
+    _renderedPaths =
+        List.generate(rows, (_) => List<String?>.filled(cols, null));
 
     final diamond = _tileDiamond();
 
@@ -216,20 +188,6 @@ class IsoMapGrid extends Node2D {
     return (frac >= 0.5) ? (f + 1) : f;
   }
 
-  /// Ancien comportement local (fallback quand pas de BLoC)
-  void _selectTile(int r, int c) {
-    if (_selR >= 0 && _selC >= 0) {
-      _tiles[_selR][_selC].setColor(fillColor);
-      _edges[_selR][_selC].setDefaultColor(lineColor);
-    }
-
-    _tiles[r][c].setColor(selectedFill);
-    _edges[r][c].setDefaultColor(selectedLine);
-
-    _selR = r;
-    _selC = c;
-  }
-
   void _recenterByBounds() {
     final vp = getViewport();
     if (vp == null) return;
@@ -268,8 +226,21 @@ class IsoMapGrid extends Node2D {
 
   /// Appelé par AppRoot à chaque nouveau state du BLoC.
   void render(IsomapGridState state) {
+    if (rows != state.rows || cols != state.cols) {
+      for (var index = getChildCount() - 1; index >= 0; index--) {
+        final child = getChild(index)!;
+        removeChild(child);
+        child.queueFree();
+      }
+      _rows = state.rows;
+      _cols = state.cols;
+      _buildGrid();
+      _recenterByBounds();
+    }
     _applySelectionHighlight(state.selected);
-    _syncIconsWithState(state.tiles);
+    _syncIconsWithState(state.tiles.map(
+      (position, kind) => MapEntry(position, resourceVisuals[kind]!.path),
+    ));
   }
 
   void _applySelectionHighlight(GridPos? selected) {
@@ -300,8 +271,10 @@ class IsoMapGrid extends Node2D {
         final existing = _icons[r][c];
 
         if (!shouldHave && existing != null) {
+          existing.getParent()?.removeChild(existing);
           existing.queueFree();
           _icons[r][c] = null;
+          _renderedPaths[r][c] = null;
         }
       }
     }
@@ -313,42 +286,31 @@ class IsoMapGrid extends Node2D {
 
       if (r < 0 || r >= rows || c < 0 || c >= cols) return;
 
-      // déjà un sprite ? on laisse (c’est le BLoC qui est la vérité)
-      if (_icons[r][c] != null) return;
+      if (_icons[r][c] != null && _renderedPaths[r][c] == path) return;
 
       _placeIconAt(r, c, path);
     });
   }
 
   // ======================================================================
-  // Placement d'icône (utilisé par le BLoC + fallback public)
+  // Rendering of resource icons
   // ======================================================================
-
-  /// Fallback "ancienne API" : place sur la tuile sélectionnée locale.
-  void placeIconOnSelected(String path) {
-    if (_selR < 0 || _selC < 0) {
-      GD.print(Variant(
-          '[IsoMapGrid] placeIconOnSelected: aucune tuile sélectionnée'));
-      return;
-    }
-    _placeIconAt(_selR, _selC, path);
-  }
 
   /// Placement d’icône sur une tuile précise (r,c).
   void _placeIconAt(int r, int c, String path) {
     final texRes = ResourceLoader.singleton.load(path);
     if (texRes is! Texture2D) {
       GD.pushWarning(
-        Variant(
-            '[IsoMapGrid] _placeIconAt: échec load Texture2D -> $path'),
+        Variant('[IsoMapGrid] _placeIconAt: échec load Texture2D -> $path'),
       );
       return;
     }
-    final tex = texRes as Texture2D;
+    final tex = texRes;
 
     // supprimer l'icône précédente s'il y en a une
     final existing = _icons[r][c];
     if (existing != null) {
+      existing.getParent()?.removeChild(existing);
       existing.queueFree();
       _icons[r][c] = null;
     }
@@ -389,6 +351,7 @@ class IsoMapGrid extends Node2D {
     final area = _tiles[r][c].getParent() as Node2D;
     area.addChild(sprite);
     _icons[r][c] = sprite;
+    _renderedPaths[r][c] = path;
 
     GD.print(
       Variant('[IsoMapGrid] +sprite ($r,$c) path=$path scale=$uniformScale'),

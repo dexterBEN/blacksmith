@@ -1,66 +1,49 @@
 import 'package:get_it/get_it.dart';
+import 'package:http/http.dart' as http;
+import '../../domain/bloc/isomap_grid/isomap_grid_bloc.dart';
+import '../../domain/bloc/isomap_grid/isomap_grid_state.dart';
+import '../../data/services/cloud_services_api.dart';
+import '../../data/repositories/cloud_storage_repository.dart';
 
-import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
-import 'package:blacksmith_front/data/services/cloud_services_api.dart';
-import 'package:blacksmith_front/data/repositories/cloud_storage_repository.dart';
-
-/// Service locator
 final sl = GetIt.instance;
+const defaultBackendUrl = 'http://localhost:5100';
+const defaultGcpProjectId = 'isometric-app-sample';
 
-/// Register all dependencies once on setup
-Future<void> setupServiceLocator({int rows = 6, int cols = 6}) async {
-  // ============================
-  // Services (HTTP)
-  // ============================
-
+/// Register once per isolate. Configuration applies when instances are created;
+/// calling setup again does not replace an existing runtime or its state.
+void setupServiceLocator({
+  int rows = IsomapGridState.defaultRows,
+  int cols = IsomapGridState.defaultCols,
+  String baseUrl = defaultBackendUrl,
+  String projectId = defaultGcpProjectId,
+  http.Client? httpClient,
+}) {
   if (!sl.isRegistered<CloudServicesApi>()) {
     sl.registerLazySingleton<CloudServicesApi>(
-      () => CloudServicesApi(
-        baseUrl: 'http://localhost:5256', // backend actuel
-      ),
+      () => CloudServicesApi(baseUrl: baseUrl, client: httpClient),
+      dispose: (api) => api.close(),
     );
   }
-
-  // ============================
-  // Repositories
-  // ============================
-
   if (!sl.isRegistered<CloudStorageRepository>()) {
     sl.registerLazySingleton<CloudStorageRepository>(
-      () => CloudStorageRepository(
-        sl<CloudServicesApi>(),
-      ),
+      () =>
+          CloudStorageRepository(sl<CloudServicesApi>(), projectId: projectId),
     );
   }
-
-  // ============================
-  // BLoC
-  // ============================
-
   if (!sl.isRegistered<IsomapGridBloc>()) {
     sl.registerLazySingleton<IsomapGridBloc>(
       () => IsomapGridBloc(
         rows: rows,
         cols: cols,
-        cloudStorageRepository: sl<CloudStorageRepository>(), // ✅ injection
+        cloudStorageRepository: sl<CloudStorageRepository>(),
       ),
+      dispose: (bloc) => bloc.close(),
     );
   }
-
-  // if (!sl.isRegistered<MenuBloc>()) {
-  //   sl.registerLazySingleton<MenuBloc>(() => MenuBloc());
-  // }
 }
 
-/// Dispose everything properly
 Future<void> disposeServiceLocator() async {
-  if (sl.isRegistered<IsomapGridBloc>()) {
-    await sl<IsomapGridBloc>().close();
-  }
-
-  // if (sl.isRegistered<MenuBloc>()) {
-  //   await sl<MenuBloc>().close();
-  // }
-
+  // Dispose created singletons in reverse order without instantiating unused
+  // lazy registrations. Scene exit cancels only that scene's subscription.
   await sl.reset();
 }
