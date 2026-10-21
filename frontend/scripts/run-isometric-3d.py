@@ -43,7 +43,8 @@ def main():
         copy(relative)
     for folder, pattern in [('src/lib', '*.dart'), ('src/test_support', '*.dart'),
                             ('scenes', '*.tscn'), ('scenes', '*.tres'),
-                            ('scenes', '*.gdshader'), ('scenes', '*.svg')]:
+                            ('scenes', '*.gdshader'), ('scenes', '*.svg'),
+                            ('scenes', '*.jpeg')]:
         for path in (source / folder).rglob(pattern):
             copy(path.relative_to(source))
     config = (source / 'project.godot').read_text()
