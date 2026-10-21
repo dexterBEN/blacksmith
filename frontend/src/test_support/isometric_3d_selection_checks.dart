@@ -204,6 +204,9 @@ class SelectionFixture {
     await _click(scene, _project(scene, const GridPos(0, 5)));
     await _until(() => _bloc.state.selected == const GridPos(0, 5));
     _checkHighlight(scene, const GridPos(0, 5));
+    if (capture) {
+      await _capture(scene, 'selection_portrait.png', width: 480, height: 640);
+    }
     window.setContentScaleSize(Vector2i.fromXY(1152, 648));
     await _until(() => (camera.getSize() - initialSize).abs() < 1e-4);
 
@@ -354,15 +357,14 @@ Future<void> _click(Node scene, Vector2 point,
   }
 }
 
-Future<void> _capture(Node scene, String filename) async {
+Future<void> _capture(Node scene, String filename,
+    {int width = 1152, int height = 648}) async {
   await RenderingServer.singleton.framePostDraw.asFuture(scene);
   final output = Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']!;
+  final image = scene.getViewport()!.getTexture()!.getImage()!;
+  _check(image.getWidth() == width && image.getHeight() == height,
+      'Capture must use the expected internal viewport dimensions.');
   _check(
-      scene
-              .getViewport()!
-              .getTexture()!
-              .getImage()!
-              .savePng('$output/$filename') ==
-          GDError.ok,
+      image.savePng('$output/$filename') == GDError.ok,
       'Capture must come from the actual renderer.');
 }
