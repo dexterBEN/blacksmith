@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="432" viewBox="0 0 768 432">
+  <!-- Static soft-focus artwork. Radial falloffs replace blur filters. -->
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1d222b"/>
+      <stop offset=".52" stop-color="#111822"/>
+      <stop offset="1" stop-color="#181b24"/>
+    </linearGradient>
+    <radialGradient id="cool">
+      <stop stop-color="#455a74" stop-opacity=".38"/>
+      <stop offset=".38" stop-color="#354a62" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#1a2634" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="amber">
+      <stop stop-color="#ad7949" stop-opacity=".32"/>
+      <stop offset=".25" stop-color="#8c633e" stop-opacity=".23"/>
+      <stop offset=".6" stop-color="#604c3b" stop-opacity=".1"/>
+      <stop offset="1" stop-color="#332d2b" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="silhouette">
+      <stop stop-color="#080c13" stop-opacity=".56"/>
+      <stop offset=".58" stop-color="#0a1019" stop-opacity=".31"/>
+      <stop offset="1" stop-color="#0c121c" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" r=".72">
+      <stop offset=".38" stop-color="#05080e" stop-opacity="0"/>
+      <stop offset="1" stop-color="#05080e" stop-opacity=".55"/>
+    </radialGradient>
+  </defs>
+  <path fill="url(#base)" d="M0 0h768v432H0z"/>
+  <ellipse fill="url(#cool)" cx="438" cy="40" rx="155" ry="99"/>
+  <ellipse fill="url(#cool)" cx="712" cy="273" rx="137" ry="191" opacity=".65"/>
+  <ellipse fill="url(#silhouette)" cx="75" cy="178" rx="66" ry="243"/>
+  <ellipse fill="url(#silhouette)" cx="655" cy="131" rx="56" ry="216"/>
+  <ellipse fill="url(#silhouette)" cx="338" cy="260" rx="160" ry="183" opacity=".65"/>
+  <ellipse fill="url(#amber)" cx="151" cy="98" rx="73" ry="69"/>
+  <ellipse fill="url(#amber)" cx="116" cy="359" rx="59" ry="112" opacity=".8"/>
+  <ellipse fill="url(#amber)" cx="520" cy="350" rx="55" ry="78" opacity=".7"/>
+  <ellipse fill="url(#cool)" cx="316" cy="398" rx="105" ry="59" opacity=".4"/>
+  <path fill="url(#vignette)" d="M0 0h768v432H0z"/>
+</svg>

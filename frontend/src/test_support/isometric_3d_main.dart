@@ -162,8 +162,18 @@ void _validate(Node scene) {
   _check(
       probe.getUpdateMode() == ReflectionProbeUpdateMode.updateOnce &&
           probe.getReflectionMask() & tile.getLayerMask() != 0 &&
-          probe.getReflectionMask() & ground.getLayerMask() == 0,
-      'The static reflection must affect tiles only.');
+          probe.getReflectionMask() & ground.getLayerMask() == 0 &&
+          probe.getCullMask() & ground.getLayerMask() == 0,
+      'The static reflection must affect tiles only and never capture the backdrop.');
+  var groundLights = 0;
+  for (var i = 0; i < scene.getChildCount(); i++) {
+    final child = scene.getChild(i);
+    if (child is Light3D && child.getCullMask() & ground.getLayerMask() != 0) {
+      groundLights++;
+    }
+  }
+  _check(groundLights == 1,
+      'The backdrop shadow receiver requires exactly one light on its layer.');
   for (final name in ['Card', 'FillCard']) {
     final card = finish.getNodeT<MeshInstance3D>(name)!;
     _check(

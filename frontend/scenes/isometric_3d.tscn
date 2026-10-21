@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://hsjahmwjomrh" path="res://src/lib/prototypes/isometric_3d/isometric_3d_grid.dart" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/isometric_3d/surface_reflection.tscn" id="2_reflection"]
+[ext_resource type="Material" path="res://scenes/isometric_3d/backdrop_material.tres" id="3_backdrop"]
 
 [sub_resource type="Environment" id="Environment_board"]
 background_mode = 1
@@ -9,10 +10,6 @@ background_color = Color(0.045, 0.055, 0.075, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.65, 0.73, 0.88, 1)
 ambient_light_energy = 0.3
-
-[sub_resource type="StandardMaterial3D" id="Material_ground"]
-albedo_color = Color(0.08, 0.095, 0.12, 1)
-metallic_specular = 0.15
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
 size = Vector2(30, 30)
@@ -55,7 +52,7 @@ environment = SubResource("Environment_board")
 
 [node name="Ground" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
-material_override = SubResource("Material_ground")
+material_override = ExtResource("3_backdrop")
 mesh = SubResource("PlaneMesh_ground")
 
 [node name="SurfaceFinishReflection" parent="." instance=ExtResource("2_reflection")]
