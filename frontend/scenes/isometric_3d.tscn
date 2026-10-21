@@ -8,10 +8,11 @@ background_mode = 1
 background_color = Color(0.045, 0.055, 0.075, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.65, 0.73, 0.88, 1)
-ambient_light_energy = 0.45
+ambient_light_energy = 0.3
 
 [sub_resource type="StandardMaterial3D" id="Material_ground"]
-albedo_color = Color(0.055, 0.065, 0.085, 1)
+albedo_color = Color(0.08, 0.095, 0.12, 1)
+metallic_specular = 0.15
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
 size = Vector2(30, 30)
@@ -31,12 +32,23 @@ near = 0.1
 far = 50.0
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.848048, 0.393807, -0.354585, 0, 0.669131, 0.743145, 0.529919, -0.630223, 0.567455, 0, 0, 0)
-light_color = Color(1, 0.96, 0.91, 1)
-light_energy = 1.25
+rotation = Vector3(-0.87266463, -0.95993109, 0)
+light_color = Color(0.98, 0.985, 1, 1)
+light_energy = 1.15
+light_cull_mask = 5
 shadow_enabled = true
+shadow_bias = 0.035
+shadow_normal_bias = 0.4
 directional_shadow_mode = 0
-directional_shadow_max_distance = 30.0
+directional_shadow_max_distance = 26.0
+directional_shadow_fade_start = 1.0
+
+[node name="CoolFill" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.5235988, 2.1816616, 0)
+light_color = Color(0.65, 0.78, 1, 1)
+light_energy = 0.4
+light_specular = 0.25
+light_cull_mask = 4
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_board")

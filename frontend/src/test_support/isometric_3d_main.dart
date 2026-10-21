@@ -157,16 +157,20 @@ void _validate(Node scene) {
       'An orthographic camera is required.');
   final finish = scene.getNodeT<Node3D>('SurfaceFinishReflection')!;
   final probe = finish.getNodeT<ReflectionProbe>('Capture')!;
-  final card = finish.getNodeT<MeshInstance3D>('Card')!;
   final ground = scene.getNodeT<MeshInstance3D>('Ground')!;
   final tile = grid.getChild(0)! as MeshInstance3D;
   _check(
       probe.getUpdateMode() == ReflectionProbeUpdateMode.updateOnce &&
-          probe.getCullMask() & card.getLayerMask() != 0 &&
-          camera.getCullMask() & card.getLayerMask() == 0 &&
           probe.getReflectionMask() & tile.getLayerMask() != 0 &&
           probe.getReflectionMask() & ground.getLayerMask() == 0,
-      'The static reflection card must be camera-hidden and affect tiles only.');
+      'The static reflection must affect tiles only.');
+  for (final name in ['Card', 'FillCard']) {
+    final card = finish.getNodeT<MeshInstance3D>(name)!;
+    _check(
+        probe.getCullMask() & card.getLayerMask() != 0 &&
+            camera.getCullMask() & card.getLayerMask() == 0,
+        'Each reflection card must be captured and hidden from the camera.');
+  }
   _check(
       scene.getNodeT<WorldEnvironment>('WorldEnvironment')!.getEnvironment() !=
           null,

@@ -1,8 +1,8 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=9 format=3]
 
 [sub_resource type="Gradient" id="Gradient_card"]
 offsets = PackedFloat32Array(0, 0.22, 0.5, 0.78, 1)
-colors = PackedColorArray(0.01, 0.015, 0.025, 1, 0.3, 0.36, 0.5, 1, 1.5, 1.65, 2, 1, 0.3, 0.36, 0.5, 1, 0.01, 0.015, 0.025, 1)
+colors = PackedColorArray(0.015, 0.025, 0.045, 1, 0.35, 0.4, 0.5, 1, 1.4, 1.5, 1.7, 1, 0.35, 0.4, 0.5, 1, 0.015, 0.025, 0.045, 1)
 
 [sub_resource type="GradientTexture2D" id="Texture_card"]
 gradient = SubResource("Gradient_card")
@@ -18,25 +18,53 @@ albedo_texture = SubResource("Texture_card")
 cull_mode = 2
 
 [sub_resource type="QuadMesh" id="Mesh_card"]
-size = Vector2(10, 3)
+size = Vector2(12, 7)
 material = SubResource("Material_card")
+
+[sub_resource type="Gradient" id="Gradient_fill"]
+offsets = PackedFloat32Array(0, 0.22, 0.5, 0.78, 1)
+colors = PackedColorArray(0.005, 0.01, 0.02, 1, 0.14, 0.2, 0.32, 1, 0.6, 0.75, 1, 1, 0.14, 0.2, 0.32, 1, 0.005, 0.01, 0.02, 1)
+
+[sub_resource type="GradientTexture2D" id="Texture_fill"]
+gradient = SubResource("Gradient_fill")
+width = 32
+height = 64
+use_hdr = true
+fill_from = Vector2(0, 0)
+fill_to = Vector2(0, 1)
+
+[sub_resource type="StandardMaterial3D" id="Material_fill"]
+shading_mode = 0
+albedo_texture = SubResource("Texture_fill")
+cull_mode = 2
+
+[sub_resource type="QuadMesh" id="Mesh_fill"]
+size = Vector2(10, 3)
+material = SubResource("Material_fill")
 
 [node name="SurfaceFinishReflection" type="Node3D"]
 
 [node name="Capture" type="ReflectionProbe" parent="."]
 position = Vector3(0, 2, 0)
-size = Vector3(12, 6, 12)
+size = Vector3(20, 7, 20)
 update_mode = 0
 cull_mask = 2
 reflection_mask = 4
 box_projection = true
 ambient_mode = 2
 ambient_color = Color(0.65, 0.73, 0.88, 1)
-ambient_color_energy = 0.45
+ambient_color_energy = 0.3
 
 [node name="Card" type="MeshInstance3D" parent="."]
 position = Vector3(-4.5, 5, -4.5)
-rotation = Vector3(1.5707963, 0.7853982, 0)
+rotation = Vector3(1.5707963, 0, 0)
 layers = 2
 cast_shadow = 0
 mesh = SubResource("Mesh_card")
+
+[node name="FillCard" type="MeshInstance3D" parent="."]
+position = Vector3(-8, 5.1, -4.5)
+rotation = Vector3(1.5707963, 1.5707963, 0)
+layers = 2
+cast_shadow = 0
+mesh = SubResource("Mesh_fill")
