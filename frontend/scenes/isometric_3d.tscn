@@ -1,6 +1,7 @@
-[gd_scene load_steps=5 format=3 uid="uid://d0nh6ysxiiuyd"]
+[gd_scene load_steps=6 format=3 uid="uid://d0nh6ysxiiuyd"]
 
 [ext_resource type="Script" uid="uid://hsjahmwjomrh" path="res://src/lib/prototypes/isometric_3d/isometric_3d_grid.dart" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/isometric_3d/surface_reflection.tscn" id="2_reflection"]
 
 [sub_resource type="Environment" id="Environment_board"]
 background_mode = 1
@@ -21,6 +22,7 @@ script = ExtResource("1_script")
 [node name="GridRoot" type="Node3D" parent="."]
 
 [node name="Camera3D" type="Camera3D" parent="."]
+cull_mask = 5
 transform = Transform3D(0.707107, -0.408248, 0.57735, 0, 0.816497, 0.57735, -0.707107, -0.408248, 0.57735, 10, 10, 10)
 projection = 1
 current = true
@@ -43,3 +45,5 @@ environment = SubResource("Environment_board")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
 material_override = SubResource("Material_ground")
 mesh = SubResource("PlaneMesh_ground")
+
+[node name="SurfaceFinishReflection" parent="." instance=ExtResource("2_reflection")]

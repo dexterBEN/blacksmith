@@ -89,6 +89,7 @@ class SelectionFixture {
   late final CloudServicesApi _api;
   late final _NoProvisioningRepository _repository;
   late final _ObservedBloc _bloc;
+  final _originalMaterialColors = <String, List<double>>{};
   bool _disposed = false;
 
   void _register() => di.sl.registerSingleton<IsomapGridBloc>(_bloc);
@@ -112,6 +113,17 @@ class SelectionFixture {
 
     // Deliberately change names: picking must use logical coordinates.
     final grid = scene.getNodeT<Node3D>('GridRoot')!;
+    final mesh = (grid.getChild(0)! as MeshInstance3D).getMesh()!;
+    for (var surface = 0; surface < mesh.getSurfaceCount(); surface++) {
+      final property = 'surface_$surface/material';
+      final path = mesh
+          .getIndexed(NodePath.fromString('$property:resource_path'))
+          .cast<String>();
+      final color = mesh
+          .getIndexed(NodePath.fromString('$property:albedo_color'))
+          .cast<Color>();
+      _originalMaterialColors[path] = [color.r, color.g, color.b, color.a];
+    }
     for (var i = 0; i < grid.getChildCount(); i++) {
       grid.getChild(i)!.setName('Renamed_$i');
     }
@@ -167,6 +179,14 @@ class SelectionFixture {
         _bloc.tileEvents == beforeInvalid, 'GUI must intercept grid clicks.');
     blocker.queueFree();
     await _pause();
+
+    if (capture) {
+      _bloc.add(const TileClicked(GridPos(5, 2)));
+      await _until(() => _bloc.state.selected == const GridPos(5, 2));
+      await _pause();
+      _checkHighlight(scene, const GridPos(5, 2));
+      await _capture(scene, 'selection_edge.png');
+    }
 
     // A state change with no mouse event must also update the highlight.
     _bloc.add(const TileClicked(GridPos(5, 0)));
@@ -251,6 +271,46 @@ class SelectionFixture {
         'repository_calls=0 http_requests=0'));
     return scene;
   }
+
+  void _checkHighlight(Node scene, GridPos selected) {
+    final highlight = ResourceLoader.singleton
+        .load('res://scenes/isometric_3d/selection_material.tres')! as Material;
+    final grid = scene.getNodeT<Node3D>('GridRoot')!;
+    int? meshId;
+    var count = 0;
+    for (var index = 0; index < 36; index++) {
+      final tile = grid.getChild(index)! as MeshInstance3D;
+      final mesh = tile.getMesh()!;
+      meshId ??= mesh.getInstanceId();
+      _check(mesh.getInstanceId() == meshId, 'All tiles share one mesh.');
+      final isSelected = index == selected.row * 6 + selected.col;
+      _check(
+          isSelected
+              ? tile.getMaterialOverride()?.getInstanceId() ==
+                  highlight.getInstanceId()
+              : tile.getMaterialOverride() == null,
+          'Selection override must match BLoC state for tile $index.');
+      for (var surface = 0; surface < mesh.getSurfaceCount(); surface++) {
+        final property = 'surface_$surface/material';
+        final path = mesh
+            .getIndexed(NodePath.fromString('$property:resource_path'))
+            .cast<String>();
+        final color = mesh
+            .getIndexed(NodePath.fromString('$property:albedo_color'))
+            .cast<Color>();
+        final expected = _originalMaterialColors[path]!;
+        final actual = [color.r, color.g, color.b, color.a];
+        _check(
+            List.generate(4, (i) => (expected[i] - actual[i]).abs() < 1e-6)
+                .every((equal) => equal),
+            'Shared base materials must remain unchanged.');
+        _check(tile.getSurfaceOverrideMaterial(surface) == null,
+            'Deselection must restore each correct shared surface material.');
+      }
+      if (isSelected) count++;
+    }
+    _check(count == 1, 'Exactly one tile must be highlighted.');
+  }
 }
 
 void _check(bool condition, String message) {
@@ -292,33 +352,6 @@ Future<void> _click(Node scene, Vector2 point,
         inLocalCoords: true);
     await _pause();
   }
-}
-
-void _checkHighlight(Node scene, GridPos selected) {
-  final base = ResourceLoader.singleton
-          .load('res://scenes/isometric_3d/tile_material.tres')!
-      as StandardMaterial3D;
-  final highlight = ResourceLoader.singleton
-          .load('res://scenes/isometric_3d/selection_material.tres')!
-      as StandardMaterial3D;
-  final color = base.getAlbedo();
-  _check((color.r - 0.24).abs() < 1e-5 && (color.g - 0.31).abs() < 1e-5,
-      'The shared base material must remain unchanged.');
-  final grid = scene.getNodeT<Node3D>('GridRoot')!;
-  int? meshId;
-  var count = 0;
-  for (var index = 0; index < 36; index++) {
-    final tile = grid.getChild(index)! as MeshInstance3D;
-    meshId ??= tile.getMesh()!.getInstanceId();
-    _check(
-        tile.getMesh()!.getInstanceId() == meshId, 'All tiles share one mesh.');
-    final isSelected = index == selected.row * 6 + selected.col;
-    final material = tile.getMaterialOverride()!.getInstanceId();
-    _check(material == (isSelected ? highlight : base).getInstanceId(),
-        'Visible highlight must match BLoC state for tile $index.');
-    if (material == highlight.getInstanceId()) count++;
-  }
-  _check(count == 1, 'Exactly one tile must be highlighted.');
 }
 
 Future<void> _capture(Node scene, String filename) async {

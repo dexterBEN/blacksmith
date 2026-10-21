@@ -53,6 +53,13 @@ void main() {
 
       final mode = Platform.environment['BLACKSMITH_ISSUE17_MODE'];
       if (mode == 'interactive') return;
+      if (mode == 'check') {
+        // Allow the update-once material reflection to finish before capture.
+        final firstFrame = Engine.singleton.getFramesDrawn();
+        await _until(
+            () => Engine.singleton.getFramesDrawn() - firstFrame >= 12);
+        await _saveViewport(scene, 'unselected.png');
+      }
       scene = await fixture.check(tree, capture: mode == 'check');
       if (mode == 'headless') {
         tree.quit();
@@ -89,7 +96,7 @@ void _validate(Node scene) {
   final grid = scene.getNodeT<Node3D>('GridRoot')!;
   _check(grid.getChildCount() == 36, 'Exactly 36 tile nodes are required.');
   int? sharedMesh;
-  int? sharedMaterial;
+  final sharedMaterials = <int, String>{};
   for (var row = 0; row < layout.rows; row++) {
     for (var col = 0; col < layout.cols; col++) {
       final tile = grid.getNodeT<MeshInstance3D>('Tile_${row}_$col')!;
@@ -107,23 +114,59 @@ void _validate(Node scene) {
               (size.y - 0.24).abs() < 1e-5 &&
               (size.z - 1).abs() < 1e-5,
           'Tile mesh dimensions and thickness.');
-      _check(
-          mesh.getSurfaceCount() == 1 && mesh.surfaceGetArrayIndexLen(0) == 132,
-          'The mesh must contain the complete 44-triangle bevel treatment.');
-      _check(
-          mesh.surfaceGetFormat(0) & 2 != 0, 'Bevel normals must be present.');
+      _check(mesh.getSurfaceCount() == 3,
+          'Top, bevels and sides must share one mesh with three surfaces.');
       sharedMesh ??= mesh.getInstanceId();
-      final material = tile.getMaterialOverride()! as StandardMaterial3D;
-      sharedMaterial ??= material.getInstanceId();
       _check(
           mesh.getInstanceId() == sharedMesh &&
-              material.getInstanceId() == sharedMaterial,
-          'All tiles must reuse the mesh and material.');
+              tile.getMaterialOverride() == null,
+          'Unselected tiles reuse the mesh surface materials without overrides.');
+      for (var surface = 0; surface < 3; surface++) {
+        _check(
+            mesh.surfaceGetArrayIndexLen(surface) == [6, 96, 30][surface] &&
+                mesh.surfaceGetFormat(surface) & 2 != 0,
+            'All 44 triangles and outward shading normals must remain present.');
+        // Native property traversal avoids extra Dart-owned Material wrappers;
+        // their shutdown path is defective in the installed native extension.
+        final property = 'surface_$surface/material';
+        final path = mesh
+            .getIndexed(NodePath.fromString('$property:resource_path'))
+            .cast<String>();
+        sharedMaterials.putIfAbsent(surface, () => path);
+        _check(
+            path.isNotEmpty &&
+                path == sharedMaterials[surface] &&
+                tile.getSurfaceOverrideMaterial(surface) == null,
+            'All tiles reuse the shared mesh materials without surface overrides.');
+        final color = mesh
+            .getIndexed(NodePath.fromString('$property:albedo_color'))
+            .cast<Color>();
+        _check(
+            color.a == 1 &&
+                mesh
+                        .getIndexed(
+                            NodePath.fromString('$property:transparency'))
+                        .cast<int>() ==
+                    0,
+            'The coated finish stays opaque.');
+      }
     }
   }
   final camera = scene.getNodeT<Camera3D>('Camera3D')!;
   _check(camera.getProjection() == Camera3DProjectionType.projectionOrthogonal,
       'An orthographic camera is required.');
+  final finish = scene.getNodeT<Node3D>('SurfaceFinishReflection')!;
+  final probe = finish.getNodeT<ReflectionProbe>('Capture')!;
+  final card = finish.getNodeT<MeshInstance3D>('Card')!;
+  final ground = scene.getNodeT<MeshInstance3D>('Ground')!;
+  final tile = grid.getChild(0)! as MeshInstance3D;
+  _check(
+      probe.getUpdateMode() == ReflectionProbeUpdateMode.updateOnce &&
+          probe.getCullMask() & card.getLayerMask() != 0 &&
+          camera.getCullMask() & card.getLayerMask() == 0 &&
+          probe.getReflectionMask() & tile.getLayerMask() != 0 &&
+          probe.getReflectionMask() & ground.getLayerMask() == 0,
+      'The static reflection card must be camera-hidden and affect tiles only.');
   _check(
       scene.getNodeT<WorldEnvironment>('WorldEnvironment')!.getEnvironment() !=
           null,
@@ -169,12 +212,7 @@ Future<void> _captureRuntime(Node scene) async {
   _check(frames > 5, 'Real rendered frames must be observed.');
   final output = Directory(Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']!);
   output.createSync(recursive: true);
-  await RenderingServer.singleton.framePostDraw.asFuture(scene);
-  final image = scene.getViewport()!.getTexture()!.getImage();
-  _check(image != null && image.getWidth() == 1152 && image.getHeight() == 648,
-      'Capture must come from the real 1152x648 Godot viewport.');
-  _check(image!.savePng('${output.path}/grid.png') == GDError.ok,
-      'Saving the actual renderer image must succeed.');
+  final image = await _saveViewport(scene, 'grid.png');
   final averageMs = clock.elapsedMicroseconds / frames / 1000;
   final rendering = RenderingServer.singleton;
   final result = {
@@ -199,4 +237,15 @@ Future<void> _captureRuntime(Node scene) async {
   File('${output.path}/runtime.json')
       .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(result));
   GD.print(Variant('BLACKSMITH_ISSUE17_RUNTIME ${jsonEncode(result)}'));
+}
+
+Future<Image> _saveViewport(Node scene, String filename) async {
+  final output = Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']!;
+  await RenderingServer.singleton.framePostDraw.asFuture(scene);
+  final image = scene.getViewport()!.getTexture()!.getImage();
+  _check(image != null && image.getWidth() == 1152 && image.getHeight() == 648,
+      'Capture must come from the real 1152x648 Godot viewport.');
+  _check(image!.savePng('$output/$filename') == GDError.ok,
+      'Saving the actual renderer image must succeed.');
+  return image;
 }
