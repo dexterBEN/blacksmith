@@ -56,6 +56,22 @@ void main() {
     expect(repository.calls, isEmpty);
   });
 
+  test('selection switches and repeated selection never provision resources',
+      () async {
+    final states = <IsomapGridState>[];
+    final subscription = bloc.stream.listen(states.add);
+    await select(const GridPos(0, 5));
+    await select(const GridPos(5, 0));
+    bloc.add(const TileClicked(GridPos(5, 0)));
+    await tick();
+    expect(states.map((state) => state.selected),
+        [const GridPos(0, 5), const GridPos(5, 0)]);
+    expect(bloc.state.tiles, isEmpty);
+    expect(bloc.state.pendingOperations, 0);
+    expect(repository.calls, isEmpty);
+    await subscription.cancel();
+  });
+
   test('custom dimensions govern selection and bounds', () async {
     await bloc.close();
     bloc = IsomapGridBloc(cloudStorageRepository: repository, rows: 2, cols: 3);

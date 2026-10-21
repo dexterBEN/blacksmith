@@ -7,18 +7,26 @@ import 'package:godot_dart/godot_dart.dart';
 import '../godot_dart_scripts.g.dart';
 import '../lib/domain/models/grid_position.dart';
 import '../lib/prototypes/isometric_3d/grid_layout.dart';
+import 'isometric_3d_selection_checks.dart';
 
-/// Isolated launch/test entrypoint: does not initialize application DI.
+/// Isolated launch/test entrypoint: only a fake selection fixture is registered.
 void main() {
   attachScriptResolver();
-  GD.print(Variant('BLACKSMITH_ISSUE15_DART_READY'));
+  GD.print(Variant('BLACKSMITH_ISSUE17_DART_READY'));
   if (Engine.singleton.isEditorHint()) return;
+  final fixture = SelectionFixture();
   async.Timer.run(() async {
     final tree = Engine.singleton.getMainLoop()! as SceneTree;
     try {
       await _until(() => tree.getCurrentScene() != null);
-      final scene = tree.getCurrentScene()!;
-      tree.getRoot()!.closeRequested.connect(scene, () => tree.quit());
+      var scene = tree.getCurrentScene()!;
+      tree
+          .getRoot()!
+          .closeRequested
+          .connect(tree.getRoot()!, () => tree.quit());
+      tree.getRoot()!.treeExiting.connect(tree.getRoot()!, () {
+        async.unawaited(fixture.dispose());
+      });
       final window = tree.getRoot()!;
       // X11's window manager can override requested window dimensions. Keep
       // capture/framing assertions deterministic through an internal viewport.
@@ -40,20 +48,21 @@ void main() {
       window.setContentScaleSize(Vector2i.fromXY(1152, 648));
       await _until(() => (camera.getSize() - originalSize).abs() < 1e-4);
       _validateFraming(scene, camera);
-      GD.print(Variant('BLACKSMITH_ISSUE15_SCENE_PASSED tiles=36 beveled=true '
+      GD.print(Variant('BLACKSMITH_ISSUE17_SCENE_PASSED tiles=36 beveled=true '
           'shared_mesh=true orthographic=true mapping=true resize=true'));
 
-      final mode = Platform.environment['BLACKSMITH_ISSUE15_MODE'];
+      final mode = Platform.environment['BLACKSMITH_ISSUE17_MODE'];
       if (mode == 'interactive') return;
+      scene = await fixture.check(tree, capture: mode == 'check');
       if (mode == 'headless') {
         tree.quit();
         return;
       }
       await _captureRuntime(scene);
-      GD.print(Variant('BLACKSMITH_ISSUE15_RENDER_PASSED'));
+      GD.print(Variant('BLACKSMITH_ISSUE17_RENDER_PASSED'));
       tree.quit();
     } catch (error, stack) {
-      GD.print(Variant('BLACKSMITH_ISSUE15_FAILED: $error\n$stack'));
+      GD.print(Variant('BLACKSMITH_ISSUE17_FAILED: $error\n$stack'));
       tree.quit(exitCode: 1);
     }
   });
@@ -158,7 +167,7 @@ Future<void> _captureRuntime(Node scene) async {
   clock.stop();
   final frames = Engine.singleton.getFramesDrawn() - startFrames;
   _check(frames > 5, 'Real rendered frames must be observed.');
-  final output = Directory(Platform.environment['BLACKSMITH_ISSUE15_OUTPUT']!);
+  final output = Directory(Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']!);
   output.createSync(recursive: true);
   await RenderingServer.singleton.framePostDraw.asFuture(scene);
   final image = scene.getViewport()!.getTexture()!.getImage();
@@ -169,7 +178,7 @@ Future<void> _captureRuntime(Node scene) async {
   final averageMs = clock.elapsedMicroseconds / frames / 1000;
   final rendering = RenderingServer.singleton;
   final result = {
-    'godot': Platform.environment['BLACKSMITH_ISSUE15_GODOT_VERSION'],
+    'godot': Platform.environment['BLACKSMITH_ISSUE17_GODOT_VERSION'],
     'adapter': rendering.getVideoAdapterName(),
     'graphics_api': rendering.getVideoAdapterApiVersion(),
     'viewport': {'width': image.getWidth(), 'height': image.getHeight()},
@@ -183,10 +192,11 @@ Future<void> _captureRuntime(Node scene) async {
         Performance.singleton.getMonitor(PerformanceMonitor.timeFps),
     'average_fps': 1000 / averageMs,
     'average_frame_ms': averageMs,
+    'selected_tile': {'row': 2, 'col': 3},
     'note': 'Lightweight windowed check using native Godot frame counts; includes presentation. '
         'Not an uncapped benchmark or a measurement of the final visual target.',
   };
   File('${output.path}/runtime.json')
       .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(result));
-  GD.print(Variant('BLACKSMITH_ISSUE15_RUNTIME ${jsonEncode(result)}'));
+  GD.print(Variant('BLACKSMITH_ISSUE17_RUNTIME ${jsonEncode(result)}'));
 }

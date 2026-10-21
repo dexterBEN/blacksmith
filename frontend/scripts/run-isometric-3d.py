@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Launch the Issue #15 scene in an isolated copy, without application DI.
+"""Launch the interactive 3D scene in an isolated fixture without a backend.
 
 Default: interactive preview. --check captures a real viewport and a lightweight
-runtime sample; --headless checks structure only. Requires the existing Dart
+runtime sample; --headless checks structure, input and lifecycle without images.
+Only fake selection dependencies are registered. Requires the existing Dart
 packages, generated bindings and Linux Godot/Dart native libraries.
 """
 import argparse
@@ -23,7 +24,7 @@ def main():
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     source = Path(__file__).resolve().parents[1]
-    project = Path(tempfile.mkdtemp(prefix='blacksmith-issue15-'))
+    project = Path(tempfile.mkdtemp(prefix='blacksmith-isometric3d-'))
     output = args.output.resolve() if args.output else project / 'evidence'
     output.mkdir(parents=True, exist_ok=True)
     print(f'Isolated scene: {project}', flush=True)
@@ -46,7 +47,7 @@ def main():
             copy(path.relative_to(source))
     config = (source / 'project.godot').read_text()
     config = config.replace('config/name="frontend"',
-                            'config/name="Blacksmith — Issue 15"')
+                            'config/name="Blacksmith — Interactive 3D Grid"')
     config = '\n'.join(
         'run/main_scene="res://scenes/isometric_3d.tscn"'
         if line.startswith('run/main_scene=') else line
@@ -60,10 +61,10 @@ def main():
     env = os.environ.copy()
     for name in ['DATA', 'CONFIG', 'CACHE']:
         env[f'XDG_{name}_HOME'] = str(project / f'xdg-{name.lower()}')
-    env['BLACKSMITH_ISSUE15_MODE'] = (
+    env['BLACKSMITH_ISSUE17_MODE'] = (
         'headless' if args.headless else 'check' if args.check else 'interactive')
-    env['BLACKSMITH_ISSUE15_OUTPUT'] = str(output)
-    env['BLACKSMITH_ISSUE15_GODOT_VERSION'] = subprocess.check_output(
+    env['BLACKSMITH_ISSUE17_OUTPUT'] = str(output)
+    env['BLACKSMITH_ISSUE17_GODOT_VERSION'] = subprocess.check_output(
         [args.godot, '--version'], text=True).strip()
 
     def run(name, arguments, marker, timeout):
@@ -80,11 +81,13 @@ def main():
 
     # Import exit status alone is insufficient if native Dart loading fails.
     run('import', ['--headless', '--editor', '--import'],
-        'BLACKSMITH_ISSUE15_DART_READY', args.timeout)
+        'BLACKSMITH_ISSUE17_DART_READY', args.timeout)
     arguments = ['--headless'] if args.headless else [
         '--display-driver', 'x11', '--rendering-method', 'gl_compatibility',
         '--resolution', '1152x648', '--max-fps', '60']
-    marker = 'BLACKSMITH_ISSUE15_RENDER_PASSED' if args.check else 'BLACKSMITH_ISSUE15_SCENE_PASSED'
+    marker = ('BLACKSMITH_ISSUE17_RENDER_PASSED' if args.check else
+              'BLACKSMITH_ISSUE17_SELECTION_PASSED' if args.headless else
+              'BLACKSMITH_ISSUE17_SCENE_PASSED')
     run('scene', arguments, marker,
         args.timeout if args.check or args.headless else None)
 
