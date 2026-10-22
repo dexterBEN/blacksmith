@@ -22,6 +22,10 @@ def main():
     parser.add_argument('--godot', default='godot')
     parser.add_argument('--timeout', type=int, default=300)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--material-variant',
+                        choices=['opaque', 'alpha-top', 'refraction-top'],
+                        default='opaque',
+                        help='Isolated material comparison; transparent variants never change production assets.')
     args = parser.parse_args()
     source = Path(__file__).resolve().parents[1]
     project = Path(tempfile.mkdtemp(prefix='blacksmith-isometric3d-'))
@@ -47,6 +51,14 @@ def main():
                             ('scenes', '*.jpeg')]:
         for path in (source / folder).rglob(pattern):
             copy(path.relative_to(source))
+    if args.material_variant != 'opaque':
+        top = project / 'scenes/isometric_3d/tile_material.tres'
+        shutil.copyfile(
+            source / 'tools/material_experiments/alpha_top.tres',
+            top)
+        if args.material_variant == 'refraction-top':
+            with top.open('a') as stream:
+                stream.write('\nrefraction_enabled = true\nrefraction_scale = 0.015\n')
     config = (source / 'project.godot').read_text()
     config = config.replace('config/name="frontend"',
                             'config/name="Blacksmith — Interactive 3D Grid"')
@@ -66,6 +78,7 @@ def main():
     env['BLACKSMITH_ISSUE17_MODE'] = (
         'headless' if args.headless else 'check' if args.check else 'interactive')
     env['BLACKSMITH_ISSUE17_OUTPUT'] = str(output)
+    env['BLACKSMITH_ISSUE25_VARIANT'] = args.material_variant
     env['BLACKSMITH_ISSUE17_GODOT_VERSION'] = subprocess.check_output(
         [args.godot, '--version'], text=True).strip()
 

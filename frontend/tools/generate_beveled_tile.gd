@@ -89,5 +89,11 @@ func triangle(a: Vector3, b: Vector3, c: Vector3, surface_index: int) -> void:
 		normal = -normal
 	var surface := surfaces[surface_index]
 	for vertex in [a, c, b]:
-		surface.set_normal(normal)
+		# Interpolate a rounded-box normal only across the existing chamfers.
+		# Top/side normals, positions, winding and triangle count stay intact.
+		var shading_normal := normal
+		if surface_index == BEVELS:
+			var inset := HALF - Vector3.ONE * BEVEL
+			shading_normal = (vertex - vertex.clamp(-inset, inset)).normalized()
+		surface.set_normal(shading_normal)
 		surface.add_vertex(vertex)

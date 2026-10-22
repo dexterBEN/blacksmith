@@ -58,7 +58,12 @@ void main() {
         final firstFrame = Engine.singleton.getFramesDrawn();
         await _until(
             () => Engine.singleton.getFramesDrawn() - firstFrame >= 12);
-        await _saveViewport(scene, 'unselected.png');
+        final unselected = await _saveViewport(scene, 'unselected.png');
+        final closeup =
+            unselected.getRegion(Rect2i.fromXYWidthHeight(488, 493, 176, 130))!;
+        final output = Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']!;
+        _check(closeup.savePng('$output/closeup.png') == GDError.ok,
+            'Close-up must be an unscaled crop of the actual viewport.');
       }
       scene = await fixture.check(tree, capture: mode == 'check');
       if (mode == 'headless') {
@@ -97,6 +102,9 @@ void _validate(Node scene) {
   _check(grid.getChildCount() == 36, 'Exactly 36 tile nodes are required.');
   int? sharedMesh;
   final sharedMaterials = <int, String>{};
+  final variant =
+      Platform.environment['BLACKSMITH_ISSUE25_VARIANT'] ?? 'opaque';
+  final alphaTop = variant != 'opaque';
   for (var row = 0; row < layout.rows; row++) {
     for (var col = 0; col < layout.cols; col++) {
       final tile = grid.getNodeT<MeshInstance3D>('Tile_${row}_$col')!;
@@ -141,14 +149,19 @@ void _validate(Node scene) {
         final color = mesh
             .getIndexed(NodePath.fromString('$property:albedo_color'))
             .cast<Color>();
+        final transparency = mesh
+            .getIndexed(NodePath.fromString('$property:transparency'))
+            .cast<int>();
+        final refraction = mesh
+            .getIndexed(NodePath.fromString('$property:refraction_enabled'))
+            .cast<bool>();
         _check(
-            color.a == 1 &&
-                mesh
-                        .getIndexed(
-                            NodePath.fromString('$property:transparency'))
-                        .cast<int>() ==
-                    0,
-            'The coated finish stays opaque.');
+            alphaTop && surface == 0
+                ? (color.a - 0.82).abs() < 1e-6 && transparency == 1
+                : color.a == 1 && transparency == 0,
+            'Only an explicit transparent experiment may blend its top surface.');
+        _check(refraction == (variant == 'refraction-top' && surface == 0),
+            'Refraction belongs only to the isolated refraction-top experiment.');
       }
     }
   }
@@ -245,6 +258,8 @@ Future<void> _captureRuntime(Node scene) async {
     'average_fps': 1000 / averageMs,
     'average_frame_ms': averageMs,
     'selected_tile': {'row': 2, 'col': 3},
+    'material_variant':
+        Platform.environment['BLACKSMITH_ISSUE25_VARIANT'] ?? 'opaque',
     'note': 'Lightweight windowed check using native Godot frame counts; includes presentation. '
         'Not an uncapped benchmark or a measurement of the final visual target.',
   };

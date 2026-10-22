@@ -2,6 +2,10 @@
 
 [resource]
 resource_name = "DarkBlueGraySides"
-albedo_color = Color(0.07, 0.085, 0.12, 1)
-metallic = 0.12
-roughness = 0.46
+albedo_color = Color(0.07, 0.115, 0.18, 1)
+metallic = 0.0
+metallic_specular = 0.5
+roughness = 0.22
+clearcoat_enabled = true
+clearcoat = 0.12
+clearcoat_roughness = 0.2

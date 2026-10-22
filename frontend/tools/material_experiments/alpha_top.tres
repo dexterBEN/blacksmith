@@ -1,0 +1,14 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+; Test-only comparison. The launcher copies this over the top material in its
+; temporary project; the production scene never references this resource.
+[resource]
+resource_name = "ExperimentalAlphaGlassTop"
+transparency = 1
+albedo_color = Color(0.14, 0.195, 0.26, 0.82)
+metallic = 0.0
+metallic_specular = 0.5
+roughness = 0.12
+clearcoat_enabled = true
+clearcoat = 0.35
+clearcoat_roughness = 0.14
