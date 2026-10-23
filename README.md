@@ -80,6 +80,28 @@ The backend uses a **layered architecture with ports-and-adapters principles**. 
 
 ---
 
+## Standalone local 3D editor
+
+The production `main.tscn` remains the 2D editor. The existing standalone 3D
+scene now supports selecting a tile and placing or replacing Cloud Storage,
+Compute Engine, Cloud VPN and Cloud Load Balancing cubes through a native palette.
+All placement stays in `IsomapGridBloc` memory. No backend or credentials are
+required, and no cloud operation runs.
+
+From the repository root, with the existing Godot/Dart development prerequisites:
+
+```bash
+python3 frontend/scripts/run-isometric-3d.py
+python3 frontend/scripts/run-isometric-3d.py --check --timeout 600 --output /tmp/blacksmith-placement
+```
+
+The launcher uses a temporary project, leaving the production entry point intact.
+The check exercises native clicks, replacement and scene reload, and saves actual
+Godot screenshots. See [the Issue #33 report](issue_33_report.md) for results,
+prerequisites and integration limits. Full application restart clears placements.
+
+---
+
 ## 🐳 Devcontainers
 
 Blacksmith provides frontend and backend **VS Code Dev Container** configurations. The graphical Godot editor/player may run on the host; using a frontend devcontainer does not by itself mean the GUI runs inside Docker.

@@ -5,8 +5,12 @@ import 'package:godot_dart/godot_dart.dart';
 import '../../core/di/service_locator.dart' as di;
 import '../../domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../../domain/bloc/isomap_grid/isomap_grid_event.dart';
+import '../../domain/bloc/isomap_grid/isomap_grid_state.dart';
 import '../../domain/models/grid_position.dart';
+import '../../domain/models/resource_kind.dart';
 import 'grid_layout.dart';
+import 'resource_palette_3d.dart';
+import 'resource_visuals_3d.dart';
 
 part 'isometric_3d_grid.g.dart';
 
@@ -28,7 +32,13 @@ class Isometric3DGrid extends Node3D {
   static const layout = GridLayout3D();
   final _tiles = <GridPos, MeshInstance3D>{};
   IsomapGridBloc? _bloc;
-  async.StreamSubscription<GridPos?>? _selectionSubscription;
+  async.StreamSubscription<IsomapGridState>? _stateSubscription;
+  ResourcePalette3D? _palette;
+  Node3D? _resourceRoot;
+  // Render caches derived exclusively from BLoC state, not placement state.
+  final _resources = <GridPos, ({ResourceKind kind, Node3D node})>{};
+  final _resourceScenes = <ResourceKind, PackedScene>{};
+  static const resourceScale = 0.68;
   Material? _baseMaterial;
   Material? _selectionMaterial;
   bool _active = false;
@@ -54,6 +64,13 @@ class Isometric3DGrid extends Node3D {
         _tiles[GridPos(row, col)] = tile;
       }
     }
+    _resourceRoot = getNodeT<Node3D>('ResourceRoot')!;
+    _palette = ResourcePalette3D(this, (kind) {
+      final bloc = _bloc;
+      if (_active && bloc != null && !bloc.isClosed) {
+        bloc.add(PlaceResource(kind));
+      }
+    });
     // The camera is fixed: react to viewport changes instead of polling Godot
     // through Dart on every rendered frame. The connection is owned by this node.
     getViewport()!.sizeChanged.connect(this, _fitCamera);
@@ -73,13 +90,10 @@ class Isometric3DGrid extends Node3D {
       _ownsBloc = true;
     }
     final bloc = _bloc!;
-    _selectionSubscription = bloc.stream
-        .map((state) => state.selected)
-        .distinct()
-        .listen((selected) {
-      if (_active) _renderSelection(selected);
+    _stateSubscription = bloc.stream.listen((state) {
+      if (_active) _renderState(state);
     });
-    _renderSelection(bloc.state.selected);
+    _renderState(bloc.state);
     setProcessUnhandledInput(true);
     GD.print(Variant('[Isometric3DGrid] 36 shared beveled tiles ready.'));
   }
@@ -126,16 +140,53 @@ class Isometric3DGrid extends Node3D {
     GD.print(Variant('[Isometric3DGrid] Selected tile: ${selected ?? "none"}'));
   }
 
+  void _renderState(IsomapGridState state) {
+    _renderSelection(state.selected);
+    _palette?.render(state);
+    final root = _resourceRoot!;
+    for (final position in _resources.keys.toList()) {
+      if (state.tiles[position] != _resources[position]!.kind) {
+        final previous = _resources.remove(position)!;
+        root.removeChild(previous.node);
+        previous.node.queueFree();
+      }
+    }
+    for (final entry in state.tiles.entries) {
+      if (_resources.containsKey(entry.key) || !_tiles.containsKey(entry.key)) {
+        continue;
+      }
+      final packed = _resourceScenes.putIfAbsent(
+          entry.value,
+          () => ResourceLoader.singleton
+              .load(resourceVisuals3D[entry.value]!.scenePath)! as PackedScene);
+      final node = packed.instantiate()! as Node3D;
+      final position = layout.worldPosition(entry.key);
+      node
+        ..setName('Resource_${entry.key.row}_${entry.key.col}')
+        ..setPosition(Vector3(
+            x: position.x, y: GridLayout3D.tileHeight / 2, z: position.z))
+        ..setScale(
+            Vector3(x: resourceScale, y: resourceScale, z: resourceScale));
+      root.addChild(node);
+      _resources[entry.key] = (kind: entry.value, node: node);
+    }
+  }
+
   @override
   void vExitTree() {
     _active = false;
-    final subscription = _selectionSubscription;
-    _selectionSubscription = null;
+    final subscription = _stateSubscription;
+    _stateSubscription = null;
     if (subscription != null) async.unawaited(subscription.cancel());
     final bloc = _bloc;
     _bloc = null;
     if (_ownsBloc && bloc != null) async.unawaited(bloc.close());
     _tiles.clear();
+    _palette = null;
+    _resourceRoot = null;
+    // Scene-owned controls/cubes are freed with the scene, not by the BLoC.
+    _resources.clear();
+    _resourceScenes.clear();
     _baseMaterial = null;
     _selectionMaterial = null;
   }
@@ -143,6 +194,7 @@ class Isometric3DGrid extends Node3D {
   void _fitCamera() {
     final size = getViewport()!.getVisibleRect().size;
     if (size.x <= 0 || size.y <= 0) return;
+    _palette?.resize(size);
     // Fixed 45° yaw and 35.264° elevation. Fit the complete tile AABB with a
     // 12% margin; the logical mapping remains independent of this projection.
     final projectedWidth = (layout.width + layout.depth) / math.sqrt(2);

@@ -1,8 +1,17 @@
-[gd_scene load_steps=6 format=3 uid="uid://d0nh6ysxiiuyd"]
+[gd_scene load_steps=11 format=3 uid="uid://d0nh6ysxiiuyd"]
 
 [ext_resource type="Script" uid="uid://hsjahmwjomrh" path="res://src/lib/prototypes/isometric_3d/isometric_3d_grid.dart" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/isometric_3d/surface_reflection.tscn" id="2_reflection"]
 [ext_resource type="Material" path="res://scenes/isometric_3d/backdrop_material.tres" id="3_backdrop"]
+
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/icons/white/cloud_storage.svg" id="4_storage"]
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/source/compute_engine/compute_engine_texture.png" id="5_compute"]
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/icons/white/cloud_vpn.svg" id="6_vpn"]
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/icons/white/load_balancer.svg" id="7_balancing"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_compute"]
+atlas = ExtResource("5_compute")
+region = Rect2(256, 256, 256, 256)
 
 [sub_resource type="Environment" id="Environment_board"]
 background_mode = 1
@@ -56,3 +65,82 @@ material_override = ExtResource("3_backdrop")
 mesh = SubResource("PlaneMesh_ground")
 
 [node name="SurfaceFinishReflection" parent="." instance=ExtResource("2_reflection")]
+
+[node name="ResourceRoot" type="Node3D" parent="."]
+
+[node name="PaletteLayer" type="CanvasLayer" parent="."]
+visible = false
+
+[node name="ResourcePalette" type="Control" parent="PaletteLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="Panel" parent="PaletteLayer/ResourcePalette"]
+layout_mode = 0
+mouse_filter = 0
+
+[node name="Instruction" type="Label" parent="PaletteLayer/ResourcePalette/Panel"]
+layout_mode = 0
+mouse_filter = 2
+text = "Select a tile first"
+horizontal_alignment = 1
+
+[node name="Choices" type="GridContainer" parent="PaletteLayer/ResourcePalette/Panel"]
+layout_mode = 0
+mouse_filter = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 4
+
+[node name="CloudStorage" type="Button" parent="PaletteLayer/ResourcePalette/Panel/Choices"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 0
+disabled = true
+text = "Cloud Storage"
+tooltip_text = "Cloud Storage - local visualization only"
+icon = ExtResource("4_storage")
+icon_alignment = 0
+icon_max_width = 28
+expand_icon = true
+
+[node name="ComputeEngine" type="Button" parent="PaletteLayer/ResourcePalette/Panel/Choices"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 0
+disabled = true
+text = "Compute Engine"
+tooltip_text = "Compute Engine - local visualization only"
+icon = SubResource("AtlasTexture_compute")
+icon_alignment = 0
+icon_max_width = 28
+expand_icon = true
+
+[node name="CloudVpn" type="Button" parent="PaletteLayer/ResourcePalette/Panel/Choices"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 0
+disabled = true
+text = "Cloud VPN"
+tooltip_text = "Cloud VPN - local visualization only"
+icon = ExtResource("6_vpn")
+icon_alignment = 0
+icon_max_width = 28
+expand_icon = true
+
+[node name="CloudLoadBalancing" type="Button" parent="PaletteLayer/ResourcePalette/Panel/Choices"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 0
+disabled = true
+text = "Load Balancing"
+tooltip_text = "Load Balancing - local visualization only"
+icon = ExtResource("7_balancing")
+icon_alignment = 0
+icon_max_width = 28
+expand_icon = true

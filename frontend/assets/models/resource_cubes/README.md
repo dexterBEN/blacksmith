@@ -55,8 +55,11 @@ python3 frontend/scripts/preview-resource-cubes.py --check --output /tmp/blacksm
 # Regenerate the shared mesh and check geometry without rendering the scene.
 python3 frontend/scripts/preview-resource-cubes.py --generate-mesh --headless
 
-# Use the existing Dart grid and run real selection/lifecycle checks with cubes.
-python3 frontend/scripts/run-isometric-3d.py --resource-cubes --check --timeout 600 --output /tmp/blacksmith-cubes-selection
+# Open the interactive Dart grid: select a tile, then choose a local resource.
+python3 frontend/scripts/run-isometric-3d.py
+
+# Exercise actual palette input, placement/replacement, replay and lifecycle.
+python3 frontend/scripts/run-isometric-3d.py --check --timeout 600 --output /tmp/blacksmith-placement
 ```
 
 The asset-only launcher creates a fresh temporary Godot project containing
@@ -67,9 +70,14 @@ with 4× MSAA. The import uses the windowed editor to avoid Godot 4.4 headless
 editor diagnostics on this VM; **X11 is required even with `--headless`**, which
 applies only to the scene check. Images, JSON and logs go to the selected output.
 
-The opt-in Dart demonstration requires the usual local Godot/Dart libraries,
-packages and generated bindings. It adds static visual children to a temporary
-copy of the existing scene while retaining its BLoC, picking and lifecycle tests.
-Neither launcher implements application placement, persistence or cloud calls.
-The current tile-plane selection algorithm is unchanged; cubes have no separate
-picking handlers. Do not commit import caches, native libraries or package caches.
+The Dart launcher requires the usual local Godot/Dart libraries, packages and
+generated bindings. Its four-choice palette places and replaces cubes from the
+existing BLoC's in-memory tile state. It starts empty, with placement disabled
+until a tile is selected. `--resource-cubes` remains a compatibility alias; it no
+longer inserts static cubes. The asset-only preview above retains its isolated
+four-cube fixture, with the interactive palette hidden.
+
+Neither launcher needs a backend or credentials, persists placements, or calls
+cloud services. The tile-plane selection algorithm is unchanged; cubes have no
+separate picking handlers. Do not commit import caches, native libraries or
+package caches.
