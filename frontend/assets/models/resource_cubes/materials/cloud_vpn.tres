@@ -1,0 +1,18 @@
+[gd_resource type="ShaderMaterial" load_steps=4 format=3]
+
+[ext_resource type="Shader" path="res://assets/models/resource_cubes/coated_blue_plastic.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/source/cloud_vpn/cloud_vpn_texture.png" id="2_texture"]
+
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/icons/white/cloud_vpn.svg" id="3_icon"]
+
+[resource]
+resource_name = "cloud_vpn_CoatedBluePlastic"
+shader = ExtResource("1_shader")
+shader_parameter/albedo_texture = ExtResource("2_texture")
+shader_parameter/body_tint = Color(0.42, 0.58, 0.9, 1)
+shader_parameter/roughness = 0.38
+shader_parameter/specular = 0.25
+shader_parameter/clearcoat = 0.18
+shader_parameter/replace_front_icon = true
+shader_parameter/service_icon = ExtResource("3_icon")
+shader_parameter/icon_scale = 0.7
