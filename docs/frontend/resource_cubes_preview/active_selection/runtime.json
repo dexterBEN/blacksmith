@@ -10,11 +10,11 @@
   "frame_cap_fps": 60,
   "warmup_seconds": 2,
   "sample_seconds": 6,
-  "rendered_frames": 51,
-  "elapsed_sample_seconds": 6.531075,
-  "engine_reported_fps": 5.0,
-  "average_fps": 7.808821671776851,
-  "average_frame_ms": 128.06029411764706,
+  "rendered_frames": 47,
+  "elapsed_sample_seconds": 6.095537,
+  "engine_reported_fps": 9.0,
+  "average_fps": 7.710559381396585,
+  "average_frame_ms": 129.6922765957447,
   "selected_tile": {
     "row": 2,
     "col": 3

@@ -1,125 +1,101 @@
-# Issue #28 / PR #29 — Complete asset publication and validation
+# Issue #28 / PR #29 — GCP resource cube assets
 
 [Issue #28](https://github.com/dexterBEN/blacksmith/issues/28) ·
 [PR #29](https://github.com/dexterBEN/blacksmith/pull/29) · branch `issue_28`.
 
-The published commit `5d26367` omitted two required PNGs: the Cloud Storage and
-Cloud VPN source textures. They were missing from both its Git tree and the local
-working directory; neither path was ignored by `.gitignore`. A clean export of
-that exact commit reproduces Godot's missing-resource import errors. The fix
-restores the original bytes from `Blacksmith_Godot_3D_Models.zip` and publishes the
-supporting documentation and reproducible dependency checks.
+Four reusable Godot scenes display Cloud Storage, Compute Engine, Cloud VPN
+and Load Balancing on the existing 3D board. The final visual assets restore
+commit `5d26367`, including its white service icons, at the user's explicit
+request. The missing Storage and VPN texture fixes are retained, so the scenes
+can load from committed sources rather than relying on local files.
 
-## Focused changes
+## Changes and cleanup
 
-- Restore `source/cloud_storage/cloud_storage_texture.png` and
-  `source/cloud_vpn/cloud_vpn_texture.png`. Both original OBJ comparisons and the
-  corrected native materials need these PNGs.
-- Add `check_resource_cubes.py`. It walks all 28 runtime/source dependencies,
-  including OBJ `mtllib`, MTL `map_Kd`, original SVGs and rendered icon PNGs.
-  `--require-tracked` also rejects dependencies absent from the Git index. The
-  original published tree fails this check; the corrected candidate passes.
-- Keep the shared 44-triangle beveled mesh, dimensions, materials, four service
-  variants and current board appearance. No new geometry pipeline is introduced.
-- Following the user's explicit choice during review, remove the three white
-  adaptations. Use the original Google SVG artwork without recoloring. Godot
-  rasterizes those unchanged sources at 256 pixels for sharp texture sampling;
-  the original 24-pixel import was visibly blurred at the cube's screen size.
-- Add an opt-in `--resource-cubes` demonstration to the existing 3D launcher.
-  It attaches only static visual children in a temporary copy of the real Dart
-  grid scene. The existing grid script, picking, BLoC, highlighting, scene reload
-  and lifecycle tests remain active. Placement is not connected to application
-  resource state, and the helper has no input handlers.
+- Restore the three white SVGs and their material references byte-for-byte from
+  `5d26367`. The four scene wrappers, shared mesh, shader and all four materials
+  also match that baseline. Compute Engine keeps its supplied-pack CPU symbol.
+- Preserve all four original atlas PNGs. Storage and VPN were absent from
+  `5d26367`; both were recovered from the supplied ZIP. All four PNGs match
+  that ZIP byte-for-byte and are required by the native materials.
+- Remove the eight original OBJ/MTL comparison files and their pack README.
+  The reusable scenes use the shared native mesh, not those source meshes.
+- Remove the three colored icon PNGs and their now-unused rasterization tool.
+  Godot imports the selected 256-pixel white SVGs directly.
+- Remove eight redundant committed comparison/full-board evidence files and
+  clean up the historical untracked comparison outputs. Before/after evidence
+  is already recorded in the PR. Keep two useful captures and two JSON records.
+- Remove the resource preview's `--compare`, `--variant` and `--generate-icons`
+  options and associated branches. Update dependency checks and documentation
+  to match the retained files.
 
-## Asset inventory and conventions
+The PR now contains **35 changed files instead of 53** against `master`:
+17 runtime assets, three original SVG sources for provenance, seven launcher /
+validation / authoring files, four documentation / provenance files and four
+validation evidence files. No native libraries or new import caches are included.
 
-The required native assets are four `.tscn` wrappers, one shared mesh `.tres`,
-one shared spatial shader, four material `.tres` files, three original Google
-SVGs and their reproducible rendered PNGs, and four original OBJ/MTL/PNG triples.
-Source/usage READMEs, icon provenance, the checker, launchers and native test helpers
-are included. Screenshots and sanitized JSON are review evidence, not import caches.
-No native Dart libraries, package caches, Python bytecode or new `.godot` caches
-are added. The repository has some pre-existing tracked `.godot` files; the
-isolated asset launcher does not copy or use them.
+The original ZIP and earlier Git commits retain the comparison meshes. The
+four `source/*/*_texture.png` files stay in the repository because they remain
+runtime dependencies. The original Google SVGs stay as provenance sources;
+they are distinct from the white derivatives used at runtime.
 
-Cubes remain **1 × 1 × 1**, Y-up, with the base at Y=0 and a **0.045** bevel.
-The demo uses **0.68** uniform scale and positions the base at **Y=0.12**, exactly
-on the existing tile top. Their footprint fits inside its 0.93-unit flat top.
-The four demo cells, `(row, column)`, are Storage `(3,1)`, Compute `(1,2)`, VPN
-`(2,4)`, and Load Balancing `(4,3)`.
+## Asset conventions and demonstration
 
-## Icon mapping and usage
+The shared mesh is **1 × 1 × 1**, Y-up, centered on X/Z=0 with its base at Y=0.
+It has a **0.045-unit chamfer** and **44 triangles**. All four scene wrappers
+reuse this mesh. The opaque shader uses metallic=0, roughness=0.38,
+specular=0.25 and clearcoat=0.18, with the original atlas orientation preserved.
 
-| Service | Source icon | Classification |
-| --- | --- | --- |
-| Cloud Storage | `icons/official/cloud_storage.svg` | Official legacy console artwork, unchanged |
-| Compute Engine | `source/compute_engine/compute_engine_texture.png` | Supplied-pack CPU symbol; not claimed as official Google artwork |
-| Cloud VPN | `icons/official/cloud_vpn.svg` | Official legacy console artwork, unchanged |
-| Cloud Load Balancing | `icons/official/cloud_load_balancing.svg` | Official legacy console artwork, unchanged |
+The demonstration uses uniform scale **0.68** and base height **Y=0.12**, inside
+the existing tile's 0.93-unit flat top. Cells `(row, column)` are Storage `(3,1)`,
+Compute `(1,2)`, VPN `(2,4)` and Load Balancing `(4,3)`.
 
-Google's [icon library](https://cloud.google.com/icons) supplies these resources
-for diagrams and technical documentation. The
-[brand guidance](https://about.google/brand-resource-center/guidance/) and
-[trademark rules](https://about.google/brand-resource-center/rules/) require
-appropriate original artwork and no suggestion of affiliation or endorsement.
-The download is not treated as permission to recolor or relicense the art. The
-three official source hashes and rendered-image hashes are documented in
-[`icons/provenance.json`](frontend/assets/models/resource_cubes/icons/provenance.json).
-See the [usage notes](frontend/assets/models/resource_cubes/icons/README.md) for
-ownership, the absence of a standalone ZIP license and applicable Google terms.
-The previous white derivatives are removed from the current tree; history is not rewritten.
+The asset-only preview needs Python, Godot 4.4 and X11. It builds an empty
+temporary project from the existing board, camera, lighting and backdrop, then
+uses a native visual fixture. It needs no Dart libraries, package caches,
+previous imports or backend. Final publication validation uses a clean export
+of the exact commit and a fresh import.
+
+The opt-in `--resource-cubes` mode in the existing Dart-grid launcher adds four
+static visual children in a temporary scene. The existing Dart grid, real BLoC,
+tile picking, highlighting and lifecycle tests stay active. Its fake repository
+and HTTP client reject unexpected calls. This is a visual demonstration, not
+application resource placement or provisioning.
 
 ## Validation
 
-The asset-only test uses a clean Git-exported source tree and an empty temporary
-Godot project. It copies only committed resource sources, not the working tree's
-untracked files, native Dart libraries or imported resources. It regenerates
-icon PNGs from the original SVGs and verifies matching hashes, then imports and
-renders all four corrected scenes and the original comparison assets.
-
-The separate Dart-grid demonstration uses the established local Godot/Dart SDK
-prerequisites. Its fake repository/client are fail-closed; the regression marker
-asserts **repository calls=0, HTTP requests=0**, no placed resources and no pending
-operations. The tests cover all 36 tile centers, gaps/outside clicks, GUI input
-interception, resizing, external selection updates, reloads, subscription counts
-and local fallback disposal. All four visual children survive reloads.
-
-Recorded results and dependency hashes are in
-[publication_validation.json](docs/frontend/resource_cubes_preview/publication_validation.json).
-The original exact published commit is tested as a negative control, and the
-fixed source tree is tested with fresh imports before publication. The final
-committed tree is checked again before pushing its exact commit to the PR branch.
-
 | Check | Result |
 | --- | --- |
-| Published `5d26367` negative control | Reproduced the two missing texture errors |
-| Dependency graph and Git-index check | 28 dependencies pass; old-index negative control rejects unpublished files |
-| Fresh asset-only import/render and icon regeneration | Both variants pass; regenerated PNG hashes match |
-| Dart unit tests / analysis | 49 tests pass; no analysis issues |
-| Native Godot 2D scene and local diagnostic | Pass |
-| Native 3D selection/lifecycle with four cubes | Pass; 36 centers tested, no HTTP or provisioning calls |
+| Visual baseline | All 13 scene/mesh/shader/material/white-SVG files match `5d26367` |
+| Texture integrity | All four atlases match the supplied ZIP |
+| Dependency closure | 20 resource/provenance files; missing Storage or VPN PNG is rejected |
+| Git-index inclusion | Required dependencies must be tracked before publication |
+| Fresh native asset import and rendering | Passed: four models, 36 tiles, geometry/material assertions |
+| Dart unit tests | 49 passed |
+| Dart static analysis | No issues found |
+| Native Dart 3D selection/lifecycle with cubes | Passed; 36 centers, zero repository/HTTP calls |
 
-The unchanged 2D harness's headless editor import still emits Godot 4.4
-progress-dialog diagnostics on this VM, despite exit code 0 and its positive
-initialization marker. Its runtime scene/diagnostic checks have no engine,
-script or shader errors. The windowed fresh asset import and final 3D import/run
-have no such errors or ObjectDB leak warnings. Existing UID fallback warnings
-resolve through the checked-in text paths. These environment diagnostics are
-recorded rather than hidden or addressed through unrelated configuration changes.
+The 3D regression covers all 36 tile centers, gaps/outside clicks, GUI
+interception, resizing, external state updates, scene reloads, subscription
+counts and fallback disposal. It asserts zero repository/HTTP calls and checks
+that all four visual cubes survive reloads. Results and dependency hashes are
+recorded in [publication_validation.json](docs/frontend/resource_cubes_preview/publication_validation.json).
 
-## Actual Godot captures
+The existing native 2D scene and local diagnostic passed during the preceding
+PR validation; they are unchanged by this cleanup and were not rerun. Their
+headless editor import has known Godot 4.4 progress-dialog diagnostics on this
+VM. The new asset checks use the windowed editor instead. The final native
+asset and 3D import/runtime logs have no engine, script or shader errors or
+ObjectDB leak warnings; the existing 3D UID warning falls back to its text path. Captures and runtime
+measurements use VirtualBox/Mesa llvmpipe software rendering; they are local
+validation evidence, not CI results or a hardware-performance claim.
 
-Four official-color service visuals with the existing selection active:
+## Current captures
 
-![Four cubes and active tile selection](docs/frontend/resource_cubes_preview/active_selection/selection_edge.png)
+![Four resource cubes with active tile selection](docs/frontend/resource_cubes_preview/active_selection/selection_edge.png)
 
-Unscaled native crop containing Storage and Compute Engine:
+![Compute and Storage icon detail](docs/frontend/resource_cubes_preview/active_selection/resource_cubes_two_services.png)
 
-![Two service icons](docs/frontend/resource_cubes_preview/active_selection/resource_cubes_two_services.png)
-
-[Asset-only full-board capture](docs/frontend/resource_cubes_preview/corrected.png) ·
-[Asset-only runtime record](docs/frontend/resource_cubes_preview/corrected.json) ·
-[Selection runtime record](docs/frontend/resource_cubes_preview/active_selection/runtime.json).
+[Runtime sample](docs/frontend/resource_cubes_preview/active_selection/runtime.json).
 
 ## Reproduce
 
@@ -127,31 +103,30 @@ From the repository root:
 
 ```bash
 python3 frontend/scripts/check_resource_cubes.py --require-tracked
-python3 frontend/scripts/preview-resource-cubes.py --generate-icons --check --compare --output /tmp/blacksmith-assets
-cd frontend/src
-/usr/lib/dart/bin/dart test
-/usr/lib/dart/bin/dart analyze
-cd ../..
-python3 frontend/scripts/test-godot.py --timeout 600
+python3 frontend/scripts/preview-resource-cubes.py --check --output /tmp/blacksmith-assets
 python3 frontend/scripts/run-isometric-3d.py --resource-cubes --check --timeout 600 --output /tmp/blacksmith-selection
 ```
 
-The asset-only check needs Python, Godot 4.4 and the VM's X11 display. The native
-Dart regressions additionally need the existing ignored Linux libraries, generated
-bindings and package configuration; these development prerequisites are not asset
-dependencies and are not committed. The 2D/3D tests do not start the backend.
+Run `dart test` and `dart analyze` from `frontend/src`. The Dart-grid launcher
+requires the existing local native libraries, generated bindings and package
+configuration. These development prerequisites are not committed asset imports.
+The asset-only launcher imports through X11 even when its scene check uses
+`--headless`; see the [asset README](frontend/assets/models/resource_cubes/README.md).
 
-## Scope and remaining limits
+## Observations and remaining limits
 
-No backend, database, GCP provisioning, production BLoC, resource-placement logic,
-production main scene or development-container configuration is modified. All
-existing stashes, including the issue #27 internal-illumination experiment, are
-preserved. No force push, history rewrite, merge, container or volume deletion is
-part of this fix.
+The selected white icons are **modified derivatives**, not unmodified or
+Google-approved official artwork. Original sources, attribution and hashes are
+retained in the [icon usage notes](frontend/assets/models/resource_cubes/icons/README.md)
+and [provenance](frontend/assets/models/resource_cubes/icons/provenance.json).
+No separate permission for recoloring has been established; the user's visual
+choice does not resolve that distribution question.
 
-This remains a visual asset demonstration. Cube picking, placement/removal driven
-by resource state, persistence and provisioning are separate work. The existing
-reflection probe captures lighting cards rather than cube reflections. Runtime
-observations use VirtualBox/Mesa llvmpipe software rendering; the recorded sample
-was approximately 7.8 FPS over 6.53 seconds. It is not a hardware-performance
-claim or a new benchmark suite. CI was not run.
+Cube picking, placement/removal driven by application resource state,
+persistence and provisioning remain separate work. The reflection probe
+captures lighting cards rather than reflections of the cubes.
+
+No production BLoC, placement logic, main scene, backend, database, provisioning
+or Dev Container changes are included. All existing Git stashes are preserved.
+Publication adds a normal commit to `issue_28`; no history rewrite or automatic
+PR merge is involved.

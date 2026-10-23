@@ -1,95 +1,40 @@
 {
   "date": "2026-10-23",
-  "reviewed_published_commit": "5d26367f1adedb4210abdf9d39e4feaadeffefb9",
-  "negative_control": {
-    "published_checkout_import": "failed as expected: two missing PNGs",
-    "gitignore_excludes_missing_textures": false,
-    "old_index_guard": {
-      "exit_code": 1,
-      "diagnostic": "Resource dependencies not in the Git index:\nfrontend/assets/models/resource_cubes/icons/rendered/cloud_load_balancing.png\nfrontend/assets/models/resource_cubes/icons/rendered/cloud_storage.png\nfrontend/assets/models/resource_cubes/icons/rendered/cloud_vpn.png\nfrontend/assets/models/resource_cubes/source/cloud_storage/cloud_storage_texture.png\nfrontend/assets/models/resource_cubes/source/cloud_vpn/cloud_vpn_texture.png"
-    }
+  "issue": 28,
+  "branch": "issue_28",
+  "visual_baseline_commit": "5d26367f1adedb4210abdf9d39e4feaadeffefb9",
+  "baseline_match": "13 scene, mesh, shader, material and white-SVG files match byte-for-byte.",
+  "atlas_integrity": "All four original PNGs match the supplied ZIP, including restored Storage and VPN textures.",
+  "dependency_count": 20,
+  "dependency_regressions": {
+    "missing_storage_texture": "Rejected",
+    "missing_vpn_texture": "Rejected",
+    "untracked_white_svgs": "Rejected before staging",
+    "git_index_inclusion": "Required before publication"
   },
-  "tested_candidate_tree": "39f9c2baaf33d55faf7c8d9ffbf089d618eb60d4",
-  "clean_asset_import_and_render": {
-    "original": "passed",
-    "corrected": "passed",
-    "fresh_temporary_import": true,
-    "local_native_dart_libraries_used": false,
-    "cached_imported_resources_copied": false,
-    "official_icon_regeneration_identical": true
+  "validation": {
+    "asset_only": "Fresh Godot project; import and rendered geometry/material checks passed for all four scenes.",
+    "publication_check": "Clean export of the final commit is imported and rendered again before push; only committed sources are copied, no Dart native libraries or import caches.",
+    "dart_unit_tests": 49,
+    "dart_analysis": "No issues found",
+    "native_3d_selection": "PASS: centers=36 gaps=true gui=true resize=true reload=true listeners=1 fallback_disposed=true repository_calls=0 http_requests=0",
+    "static_demo": "Four visual children survive reloads; no input handlers.",
+    "final_asset_and_3d_logs": "No engine/script/shader errors or ObjectDB leak warnings.",
+    "existing_warning": "3D scene UID resolves using the text resource path.",
+    "previous_2d_validation": "Native scene and local diagnostic passed before this cleanup; unchanged and not rerun. Headless editor progress-dialog diagnostics remain a known Godot 4.4 VM caveat.",
+    "ci": "Not run"
   },
-  "dart": {
-    "unit_tests_passed": 49,
-    "analysis": "no issues"
+  "environment": {
+    "godot": "4.4.stable.official.4c311cbee",
+    "renderer": "Compatibility",
+    "display": "X11",
+    "gpu": "llvmpipe (LLVM 20.1.2, 256 bits)",
+    "viewport": [
+      1152,
+      648
+    ],
+    "runtime_sample": "active_selection/runtime.json"
   },
-  "native_2d": {
-    "import_marker": "passed",
-    "scene": "passed",
-    "local_diagnostic": "passed",
-    "runtime_errors": false,
-    "known_headless_editor_progress_dialog_errors": true
-  },
-  "native_3d": {
-    "selection_and_render": "passed",
-    "tile_centers_tested": 36,
-    "gaps_gui_resize_reload_disposal": "passed",
-    "resource_visuals": 4,
-    "http_requests": 0,
-    "repository_calls": 0,
-    "runtime_errors": false,
-    "objectdb_leak_warnings": false
-  },
-  "stashes_unchanged": true,
-  "original_source_checksums": [
-    {
-      "file": "frontend/assets/models/resource_cubes/source/cloud_storage/cloud_storage.obj",
-      "sha256": "90de37ed471922dabf7f910faa17599a0c1ffa07354f315a962c4e706674f78e"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/cloud_storage/cloud_storage.mtl",
-      "sha256": "4a177986e62cc0e00c939bf20a780603c1e44356dc0d0d32281a79d132955c6a"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/cloud_storage/cloud_storage_texture.png",
-      "sha256": "6490116fce1dc29773e80c26d73a5ad9d36a3bf01b5e1f570fd01210bffeaaee"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/compute_engine/compute_engine.obj",
-      "sha256": "2af71087c05f78cf9a32edb6999bd032ab62c7009b92cbf37fd69bfc4478d156"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/compute_engine/compute_engine.mtl",
-      "sha256": "36fe1a525c6ce195baceb5e138698be9d432ef9677f3c561d68c7c4e8936fc76"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/compute_engine/compute_engine_texture.png",
-      "sha256": "cfb2ad831a4e16cb3f44be50e550c018dfda2fd5e50734c3b8a270fa6dc1bba4"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/cloud_vpn/cloud_vpn.obj",
-      "sha256": "f3e52b6f9b58fc66cf930ed12aa0fbdb6aab24ddacde700605e7ff7a2f8b4204"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/cloud_vpn/cloud_vpn.mtl",
-      "sha256": "92899541215705730e3b65517392e2ad8e0f7b7fd8c94c03644e68a5d4062305"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/cloud_vpn/cloud_vpn_texture.png",
-      "sha256": "2ea3112a9cf46527eeb3e86e2d4068f68c83bb3fde3e19f8190a14664e2c844d"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/load_balancer/load_balancer.obj",
-      "sha256": "c282e8871e385ae932cbb5b48844a4cc223d1462eebf5e02da0dd05d857fe15f"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/load_balancer/load_balancer.mtl",
-      "sha256": "126008914c92802a9859305a8c34b42b61842fa22635c67693554ea2808035c9"
-    },
-    {
-      "file": "frontend/assets/models/resource_cubes/source/load_balancer/load_balancer_texture.png",
-      "sha256": "be3ebed9d0d12923e3a52736515d596e79638559beae6b5203ac67fa0b44123d"
-    }
-  ],
   "dependencies": [
     {
       "file": "assets/models/resource_cubes/beveled_resource_cube.tres",
@@ -124,16 +69,16 @@
       "sha256": "868f5c9e0f72db83c0e7fe4be462433ddb98fc6d4b81aff6c5eb42fa44fd3116"
     },
     {
-      "file": "assets/models/resource_cubes/icons/rendered/cloud_load_balancing.png",
-      "sha256": "47bdc805794e97cb048fae6805ec17735e7482e871936132d78040db7fcd77d9"
+      "file": "assets/models/resource_cubes/icons/white/cloud_storage.svg",
+      "sha256": "314bbedded14ff867ab233664ae7195d94b7968ae15ea717d05899063c3f48a8"
     },
     {
-      "file": "assets/models/resource_cubes/icons/rendered/cloud_storage.png",
-      "sha256": "80f491b326cec65aecbbfaa8251e5844899b2d35006374a7bd090c8a2a7d87f8"
+      "file": "assets/models/resource_cubes/icons/white/cloud_vpn.svg",
+      "sha256": "b64ccd3a66def7a9a54ab9575e378dd10a07e931dfaa535ffa9592d071411b0a"
     },
     {
-      "file": "assets/models/resource_cubes/icons/rendered/cloud_vpn.png",
-      "sha256": "a4cb0f66a77fe9b97ee8cbe8799d26c397def9a0577cfeb69ae75352d7b0718e"
+      "file": "assets/models/resource_cubes/icons/white/load_balancer.svg",
+      "sha256": "bf765b6ae6e2802ce21ee713d0350583216436c3b7851126fd63bace422402e1"
     },
     {
       "file": "assets/models/resource_cubes/load_balancer.tscn",
@@ -141,11 +86,11 @@
     },
     {
       "file": "assets/models/resource_cubes/materials/cloud_storage.tres",
-      "sha256": "fce188a14e57b8e45168f71300c434fde68105426c1a47b4437a94072b30b893"
+      "sha256": "5ddc192f77d1c3e21c5d1ccdc1e5f15633bd0d988a7c567b60435450eb4968e4"
     },
     {
       "file": "assets/models/resource_cubes/materials/cloud_vpn.tres",
-      "sha256": "3c36030c0593ea4d24522219a14b86afa95e6f6b5286ac9af348d7b72b11e89e"
+      "sha256": "6d12cb5716c58b961911a0fb2e1ebd1404ec552fb8afb95356856999999d0c23"
     },
     {
       "file": "assets/models/resource_cubes/materials/compute_engine.tres",
@@ -153,57 +98,25 @@
     },
     {
       "file": "assets/models/resource_cubes/materials/load_balancer.tres",
-      "sha256": "ebb55a236d300607a0e00c280b28c0b8804cc06500ed10cc5942dace643e73d6"
-    },
-    {
-      "file": "assets/models/resource_cubes/source/cloud_storage/cloud_storage.mtl",
-      "sha256": "4a177986e62cc0e00c939bf20a780603c1e44356dc0d0d32281a79d132955c6a"
-    },
-    {
-      "file": "assets/models/resource_cubes/source/cloud_storage/cloud_storage.obj",
-      "sha256": "90de37ed471922dabf7f910faa17599a0c1ffa07354f315a962c4e706674f78e"
+      "sha256": "defe931166956e3b3a0be427af7f50c533705be14da4120d520e45113268bf1e"
     },
     {
       "file": "assets/models/resource_cubes/source/cloud_storage/cloud_storage_texture.png",
       "sha256": "6490116fce1dc29773e80c26d73a5ad9d36a3bf01b5e1f570fd01210bffeaaee"
     },
     {
-      "file": "assets/models/resource_cubes/source/cloud_vpn/cloud_vpn.mtl",
-      "sha256": "92899541215705730e3b65517392e2ad8e0f7b7fd8c94c03644e68a5d4062305"
-    },
-    {
-      "file": "assets/models/resource_cubes/source/cloud_vpn/cloud_vpn.obj",
-      "sha256": "f3e52b6f9b58fc66cf930ed12aa0fbdb6aab24ddacde700605e7ff7a2f8b4204"
-    },
-    {
       "file": "assets/models/resource_cubes/source/cloud_vpn/cloud_vpn_texture.png",
       "sha256": "2ea3112a9cf46527eeb3e86e2d4068f68c83bb3fde3e19f8190a14664e2c844d"
-    },
-    {
-      "file": "assets/models/resource_cubes/source/compute_engine/compute_engine.mtl",
-      "sha256": "36fe1a525c6ce195baceb5e138698be9d432ef9677f3c561d68c7c4e8936fc76"
-    },
-    {
-      "file": "assets/models/resource_cubes/source/compute_engine/compute_engine.obj",
-      "sha256": "2af71087c05f78cf9a32edb6999bd032ab62c7009b92cbf37fd69bfc4478d156"
     },
     {
       "file": "assets/models/resource_cubes/source/compute_engine/compute_engine_texture.png",
       "sha256": "cfb2ad831a4e16cb3f44be50e550c018dfda2fd5e50734c3b8a270fa6dc1bba4"
     },
     {
-      "file": "assets/models/resource_cubes/source/load_balancer/load_balancer.mtl",
-      "sha256": "126008914c92802a9859305a8c34b42b61842fa22635c67693554ea2808035c9"
-    },
-    {
-      "file": "assets/models/resource_cubes/source/load_balancer/load_balancer.obj",
-      "sha256": "c282e8871e385ae932cbb5b48844a4cc223d1462eebf5e02da0dd05d857fe15f"
-    },
-    {
       "file": "assets/models/resource_cubes/source/load_balancer/load_balancer_texture.png",
       "sha256": "be3ebed9d0d12923e3a52736515d596e79638559beae6b5203ac67fa0b44123d"
     }
   ],
-  "icon_ownership_and_usage": "See frontend/assets/models/resource_cubes/icons/README.md; unmodified official sources, original colors; previous white derivatives removed by user choice.",
-  "scope": "No production BLoC, backend, database, provisioning or placement changes. Local validation, not CI."
+  "icon_usage": "White derivatives restored by explicit user choice. Original Google SVGs retained for provenance; separate recoloring permission has not been established. See the icon README.",
+  "scope": "Visual assets and local validation only; no production BLoC, placement, backend, database or provisioning changes. Existing stashes preserved."
 }

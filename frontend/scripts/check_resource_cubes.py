@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check the complete native resource dependency graph before Godot import.
 
-Includes the original OBJ/MTL comparison assets. --require-tracked also rejects
+Includes original SVG sources for provenance. --require-tracked also rejects
 dependencies absent from the Git index, preventing local-only texture fixes.
 """
 import argparse
@@ -18,8 +18,6 @@ def validate_assets(source, require_tracked=False):
     source = Path(source).resolve()
     assets = Path('assets/models/resource_cubes')
     pending = [assets / f'{service}.tscn' for service in SERVICES]
-    pending += [assets / 'source' / service / f'{service}.obj'
-                for service in SERVICES]
     pending += [assets / 'icons/official' / f'{service}.svg'
                 for service in ('cloud_storage', 'cloud_vpn', 'cloud_load_balancing')]
     visited = set()
@@ -36,11 +34,6 @@ def validate_assets(source, require_tracked=False):
         if path.suffix in {'.tscn', '.tres', '.gdshader'}:
             pending += [Path(name) for name in
                         re.findall(r'res://([^"\s]+)', path.read_text())]
-        elif path.suffix in {'.obj', '.mtl'}:
-            for line in path.read_text().splitlines():
-                fields = line.split(maxsplit=1)
-                if len(fields) == 2 and fields[0] in {'mtllib', 'map_Kd'}:
-                    pending.append(relative.parent / fields[1])
     if missing:
         raise ValueError('Missing resource dependencies:\n' +
                          '\n'.join(sorted(missing)))

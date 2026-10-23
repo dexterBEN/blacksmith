@@ -3,40 +3,41 @@
   "collection": "Google Cloud legacy console icons",
   "download_url": "https://services.google.com/fh/files/misc/google-cloud-legacy-icons.zip",
   "archive_sha256": "a6d9d7921758042538b462f03cf64614c2cebd96743b3ed63580a769fc7de3e9",
-  "adaptation": "None: the three official SVG source files are used without recoloring or geometry changes. Compute Engine uses the original supplied-pack symbol, not claimed as official artwork.",
+  "adaptation": "Three white SVG derivatives restored byte-for-byte from 5d26367; original SVGs retained for provenance. Compute Engine keeps the supplied-pack CPU symbol.",
   "icons": [
     {
       "service": "cloud_storage",
       "official_service": "cloud_storage",
       "zip_entry": "cloud_storage/cloud_storage.svg",
       "original_sha256": "2528d1bf4dce824c66e5a1421e22e1153e0661b296a48d310886d5cd09921fef",
-      "used_file": "official/cloud_storage.svg",
-      "runtime_file": "rendered/cloud_storage.png",
-      "runtime_sha256": "80f491b326cec65aecbbfaa8251e5844899b2d35006374a7bd090c8a2a7d87f8"
+      "runtime_file": "white/cloud_storage.svg",
+      "runtime_sha256": "314bbedded14ff867ab233664ae7195d94b7968ae15ea717d05899063c3f48a8",
+      "source_file": "official/cloud_storage.svg"
     },
     {
       "service": "cloud_vpn",
       "official_service": "cloud_vpn",
       "zip_entry": "cloud_vpn/cloud_vpn.svg",
       "original_sha256": "868f5c9e0f72db83c0e7fe4be462433ddb98fc6d4b81aff6c5eb42fa44fd3116",
-      "used_file": "official/cloud_vpn.svg",
-      "runtime_file": "rendered/cloud_vpn.png",
-      "runtime_sha256": "a4cb0f66a77fe9b97ee8cbe8799d26c397def9a0577cfeb69ae75352d7b0718e"
+      "runtime_file": "white/cloud_vpn.svg",
+      "runtime_sha256": "b64ccd3a66def7a9a54ab9575e378dd10a07e931dfaa535ffa9592d071411b0a",
+      "source_file": "official/cloud_vpn.svg"
     },
     {
       "service": "load_balancer",
       "official_service": "cloud_load_balancing",
       "zip_entry": "cloud_load_balancing/cloud_load_balancing.svg",
       "original_sha256": "ea8974dc8766309a616bc10c09c0f630c0ff6a5bb1e9664cc17c4fb1ec29ef11",
-      "used_file": "official/cloud_load_balancing.svg",
-      "runtime_file": "rendered/cloud_load_balancing.png",
-      "runtime_sha256": "47bdc805794e97cb048fae6805ec17735e7482e871936132d78040db7fcd77d9"
+      "runtime_file": "white/load_balancer.svg",
+      "runtime_sha256": "bf765b6ae6e2802ce21ee713d0350583216436c3b7851126fd63bace422402e1",
+      "source_file": "official/cloud_load_balancing.svg"
     }
   ],
   "usage_review_date": "2026-10-23",
   "brand_guidance": "https://about.google/brand-resource-center/guidance/",
   "trademark_rules": "https://about.google/brand-resource-center/rules/",
-  "permission_scope": "Original downloaded SVG artwork used for service identification in the architecture visualization; no independent recoloring permission or open-source license grant asserted.",
-  "user_decision": "Use the original official SVGs without recoloring; remove previous white adaptations.",
-  "rendering": "Godot Image.load_svg_from_string at 256/24 scale, original colors, geometry and aspect ratio; no white conversion."
+  "permission_scope": "No independent permission to recolor or open-source license grant established; white derivatives are not claimed as Google-approved artwork.",
+  "user_decision": "Restore the white icon variants from 5d26367, explicitly confirmed during PR #29 cleanup.",
+  "rendering": "Godot imports the original 256-pixel white SVG derivatives directly; colored rasterizations are removed.",
+  "visual_baseline_commit": "5d26367f1adedb4210abdf9d39e4feaadeffefb9"
 }

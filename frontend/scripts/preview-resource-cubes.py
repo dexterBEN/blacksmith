@@ -20,23 +20,15 @@ from check_resource_cubes import validate_assets
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--godot', default='godot')
-    parser.add_argument('--variant', choices=['original', 'corrected'],
-                        default='corrected')
     parser.add_argument('--check', action='store_true',
                         help='Validate, capture real viewport images and exit.')
-    parser.add_argument('--compare', action='store_true',
-                        help='Check both variants after one import (requires --check or --headless).')
     parser.add_argument('--headless', action='store_true',
                         help='Validate native resources without rendering.')
     parser.add_argument('--generate-mesh', action='store_true',
                         help='Regenerate the shared corrected mesh in the repo.')
-    parser.add_argument('--generate-icons', action='store_true',
-                        help='Rasterize the unchanged official SVGs at 256 pixels.')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--timeout', type=int, default=180)
     args = parser.parse_args()
-    if args.compare and not (args.check or args.headless):
-        parser.error('--compare requires --check or --headless')
     source = Path(__file__).resolve().parents[1]
     dependencies = validate_assets(source)
     print(f'Resource dependencies: PASS ({len(dependencies)} files)', flush=True)
@@ -50,8 +42,7 @@ def main():
         shutil.copytree(source / folder, project / folder,
                         ignore=shutil.ignore_patterns('*.import', '*.uid'))
     (project / 'tools').mkdir()
-    for name in ['resource_cubes_preview.gd', 'generate_resource_cube.gd',
-                 'render_resource_icons.gd']:
+    for name in ['resource_cubes_preview.gd', 'generate_resource_cube.gd']:
         shutil.copyfile(source / 'tools' / name, project / 'tools' / name)
     scene = (source / 'scenes/isometric_3d.tscn').read_text()
     old = next(line for line in scene.splitlines()
@@ -75,12 +66,11 @@ def main():
     env = os.environ.copy()
     for name in ['DATA', 'CONFIG', 'CACHE']:
         env[f'XDG_{name}_HOME'] = str(project / f'xdg-{name.lower()}')
-    env['BLACKSMITH_CUBES_VARIANT'] = args.variant
     env['BLACKSMITH_CUBES_CHECK'] = '1' if args.check or args.headless else '0'
     env['BLACKSMITH_CUBES_OUTPUT'] = str(output)
 
     def run(name, arguments, marker=None, timeout=args.timeout):
-        log = output / f'{env["BLACKSMITH_CUBES_VARIANT"]}_{name}.log'
+        log = output / f'{name}.log'
         try:
             with log.open('w') as stream:
                 result = subprocess.run(
@@ -103,12 +93,6 @@ def main():
                          'res://tools/generate_resource_cube.gd', '--',
                          str(destination)], 'BLACKSMITH_RESOURCE_CUBE_GENERATED')
         shutil.copyfile(destination, project / destination.relative_to(source))
-    if args.generate_icons:
-        directory = source / 'assets/models/resource_cubes/icons'
-        run('icons', ['--headless', '--script', 'res://tools/render_resource_icons.gd',
-                      '--', str(directory)], 'BLACKSMITH_OFFICIAL_ICONS_RENDERED')
-        for image in (directory / 'rendered').glob('*.png'):
-            shutil.copyfile(image, project / image.relative_to(source))
     # Godot 4.4's headless editor emits progress-dialog errors on this VM.
     # Import through the real editor; --headless only affects the scene check.
     run('import', ['--editor', '--import', '--display-driver', 'x11',
@@ -118,10 +102,8 @@ def main():
         '--resolution', '1152x648', '--max-fps', '60']
     marker = ('BLACKSMITH_RESOURCE_CUBES_PASSED'
               if args.check or args.headless else 'BLACKSMITH_RESOURCE_CUBES_READY')
-    for variant in ['original', 'corrected'] if args.compare else [args.variant]:
-        env['BLACKSMITH_CUBES_VARIANT'] = variant
-        run('scene', arguments, marker,
-            args.timeout if args.check or args.headless else None)
+    run('scene', arguments, marker,
+        args.timeout if args.check or args.headless else None)
 
 
 if __name__ == '__main__':

@@ -1,117 +1,75 @@
 # Resource cube assets
 
-Four reusable Godot scenes derived from the user-supplied
-`Blacksmith_Godot_3D_Models.zip`: Cloud Storage, Compute Engine, Cloud VPN and
-Load Balancer. These are visual assets; instancing one does not create a cloud
-resource or connect it to application state.
+Four reusable visual scenes for Cloud Storage, Compute Engine, Cloud VPN and
+Load Balancer, derived from the supplied `Blacksmith_Godot_3D_Models.zip`.
+Instancing a scene does not create a cloud resource or update application state.
 
-## Files and preservation
+## Required files
 
-- `source/` contains the original OBJ, MTL and PNG files, byte-for-byte copies
-  from the ZIP, plus its original README. Leave these unchanged for comparison.
-- `beveled_resource_cube.tres` is one shared native Godot `ArrayMesh`.
-- `materials/` contains one opaque coated-plastic material per original atlas.
-- `coated_blue_plastic.gdshader` supplies nonmetallic lighting and calibrates
-  blue pigment separately from the white icons. The original PNGs are unchanged.
-- `icons/official/` contains the unmodified GCP SVGs for Cloud Storage, Cloud VPN
-  and Cloud Load Balancing. See the provenance and usage notes in `icons/`.
-- `icons/rendered/` contains Godot's 256-pixel rasterizations of those exact
-  SVGs for crisp sampling on the cube; original colors and shapes are retained.
-- The four `.tscn` files share the mesh and assign their corresponding material.
+- Four `.tscn` wrappers share `beveled_resource_cube.tres` and the opaque
+  `coated_blue_plastic.gdshader`, with one material per service in `materials/`.
+- `source/*/*_texture.png` contains the four unchanged supplied-pack atlases.
+  All four are runtime dependencies, including the restored Storage and VPN PNGs.
+- `icons/white/` contains the three 256-pixel white SVG adaptations restored
+  byte-for-byte from commit `5d26367`, as explicitly requested during PR review.
+- `icons/official/` preserves their original Google SVG sources for provenance.
+  See [icon usage notes](icons/README.md) and [hashes](icons/provenance.json).
 
-The source README describes OBJ files as imported scenes. Godot's default OBJ
-import is a mesh, not a `PackedScene`; use the supplied `.tscn` wrappers instead.
-No Blender installation or model conversion tool is required to use these scenes.
+Original OBJ/MTL comparison files, colored icon rasterizations and duplicate
+before/after captures have been removed. Use the native `.tscn` wrappers; no
+Blender conversion is required. The source ZIP and previous commits retain the
+original comparison meshes.
 
 ## Geometry and placement
 
-The mesh is 1 × 1 × 1 units, Y-up, with its base at Y=0 and its footprint
-centered on X/Z=0. A 0.045-unit chamfer replaces the sharp edges. The mesh has
-44 triangles and smooth shading across the chamfers, while the six flat face
-centers retain their axis-aligned normals. The face atlas orientation is preserved.
-Compute Engine keeps its original supplied-pack symbol (not claimed as official).
-The other three front symbols use Google's original legacy console SVGs, without
-recoloring or geometry changes. Their original colors replace the earlier white
-adaptations, following the user's choice during the PR #29 review.
-The icons remain flat artwork, not raised geometry.
+Each cube is **1 × 1 × 1**, Y-up, centered on X/Z=0 with its base at Y=0.
+The shared mesh has a **0.045** chamfer and **44 triangles**. Its face atlas
+orientation is preserved. Compute Engine retains the supplied-pack CPU symbol;
+the other three front faces use the white adaptations. Icons are flat artwork.
 
-For the current unscaled tiles (1 × 0.24 × 1), instantiate a resource scene as
-a child of its tile, set its position to `(0, 0.12, 0)`, and its uniform scale
-to `0.68`. This leaves a visible margin inside the tile's flat top and puts
-the cube base exactly on its surface. The asset itself remains unscaled for reuse.
+For an existing unscaled tile (1 × 0.24 × 1), add the resource scene as a child,
+set its local position to `(0, 0.12, 0)` and its uniform scale to `0.68`.
+Its base contacts the tile top and its footprint fits inside the 0.93-unit flat
+surface. The reusable asset itself remains unscaled.
 
-The application selection currently intersects a ray with the tile plane. This
-preview does not add picking for cubes, application placement events, persistence,
-or BLoC integration.
+The shader uses metallic=0, roughness=0.38, specular=0.25 and clearcoat=0.18.
+Its `(0.42, 0.58, 0.9)` blue-pigment multiplier preserves white glyphs. For the
+three replacement icons, the shader rebuilds the front's blue gradient from
+clean atlas margins and samples `service_icon` with `icon_scale=0.7`.
+This calibration is specific to these supplied atlases.
 
-## Preview and reproduce
+## Preview and validation
 
-From the repository root, using the existing Godot 4.4 executable:
+Run from the repository root with Python 3 and Godot 4.4:
 
 ```bash
-# Open the corrected models on the current board; close the window to exit.
-python3 frontend/scripts/preview-resource-cubes.py
-
-# Check dependencies and verify they are present in the Git index.
+# Check all 20 resource/provenance dependencies and Git-index inclusion.
 python3 frontend/scripts/check_resource_cubes.py --require-tracked
 
-# Capture corrected/original models with identical framing and lighting.
-python3 frontend/scripts/preview-resource-cubes.py --check --compare --output /tmp/blacksmith-cubes
+# Open a standalone native preview; close its window to exit.
+python3 frontend/scripts/preview-resource-cubes.py
 
-# Reproduce the committed high-resolution textures from unchanged official SVGs.
-python3 frontend/scripts/preview-resource-cubes.py --generate-icons --check --output /tmp/blacksmith-cubes
+# Fresh import, geometry/material validation and actual viewport captures.
+python3 frontend/scripts/preview-resource-cubes.py --check --output /tmp/blacksmith-cubes
 
-# Use the real existing Dart grid, picking and selection with static visual cubes.
-python3 frontend/scripts/run-isometric-3d.py --resource-cubes
+# Regenerate the shared mesh and check geometry without rendering the scene.
+python3 frontend/scripts/preview-resource-cubes.py --generate-mesh --headless
 
-# Run existing native selection/lifecycle checks with the cubes present.
+# Use the existing Dart grid and run real selection/lifecycle checks with cubes.
 python3 frontend/scripts/run-isometric-3d.py --resource-cubes --check --timeout 600 --output /tmp/blacksmith-cubes-selection
-
-# Regenerate the shared mesh, then check it in the native fixture.
-python3 frontend/scripts/preview-resource-cubes.py --generate-mesh --headless --output /tmp/blacksmith-cubes-geometry
 ```
 
-The launcher creates a temporary Godot project. It copies the existing board
-scene, materials, backdrop and reflection setup, replacing only the Dart root
-script in that temporary copy with a static native visual fixture. It never
-starts the backend or loads the application dependencies. The import step uses
-the windowed editor to avoid Godot 4.4 headless-editor progress-dialog errors on
-the current VM. A working X11 display is required, including with `--headless`
-(which applies to the scene check, not the import).
+The asset-only launcher creates a fresh temporary Godot project containing
+committed assets and the existing board/camera/lighting/background. It replaces
+only the root script in that temporary fixture. It needs no Dart native libraries,
+package cache, imported resources or backend. Actual captures are 1152 × 648,
+with 4× MSAA. The import uses the windowed editor to avoid Godot 4.4 headless
+editor diagnostics on this VM; **X11 is required even with `--headless`**, which
+applies only to the scene check. Images, JSON and logs go to the selected output.
 
-Screenshots are actual 1152 × 648 Godot viewport captures. Individual-model
-close-ups are unscaled crops of the same image. The JSON records the renderer,
-model placement and native geometry/material checks. Logs remain local and
-are ignored by Git.
-
-The asset-only preview requires just Godot/Python and the committed assets; it
-does not copy native Dart libraries, package caches or local imported resources.
-The optional Dart-grid demonstration additionally requires the normal existing
-Godot/Dart native libraries and generated package configuration. It uses the
-established fail-closed test dependencies, never production provisioning.
-
-Both preview variants enable 4× MSAA in the temporary project, without changing
-the application rendering settings. The corrected material uses metallic=0,
-roughness=0.38, specular=0.25 and clearcoat=0.18. The blue-pigment multiplier is
-`(0.42, 0.58, 0.9)`; white texture pixels keep their original color. This color
-separation is tuned for the supplied atlases, not arbitrary replacement artwork.
-
-For the three corrected symbols, `replace_front_icon` removes the old painted
-glyph by reconstructing the front's blue gradient from its clean left/right
-texture margins. `service_icon` supplies the rendered official icon, centered with `icon_scale=0.7`.
-The source SVG colors are sampled directly, without the cube body's blue tint.
-Compute Engine leaves this option disabled; its material and original atlas are
-unchanged. This front-face replacement is specific to these cube atlases.
-
-## Files needed in a clean checkout
-
-Track the four `.tscn` wrappers, shared mesh and shader, four material `.tres`
-files, three official SVGs and their rendered PNGs, all original OBJ/MTL/PNG triples, and source/usage
-documentation. The source PNGs are runtime dependencies of the corrected
-materials too; the original OBJ/MTL files support the comparison variant.
-The checker walks all 28 resource/source dependencies, including `mtllib` and `map_Kd`.
-
-Track the Python checker/launchers, native preview/demo scripts and Dart test
-fixture changes. Do not track `.godot/`, `*.import`, Python bytecode, native
-libraries or package caches. Screenshots and sanitized JSON records under
-`docs/frontend/resource_cubes_preview/` are review evidence rather than imports.
+The opt-in Dart demonstration requires the usual local Godot/Dart libraries,
+packages and generated bindings. It adds static visual children to a temporary
+copy of the existing scene while retaining its BLoC, picking and lifecycle tests.
+Neither launcher implements application placement, persistence or cloud calls.
+The current tile-plane selection algorithm is unchanged; cubes have no separate
+picking handlers. Do not commit import caches, native libraries or package caches.

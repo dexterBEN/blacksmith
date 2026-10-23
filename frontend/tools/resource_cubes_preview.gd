@@ -7,15 +7,11 @@ const CELLS := [Vector2i(3, 1), Vector2i(1, 2), Vector2i(2, 4), Vector2i(4, 3)]
 const PITCH := 1.045
 const TOP := 0.12
 const MODEL_SCALE := 0.68
-var variant := "corrected"
 var samples: Array[Dictionary] = []
 var shared_cube_mesh: Mesh
 
 
 func _ready() -> void:
-	variant = OS.get_environment("BLACKSMITH_CUBES_VARIANT")
-	if variant.is_empty():
-		variant = "corrected"
 	var tile_scene: PackedScene = load("res://scenes/isometric_3d/tile.tscn")
 	for row in range(6):
 		for col in range(6):
@@ -29,15 +25,8 @@ func _ready() -> void:
 	add_child(models)
 	for index in SERVICES.size():
 		var service: String = SERVICES[index]
-		var model: Node3D
-		if variant == "original":
-			var instance := MeshInstance3D.new()
-			instance.mesh = load("res://assets/models/resource_cubes/source/%s/%s.obj" % [service, service])
-			instance.layers = 4
-			model = instance
-		else:
-			var packed: PackedScene = load("res://assets/models/resource_cubes/%s.tscn" % service)
-			model = packed.instantiate()
+		var packed: PackedScene = load("res://assets/models/resource_cubes/%s.tscn" % service)
+		var model: Node3D = packed.instantiate()
 		model.name = service
 		model.position = cell_position(CELLS[index]) + Vector3(0, TOP, 0)
 		model.scale = Vector3.ONE * MODEL_SCALE
@@ -45,7 +34,7 @@ func _ready() -> void:
 		validate_model(model, service, CELLS[index])
 	get_viewport().size_changed.connect(fit_camera)
 	fit_camera()
-	print("BLACKSMITH_RESOURCE_CUBES_READY variant=%s tiles=36 models=4" % variant)
+	print("BLACKSMITH_RESOURCE_CUBES_READY tiles=36 models=4")
 	if OS.get_environment("BLACKSMITH_CUBES_CHECK") == "1":
 		capture.call_deferred()
 
@@ -65,7 +54,7 @@ func fit_camera() -> void:
 
 
 func validate_model(model: Node3D, service: String, cell: Vector2i) -> void:
-	var instance: MeshInstance3D = model if model is MeshInstance3D else model.get_node("Cube")
+	var instance: MeshInstance3D = model.get_node("Cube")
 	var mesh := instance.mesh
 	var bounds := mesh.get_aabb()
 	assert(bounds.position.is_equal_approx(Vector3(-0.5, 0, -0.5)))
@@ -73,35 +62,24 @@ func validate_model(model: Node3D, service: String, cell: Vector2i) -> void:
 	assert(is_equal_approx(model.position.y + bounds.position.y * MODEL_SCALE, TOP))
 	assert(MODEL_SCALE < 1.0 - 2.0 * 0.035) # Inside the tile's flat top.
 	var material := instance.get_active_material(0)
-	var texture: Texture2D
-	var metallic: float
-	var roughness: float
+	assert(material is ShaderMaterial)
+	var texture: Texture2D = material.get_shader_parameter("albedo_texture")
+	var roughness: float = material.get_shader_parameter("roughness")
+	assert(is_equal_approx(roughness, 0.38))
+	assert(is_equal_approx(material.get_shader_parameter("clearcoat"), 0.18))
 	var service_icon_path := ""
-	if variant == "corrected":
-		assert(material is ShaderMaterial)
-		texture = material.get_shader_parameter("albedo_texture")
-		metallic = 0.0 # The opaque spatial shader explicitly writes METALLIC=0.
-		roughness = material.get_shader_parameter("roughness")
-		assert(is_equal_approx(roughness, 0.38))
-		assert(is_equal_approx(material.get_shader_parameter("clearcoat"), 0.18))
-		# Unset parameters return Nil here; the shader's default is false.
-		var replace_icon: bool = material.get_shader_parameter("replace_front_icon") == true
-		assert(replace_icon == (service != "compute_engine"))
-		if replace_icon:
-			var service_icon: Texture2D = material.get_shader_parameter("service_icon")
-			assert(service_icon != null)
-			assert(service_icon.get_size() == Vector2(256, 256))
-			service_icon_path = service_icon.resource_path
-			var official_name: String = "cloud_load_balancing" if service == "load_balancer" else service
-			assert(service_icon_path.ends_with("/icons/rendered/%s.png" % official_name))
-		if shared_cube_mesh == null:
-			shared_cube_mesh = mesh
-		assert(mesh == shared_cube_mesh)
-	else:
-		assert(material is StandardMaterial3D)
-		texture = material.albedo_texture
-		metallic = material.metallic
-		roughness = material.roughness
+	# Unset parameters return Nil here; the shader's default is false.
+	var replace_icon: bool = material.get_shader_parameter("replace_front_icon") == true
+	assert(replace_icon == (service != "compute_engine"))
+	if replace_icon:
+		var service_icon: Texture2D = material.get_shader_parameter("service_icon")
+		assert(service_icon != null)
+		assert(service_icon.get_size() == Vector2(256, 256))
+		service_icon_path = service_icon.resource_path
+		assert(service_icon_path.ends_with("/icons/white/%s.svg" % service))
+	if shared_cube_mesh == null:
+		shared_cube_mesh = mesh
+	assert(mesh == shared_cube_mesh)
 	assert(texture != null)
 	var arrays := mesh.surface_get_arrays(0)
 	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
@@ -119,11 +97,8 @@ func validate_model(model: Node3D, service: String, cell: Vector2i) -> void:
 		var b := vertices[indices[triangle_index + 1]]
 		var c := vertices[indices[triangle_index + 2]]
 		assert((c - a).cross(b - a).dot((a + b + c) / 3.0 - Vector3(0, 0.5, 0)) > 0)
-	if variant == "corrected":
-		assert(triangles == 44)
-	else:
-		assert(triangles == 12)
-	samples.append({"service": service, "cell": [cell.x, cell.y], "position": [model.position.x, model.position.y, model.position.z], "scale": MODEL_SCALE, "triangles": triangles, "metallic": metallic, "roughness": roughness, "texture": texture.resource_path, "service_icon": service_icon_path})
+	assert(triangles == 44)
+	samples.append({"service": service, "cell": [cell.x, cell.y], "position": [model.position.x, model.position.y, model.position.z], "scale": MODEL_SCALE, "triangles": triangles, "metallic": 0.0, "roughness": roughness, "texture": texture.resource_path, "service_icon": service_icon_path})
 
 
 func capture() -> void:
@@ -135,19 +110,12 @@ func capture() -> void:
 			await RenderingServer.frame_post_draw
 		var image := get_viewport().get_texture().get_image()
 		assert(image.get_width() == 1152 and image.get_height() == 648)
-		assert(image.save_png(output.path_join(variant + ".png")) == OK)
-		assert(image.get_region(Rect2i(340, 110, 390, 240)).save_png(output.path_join(variant + "_two_services.png")) == OK)
-		var models := get_node("ResourceModels")
-		for index in SERVICES.size():
-			var model: Node3D = models.get_child(index)
-			var center: Vector2 = $Camera3D.unproject_position(model.global_position + Vector3(0, MODEL_SCALE / 2, 0))
-			var region := Rect2i(Vector2i(center) - Vector2i(76, 90), Vector2i(152, 180))
-			assert(Rect2i(Vector2i.ZERO, image.get_size()).encloses(region))
-			assert(image.get_region(region).save_png(output.path_join("%s_%s.png" % [variant, SERVICES[index]])) == OK)
-	var report := {"variant": variant, "godot": Engine.get_version_info().string, "display": DisplayServer.get_name(), "renderer": RenderingServer.get_current_rendering_method(), "gpu": RenderingServer.get_video_adapter_name(), "viewport": [1152, 648], "msaa_3d": get_viewport().msaa_3d, "tile_count": 36, "models": samples, "rendered": not headless, "checks": "bounds, flat-top fit, base contact, UVs, normals, outward winding, triangle counts, textures, shared corrected mesh, corrected materials"}
-	var file := FileAccess.open(output.path_join(variant + ".json"), FileAccess.WRITE)
+		assert(image.save_png(output.path_join("resource_cubes.png")) == OK)
+		assert(image.get_region(Rect2i(340, 110, 390, 240)).save_png(output.path_join("resource_cubes_two_services.png")) == OK)
+	var report := {"godot": Engine.get_version_info().string, "display": DisplayServer.get_name(), "renderer": RenderingServer.get_current_rendering_method(), "gpu": RenderingServer.get_video_adapter_name(), "viewport": [1152, 648], "msaa_3d": get_viewport().msaa_3d, "tile_count": 36, "models": samples, "rendered": not headless, "checks": "bounds, flat-top fit, base contact, UVs, normals, outward winding, triangle counts, textures, shared mesh, materials"}
+	var file := FileAccess.open(output.path_join("resource_cubes.json"), FileAccess.WRITE)
 	assert(file != null)
 	file.store_string(JSON.stringify(report, "\t") + "\n")
 	file.close()
-	print("BLACKSMITH_RESOURCE_CUBES_PASSED variant=%s rendered=%s" % [variant, not headless])
+	print("BLACKSMITH_RESOURCE_CUBES_PASSED rendered=%s" % (not headless))
 	get_tree().quit()
