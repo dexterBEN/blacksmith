@@ -37,8 +37,6 @@ class _NoProvisioningRepository extends CloudStorageRepository {
 }
 
 class _ObservedBloc extends IsomapGridBloc {
-  _ObservedBloc(CloudStorageRepository repository)
-      : super(cloudStorageRepository: repository);
   int listeners = 0;
   int tileEvents = 0;
   int otherEvents = 0;
@@ -81,7 +79,7 @@ class SelectionFixture {
   SelectionFixture() {
     _api = CloudServicesApi(baseUrl: 'http://fake.invalid', client: _client);
     _repository = _NoProvisioningRepository(_api);
-    _bloc = _ObservedBloc(_repository);
+    _bloc = _ObservedBloc();
     _register();
   }
 
@@ -92,7 +90,11 @@ class SelectionFixture {
   final _originalMaterialColors = <String, List<double>>{};
   bool _disposed = false;
 
-  void _register() => di.sl.registerSingleton<IsomapGridBloc>(_bloc);
+  void _register() {
+    di.sl.registerSingleton<CloudServicesApi>(_api);
+    di.sl.registerSingleton<CloudStorageRepository>(_repository);
+    di.sl.registerSingleton<IsomapGridBloc>(_bloc);
+  }
 
   Future<void> dispose() async {
     if (_disposed) return;
@@ -266,8 +268,7 @@ class SelectionFixture {
         _repository.calls == 0 &&
             _client.requests == 0 &&
             _bloc.otherEvents == 0 &&
-            _bloc.state.tiles.isEmpty &&
-            _bloc.state.pendingOperations == 0,
+            _bloc.state.tiles.isEmpty,
         'Selection must never place resources, provision or call HTTP.');
     GD.print(Variant('BLACKSMITH_ISSUE17_SELECTION_PASSED centers=36 gaps=true '
         'gui=true resize=true reload=true listeners=1 fallback_disposed=true '
@@ -364,7 +365,6 @@ Future<void> _capture(Node scene, String filename,
   final image = scene.getViewport()!.getTexture()!.getImage()!;
   _check(image.getWidth() == width && image.getHeight() == height,
       'Capture must use the expected internal viewport dimensions.');
-  _check(
-      image.savePng('$output/$filename') == GDError.ok,
+  _check(image.savePng('$output/$filename') == GDError.ok,
       'Capture must come from the actual renderer.');
 }

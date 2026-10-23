@@ -14,30 +14,32 @@ import '../lib/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_state.dart';
 import '../lib/domain/models/grid_position.dart';
 import '../lib/domain/models/resource_kind.dart';
+import '../lib/isomap_grid.dart';
 import '../lib/resource_visuals.dart';
 
 class _NoNetworkClient extends http.BaseClient {
+  int requests = 0;
+
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) =>
-      throw StateError('Network access is forbidden in the Godot smoke test.');
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    requests++;
+    throw StateError('Network access is forbidden in the Godot smoke test.');
+  }
 }
 
 class _FakeRepository extends CloudStorageRepository {
   _FakeRepository(this.api) : super(api, projectId: 'fake-project');
   final CloudServicesApi api;
-  final calls = <async.Completer<String>>[];
+  int calls = 0;
 
   @override
   Future<String> createBucket({required int row, required int col}) {
-    final completion = async.Completer<String>();
-    calls.add(completion);
-    return completion.future;
+    calls++;
+    throw StateError('Provisioning is forbidden in the Godot smoke test.');
   }
 }
 
 class _ObservedBloc extends IsomapGridBloc {
-  _ObservedBloc(_FakeRepository repository)
-      : super(cloudStorageRepository: repository);
   int listeners = 0;
   int tileEvents = 0;
 
@@ -102,12 +104,12 @@ Sprite2D _icon(Node grid, int row, int col) =>
 
 void main() {
   final localOnly = Platform.environment['BLACKSMITH_SMOKE_LOCAL'] == '1';
-  final api = CloudServicesApi(
-      baseUrl: 'http://fake.invalid', client: _NoNetworkClient());
+  final client = _NoNetworkClient();
+  final api = CloudServicesApi(baseUrl: 'http://fake.invalid', client: client);
   final repository = _FakeRepository(api);
-  di.sl.registerSingleton<CloudStorageRepository>(repository,
-      dispose: (_) => api.close());
-  final bloc = _ObservedBloc(repository);
+  di.sl.registerSingleton<CloudServicesApi>(api, dispose: (api) => api.close());
+  di.sl.registerSingleton<CloudStorageRepository>(repository);
+  final bloc = _ObservedBloc();
   if (localOnly) {
     di.sl.registerFactory<IsomapGridBloc>(() =>
         throw StateError('Deliberately unavailable DI in diagnostic test.'));
@@ -134,8 +136,8 @@ void main() {
       final menu = scene.getNodeT<Control>('MenuOverlay')!;
       final panel = menu.getChild(0)! as Control;
       final buttons = panel.getChild(0)!;
-      final cloud = buttons.getChild(0)! as Control;
-      final compute = buttons.getChild(2)! as Control;
+      final cloud = buttons.getChild(0)! as TextureButton;
+      final compute = buttons.getChild(2)! as TextureButton;
       final size = viewport.getVisibleRect().size;
       final rect = cloud.getGlobalRect();
       GD.print(Variant('SMOKE viewport=${size.x},${size.y} '
@@ -152,9 +154,21 @@ void main() {
             y: rect.position.y + rect.size.y / 2);
       }
 
+      _check(cloud.isDisabled() && compute.isDisabled(),
+          'The palette must be disabled until a tile is selected.');
+      _check(
+          cloud.getTooltipText() == 'Select a tile before placing a resource.',
+          'Disabled placement must explain how to enable the palette.');
       await _click(viewport, center(cloud));
-      _check(repository.calls.isEmpty, 'No bucket without a selected tile.');
+      _check(grid.getChild(7)!.getChildCount() == 2,
+          'A disabled palette click must not add a resource.');
       await _click(viewport, _cell(grid, 1, 1));
+      _check(!cloud.isDisabled() && !compute.isDisabled(),
+          'Selecting a tile enables both resource choices.');
+      _check(
+          cloud.getTooltipText() ==
+              resourceVisuals[ResourceKind.cloudStorage]!.tooltip,
+          'Enabled buttons restore their service tooltip.');
       await _click(viewport, center(compute));
       _check(
           _icon(grid, 1, 1).getTexture()!.getPath() ==
@@ -171,24 +185,46 @@ void main() {
               0.01,
           'Preserve icon width scaling.');
       _check(icon.getZIndex() == 6, 'Preserve icon z ordering.');
+      await _click(viewport, center(cloud));
+      _check(
+          _icon(grid, 1, 1).getInstanceId() == icon.getInstanceId() &&
+              grid.getChild(7)!.getChildCount() == 3,
+          'Repeated placement must reuse one sprite without duplicates.');
+      await _click(viewport, center(compute));
+      _check(
+          _icon(grid, 1, 1).getTexture()!.getPath() ==
+                  resourceVisuals[ResourceKind.computeEngine]!.path &&
+              grid.getChild(7)!.getChildCount() == 3,
+          'Replacing Storage with Compute keeps exactly one sprite.');
+      await _click(viewport, center(cloud));
 
       if (localOnly) {
-        _check(
-            repository.calls.isEmpty, 'Diagnostic mode must never provision.');
+        final previousId = scene.getInstanceId();
         tree.reloadCurrentScene();
+        await _until(() =>
+            tree.getCurrentScene() != null &&
+            tree.getCurrentScene()!.getInstanceId() != previousId);
         await _frame();
-        GD.print(Variant('BLACKSMITH_GODOT_LOCAL_PASSED'));
-      } else {
         _check(
-            repository.calls.length == 1, 'One request for one cloud click.');
+            tree
+                    .getCurrentScene()!
+                    .getNodeT<Node2D>('IsoMapGrid')!
+                    .getChild(7)!
+                    .getChildCount() ==
+                2,
+            'Scene-owned diagnostic state resets when its scene is disposed.');
+        await bloc.close(); // Not registered in diagnostic mode.
+      } else {
         _check(bloc.tileEvents == 1, 'Menu clicks must not select grid cells.');
         _check(bloc.listeners == 1, 'One live scene subscription.');
-        repository.calls.single.completeError(
-            const CloudStorageFailure('Simulated safe failure.'));
-        await _until(() => bloc.state.pendingOperations == 0);
         _check(
             bloc.state.tiles[const GridPos(1, 1)] == ResourceKind.cloudStorage,
-            'Failure must keep the optimistic resource.');
+            'Storage placement belongs only to the local editor state.');
+        final renderer = scene.getNodeT<IsoMapGrid>('IsoMapGrid')!;
+        renderer.render(bloc.state);
+        renderer.render(bloc.state);
+        _check(grid.getChild(7)!.getChildCount() == 3,
+            'Redrawing state must not duplicate its sprite.');
 
         final previousId = scene.getInstanceId();
         tree.reloadCurrentScene();
@@ -219,10 +255,12 @@ void main() {
         final tile = grid.getChild(0)!.getChild(0)! as Polygon2D;
         _check((tile.getColor().r - 241 / 255).abs() < 0.01,
             'Selection must update the visible highlight.');
-        _check(repository.calls.length == 1,
-            'Reload must not repeat provisioning.');
-        GD.print(Variant('BLACKSMITH_GODOT_SCENE_PASSED'));
       }
+      _check(repository.calls == 0 && client.requests == 0,
+          'Initialization, placement, replacement, redraw and reload must never provision or send HTTP.');
+      GD.print(Variant(
+          '${localOnly ? "BLACKSMITH_GODOT_LOCAL_PASSED" : "BLACKSMITH_GODOT_SCENE_PASSED"} '
+          'repository_calls=0 http_requests=0'));
       tree.quit();
     } catch (error, stack) {
       GD.print(Variant('BLACKSMITH_GODOT_FAILED: $error\n$stack'));

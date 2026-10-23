@@ -83,9 +83,13 @@ class MenuOverlay extends Control {
 
   void setEnabled(bool enabled) {
     _enabled = enabled;
-    for (final b in _buttons) {
+    for (var index = 0; index < _buttons.length; index++) {
+      final b = _buttons[index];
       b.setDisabled(!enabled);
       b.setModulate(Color.fromRGBA(1, 1, 1, enabled ? 1.0 : 0.4));
+      b.setTooltipText(enabled
+          ? resourceVisuals.values.elementAt(index).tooltip
+          : 'Select a tile before placing a resource.');
     }
   }
 

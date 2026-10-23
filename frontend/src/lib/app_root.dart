@@ -26,11 +26,11 @@ class AppRoot extends Node2D {
   AppRoot.withNonNullOwner(Pointer<Void> owner) : super.withNonNullOwner(owner);
 
   IsoMapGrid? _grid;
+  MenuOverlay? _menu;
   IsomapGridBloc? _bloc;
   StreamSubscription<IsomapGridState>? _stateSubscription;
   bool _active = false;
   bool _ownsBloc = false;
-  int? _lastReportedAttempt;
   static bool _shutdownHookInstalled = false;
 
   @override
@@ -39,6 +39,7 @@ class AppRoot extends Node2D {
     final grid = getNodeT<IsoMapGrid>('IsoMapGrid')!;
     final menu = getNodeT<MenuOverlay>('MenuOverlay')!;
     _grid = grid;
+    _menu = menu;
 
     try {
       if (!di.sl.isRegistered<IsomapGridBloc>()) di.setupServiceLocator();
@@ -49,7 +50,7 @@ class AppRoot extends Node2D {
       _bloc = IsomapGridBloc.local();
       _ownsBloc = true;
       GD.pushWarning(Variant(
-        '[AppRoot] Local diagnostic mode: cloud operations are disabled.',
+        '[AppRoot] Local diagnostic mode: using scene-owned editor state.',
       ));
     }
 
@@ -57,30 +58,17 @@ class AppRoot extends Node2D {
     grid.onTileClicked = (position) {
       if (_active && !bloc.isClosed) bloc.add(TileClicked(position));
     };
-    _lastReportedAttempt = bloc.state.lastResult?.attemptId;
     _stateSubscription = bloc.stream.listen((state) {
       if (_active) _renderState(state);
     });
-    grid.render(bloc.state);
-    menu.setEnabled(true);
+    _renderState(bloc.state);
     _installShutdownHook();
     GD.print(Variant('[AppRoot] Grid and palette ready.'));
   }
 
   void _renderState(IsomapGridState state) {
     _grid?.render(state);
-    final result = state.lastResult;
-    if (result == null || result.attemptId == _lastReportedAttempt) return;
-    _lastReportedAttempt = result.attemptId;
-    final position = result.position;
-    final message = result.message;
-    if (result.status == PlacementStatus.success) {
-      GD.print(Variant('[AppRoot] Bucket creation at $position: $message'));
-    } else {
-      GD.pushWarning(Variant(
-        '[AppRoot] Bucket creation at $position failed: $message',
-      ));
-    }
+    _menu?.setEnabled(state.selected != null);
   }
 
   void _installShutdownHook() {
@@ -99,6 +87,7 @@ class AppRoot extends Node2D {
     _active = false;
     _grid?.onTileClicked = null;
     _grid = null;
+    _menu = null;
     final subscription = _stateSubscription;
     _stateSubscription = null;
     if (subscription != null) unawaited(subscription.cancel());

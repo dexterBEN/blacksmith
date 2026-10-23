@@ -1,6 +1,7 @@
-import 'dart:async';
 import 'package:test/test.dart';
+import 'package:blacksmith_front/core/di/service_locator.dart' as di;
 import 'package:blacksmith_front/data/repositories/cloud_storage_repository.dart';
+import 'package:blacksmith_front/data/services/cloud_services_api.dart';
 import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_state.dart';
@@ -24,21 +25,33 @@ void main() {
     await until((state) => state.selected == position);
   }
 
-  setUp(() {
+  Future<void> place(ResourceKind kind) async {
+    bloc.add(PlaceResource(kind));
+    await until((state) => state.tiles[state.selected] == kind);
+  }
+
+  setUp(() async {
+    await di.disposeServiceLocator();
     repository = FakeRepository();
-    bloc = IsomapGridBloc(cloudStorageRepository: repository);
+    di.sl.registerSingleton<CloudServicesApi>(repository.api,
+        dispose: (api) => api.close());
+    di.sl.registerSingleton<CloudStorageRepository>(repository);
+    di.setupServiceLocator();
+    bloc = di.sl<IsomapGridBloc>();
   });
   tearDown(() async {
-    repository.finishPending();
-    if (!bloc.isClosed) await bloc.close();
-    repository.close();
+    await di.disposeServiceLocator();
+    expect(repository.calls, isEmpty,
+        reason: 'Editor events must never provision, even with configured DI.');
+    expect(repository.client.requests, 0,
+        reason: 'Editor events must never send backend HTTP requests.');
   });
 
   test('initial state uses the shared six by six defaults', () {
     expect(bloc.state.rows, 6);
     expect(bloc.state.cols, 6);
     expect(bloc.state.selected, isNull);
-    expect(bloc.state.pendingOperations, 0);
+    expect(bloc.state.tiles, isEmpty);
   });
 
   test('invalid tile events preserve a valid selection', () async {
@@ -53,10 +66,10 @@ void main() {
     }
     await tick();
     expect(bloc.state.selected, const GridPos(1, 2));
-    expect(repository.calls, isEmpty);
+    expect(bloc.state.tiles, isEmpty);
   });
 
-  test('selection switches and repeated selection never provision resources',
+  test('selection switches and repeated selection never place resources',
       () async {
     final states = <IsomapGridState>[];
     final subscription = bloc.stream.listen(states.add);
@@ -67,127 +80,110 @@ void main() {
     expect(states.map((state) => state.selected),
         [const GridPos(0, 5), const GridPos(5, 0)]);
     expect(bloc.state.tiles, isEmpty);
-    expect(bloc.state.pendingOperations, 0);
-    expect(repository.calls, isEmpty);
     await subscription.cancel();
   });
 
   test('custom dimensions govern selection and bounds', () async {
-    await bloc.close();
-    bloc = IsomapGridBloc(cloudStorageRepository: repository, rows: 2, cols: 3);
-    await select(const GridPos(1, 2));
-    bloc.add(const TileClicked(GridPos(2, 0)));
+    final custom = IsomapGridBloc(rows: 2, cols: 3);
+    addTearDown(custom.close);
+    custom.add(const TileClicked(GridPos(1, 2)));
+    await custom.stream
+        .firstWhere((state) => state.selected == const GridPos(1, 2));
+    custom.add(const TileClicked(GridPos(2, 0)));
     await tick();
-    expect(bloc.state.selected, const GridPos(1, 2));
+    expect(custom.state.selected, const GridPos(1, 2));
   });
 
   test('placement without selection changes nothing and sends no request',
       () async {
-    bloc.add(const PlaceResource(ResourceKind.cloudStorage));
-    bloc.add(const PlaceResource(ResourceKind.computeEngine));
+    for (final kind in ResourceKind.values) {
+      bloc.add(PlaceResource(kind));
+    }
     await tick();
+    expect(bloc.state.selected, isNull);
     expect(bloc.state.tiles, isEmpty);
-    expect(repository.calls, isEmpty);
   });
 
-  test('Compute remains visual-only', () async {
-    await select(const GridPos(2, 3));
-    bloc.add(const PlaceResource(ResourceKind.computeEngine));
-    await until((state) => state.tiles.isNotEmpty);
-    expect(bloc.state.tiles[const GridPos(2, 3)], ResourceKind.computeEngine);
-    expect(bloc.state.pendingOperations, 0);
-    expect(repository.calls, isEmpty);
+  test('out-of-bounds clicks cannot enable placement from an empty selection',
+      () async {
+    for (final position in [
+      const GridPos(-1, 0),
+      const GridPos(0, -1),
+      const GridPos(6, 0),
+      const GridPos(0, 6),
+    ]) {
+      bloc.add(TileClicked(position));
+      bloc.add(const PlaceResource(ResourceKind.cloudStorage));
+    }
+    await tick();
+    expect(bloc.state.selected, isNull);
+    expect(bloc.state.tiles, isEmpty);
   });
 
-  test('Cloud Storage placement is optimistic and reports its own result',
+  for (final kind in ResourceKind.values) {
+    test('$kind placement is local with a cloud repository available',
+        () async {
+      await select(const GridPos(2, 3));
+      await place(kind);
+      expect(bloc.state.tiles, {const GridPos(2, 3): kind});
+      expect(bloc.state.selected, const GridPos(2, 3));
+    });
+
+    test('repeated $kind placement keeps one resource entry', () async {
+      await select(const GridPos(0, 0));
+      await place(kind);
+      for (var i = 0; i < 10; i++) {
+        bloc.add(PlaceResource(kind));
+      }
+      await tick();
+      expect(bloc.state.tiles, {const GridPos(0, 0): kind});
+    });
+  }
+
+  test('replacement changes one tile without mutating earlier snapshots',
       () async {
     await select(const GridPos(2, 3));
-    bloc.add(const PlaceResource(ResourceKind.cloudStorage));
-    await until((state) => state.pendingOperations == 1);
-    expect(bloc.state.tiles[const GridPos(2, 3)], ResourceKind.cloudStorage);
-    expect(repository.calls, hasLength(1));
-    expect(repository.calls.single.row, 2);
-    expect(repository.calls.single.col, 3);
-    repository.calls.single.completion.complete('created by fake');
-    await until((state) => state.pendingOperations == 0);
-    expect(bloc.state.lastResult!.status, PlacementStatus.success);
-    expect(bloc.state.lastResult!.position, const GridPos(2, 3));
-    expect(bloc.state.lastResult!.message, 'created by fake');
+    await place(ResourceKind.cloudStorage);
+    final first = bloc.state;
+    await place(ResourceKind.computeEngine);
+    expect(bloc.state.tiles, {const GridPos(2, 3): ResourceKind.computeEngine});
+    expect(first.tiles, {const GridPos(2, 3): ResourceKind.cloudStorage});
+    await place(ResourceKind.cloudStorage);
+    expect(bloc.state.tiles, {const GridPos(2, 3): ResourceKind.cloudStorage});
   });
 
-  test('failure retains optimistic placement and newer edits', () async {
+  test('selection and replacement preserve resources on other tiles', () async {
     await select(const GridPos(0, 0));
-    bloc.add(const PlaceResource(ResourceKind.cloudStorage));
-    await until((state) => state.pendingOperations == 1);
+    await place(ResourceKind.cloudStorage);
     await select(const GridPos(1, 1));
-    bloc.add(const PlaceResource(ResourceKind.computeEngine));
-    await until((state) => state.tiles.length == 2);
-    repository.calls.single.completion.completeError(
-      const CloudStorageFailure('The backend is unavailable.'),
-    );
-    await until((state) => state.pendingOperations == 0);
-    expect(bloc.state.selected, const GridPos(1, 1));
-    expect(bloc.state.tiles[const GridPos(0, 0)], ResourceKind.cloudStorage);
-    expect(bloc.state.tiles[const GridPos(1, 1)], ResourceKind.computeEngine);
-    expect(bloc.state.lastResult!.status, PlacementStatus.failure);
-    expect(bloc.state.lastResult!.position, const GridPos(0, 0));
+    expect(bloc.state.tiles, {const GridPos(0, 0): ResourceKind.cloudStorage});
+    await place(ResourceKind.computeEngine);
+    await select(const GridPos(0, 0));
+    await place(ResourceKind.computeEngine);
+    expect(bloc.state.tiles, {
+      const GridPos(0, 0): ResourceKind.computeEngine,
+      const GridPos(1, 1): ResourceKind.computeEngine,
+    });
   });
 
-  test('reversed completion order cannot restore an older grid snapshot',
+  test('consecutive edits preserve the latest selection and all placements',
       () async {
-    await select(const GridPos(0, 0));
-    bloc.add(const PlaceResource(ResourceKind.cloudStorage));
-    await until((state) => state.pendingOperations == 1);
-    final firstSnapshot = bloc.state;
-    await select(const GridPos(1, 1));
-    bloc.add(const PlaceResource(ResourceKind.cloudStorage));
-    await until((state) => state.pendingOperations == 2);
-    await select(const GridPos(2, 2));
-    bloc.add(const PlaceResource(ResourceKind.computeEngine));
-    await until((state) => state.tiles.length == 3);
-
-    repository.calls[1].completion.complete('second');
-    await until((state) => state.pendingOperations == 1);
-    expect(bloc.state.lastResult!.position, const GridPos(1, 1));
-    repository.calls[0].completion.complete('first');
-    await until((state) => state.pendingOperations == 0);
-    expect(bloc.state.lastResult!.position, const GridPos(0, 0));
+    for (var i = 0; i < 3; i++) {
+      await select(GridPos(i, i));
+      await place(ResourceKind.cloudStorage);
+    }
     expect(bloc.state.selected, const GridPos(2, 2));
     expect(bloc.state.tiles, hasLength(3));
-    expect(firstSnapshot.tiles, hasLength(1));
   });
 
-  test('repeated cloud placements still issue one request per event', () async {
-    await select(const GridPos(0, 0));
-    bloc.add(const PlaceResource(ResourceKind.cloudStorage));
-    bloc.add(const PlaceResource(ResourceKind.cloudStorage));
-    await until((state) => state.pendingOperations == 2);
-    expect(repository.calls, hasLength(2));
-    expect(bloc.state.tiles, hasLength(1));
-  });
-
-  test('local diagnostic mode keeps placement without a repository', () async {
-    await bloc.close();
-    bloc = IsomapGridBloc.local();
-    await select(const GridPos(1, 1));
-    bloc.add(const PlaceResource(ResourceKind.cloudStorage));
-    await until((state) => state.tiles.isNotEmpty);
-    expect(bloc.state.tiles[const GridPos(1, 1)], ResourceKind.cloudStorage);
-    expect(bloc.state.pendingOperations, 0);
-    expect(repository.calls, isEmpty);
-  });
-
-  test('completion after BLoC disposal does not emit to disposed views',
-      () async {
-    await select(const GridPos(0, 0));
-    bloc.add(const PlaceResource(ResourceKind.cloudStorage));
-    await until((state) => state.pendingOperations == 1);
-    final results = <IsomapGridState>[];
-    final subscription = bloc.stream.listen(results.add);
-    await bloc.close();
-    repository.calls.single.completion.complete('too late');
-    await tick();
-    expect(results, isEmpty);
-    await subscription.cancel();
+  test('local diagnostic mode retains the same placement semantics', () async {
+    final local = IsomapGridBloc.local();
+    addTearDown(local.close);
+    local.add(const TileClicked(GridPos(1, 1)));
+    await local.stream
+        .firstWhere((state) => state.selected == const GridPos(1, 1));
+    local.add(const PlaceResource(ResourceKind.cloudStorage));
+    await local.stream.firstWhere((state) => state.tiles.isNotEmpty);
+    expect(local.state.tiles, {const GridPos(1, 1): ResourceKind.cloudStorage});
   });
 }

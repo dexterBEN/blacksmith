@@ -35,7 +35,6 @@ void setupServiceLocator({
       () => IsomapGridBloc(
         rows: rows,
         cols: cols,
-        cloudStorageRepository: sl<CloudStorageRepository>(),
       ),
       dispose: (bloc) => bloc.close(),
     );
