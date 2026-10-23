@@ -240,6 +240,16 @@ Future<void> _captureRuntime(Node scene) async {
   final output = Directory(Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']!);
   output.createSync(recursive: true);
   final image = await _saveViewport(scene, 'grid.png');
+  if (Platform.environment['BLACKSMITH_RESOURCE_CUBES_DEMO'] == '1') {
+    _check(scene.getNodeT<Node3D>('ResourceCubesDemo')!.getChildCount() == 4,
+        'All four static visuals must survive selection and scene reloads.');
+    final closeup =
+        image.getRegion(Rect2i.fromXYWidthHeight(340, 110, 390, 240))!;
+    _check(
+        closeup.savePng('${output.path}/resource_cubes_two_services.png') ==
+            GDError.ok,
+        'Save an unscaled native crop with two distinct service icons.');
+  }
   final averageMs = clock.elapsedMicroseconds / frames / 1000;
   final rendering = RenderingServer.singleton;
   final result = {
@@ -260,6 +270,8 @@ Future<void> _captureRuntime(Node scene) async {
     'selected_tile': {'row': 2, 'col': 3},
     'material_variant':
         Platform.environment['BLACKSMITH_ISSUE25_VARIANT'] ?? 'opaque',
+    'resource_cubes_demo':
+        Platform.environment['BLACKSMITH_RESOURCE_CUBES_DEMO'] == '1',
     'note': 'Lightweight windowed check using native Godot frame counts; includes presentation. '
         'Not an uncapped benchmark or a measurement of the final visual target.',
   };

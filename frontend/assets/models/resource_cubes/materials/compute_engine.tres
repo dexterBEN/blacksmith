@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3]
+
+[ext_resource type="Shader" path="res://assets/models/resource_cubes/coated_blue_plastic.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/source/compute_engine/compute_engine_texture.png" id="2_texture"]
+
+[resource]
+resource_name = "compute_engine_CoatedBluePlastic"
+shader = ExtResource("1_shader")
+shader_parameter/albedo_texture = ExtResource("2_texture")
+shader_parameter/body_tint = Color(0.42, 0.58, 0.9, 1)
+shader_parameter/roughness = 0.38
+shader_parameter/specular = 0.25
+shader_parameter/clearcoat = 0.18

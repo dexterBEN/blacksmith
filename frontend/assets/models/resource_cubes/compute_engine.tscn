@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="ArrayMesh" path="res://assets/models/resource_cubes/beveled_resource_cube.tres" id="1_mesh"]
+[ext_resource type="Material" path="res://assets/models/resource_cubes/materials/compute_engine.tres" id="2_material"]
+
+[node name="compute_engine" type="Node3D"]
+
+[node name="Cube" type="MeshInstance3D" parent="."]
+layers = 4
+mesh = ExtResource("1_mesh")
+material_override = ExtResource("2_material")
