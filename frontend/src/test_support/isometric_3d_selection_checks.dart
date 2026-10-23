@@ -13,6 +13,7 @@ import '../lib/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_state.dart';
 import '../lib/domain/models/grid_position.dart';
 import '../lib/prototypes/isometric_3d/grid_layout.dart';
+import 'isometric_3d_placement_checks.dart';
 
 class _NoNetworkClient extends http.BaseClient {
   int requests = 0;
@@ -37,6 +38,9 @@ class _NoProvisioningRepository extends CloudStorageRepository {
 }
 
 class _ObservedBloc extends IsomapGridBloc {
+  // Fixture-only state replay/removal; the editor gains no reset/delete API.
+  // ignore: invalid_use_of_visible_for_testing_member
+  void restore(IsomapGridState state) => emit(state);
   int listeners = 0;
   int tileEvents = 0;
   int otherEvents = 0;
@@ -89,6 +93,22 @@ class SelectionFixture {
   late final _ObservedBloc _bloc;
   final _originalMaterialColors = <String, List<double>>{};
   bool _disposed = false;
+
+  IsomapGridState get state => _bloc.state;
+
+  Future<Node> checkPlacement(SceneTree tree, {required bool capture}) async {
+    final scene = await check3DPlacement(tree, _bloc,
+        restore: _bloc.restore,
+        tileEvents: () => _bloc.tileEvents,
+        listeners: () => _bloc.listeners,
+        capture: capture);
+    _check(_repository.calls == 0 && _client.requests == 0,
+        'Placement/replay/reload must never call provisioning or HTTP.');
+    GD.print(Variant('BLACKSMITH_ISSUE33_PLACEMENT_PASSED kinds=4 '
+        'replacement=true replay=true removal=true corners=true gui=true '
+        'freed_nodes=true listeners=1 repository_calls=0 http_requests=0'));
+    return scene;
+  }
 
   void _register() {
     di.sl.registerSingleton<CloudServicesApi>(_api);

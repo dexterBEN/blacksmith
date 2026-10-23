@@ -66,11 +66,12 @@ void main() {
             'Close-up must be an unscaled crop of the actual viewport.');
       }
       scene = await fixture.check(tree, capture: mode == 'check');
+      scene = await fixture.checkPlacement(tree, capture: mode == 'check');
       if (mode == 'headless') {
         tree.quit();
         return;
       }
-      await _captureRuntime(scene);
+      await _captureRuntime(scene, fixture.state.selected);
       GD.print(Variant('BLACKSMITH_ISSUE17_RENDER_PASSED'));
       tree.quit();
     } catch (error, stack) {
@@ -229,7 +230,7 @@ void _validateFraming(Node scene, Camera3D camera) {
       'The board must be centered.');
 }
 
-Future<void> _captureRuntime(Node scene) async {
+Future<void> _captureRuntime(Node scene, GridPos? selected) async {
   await Future<void>.delayed(const Duration(seconds: 2));
   final startFrames = Engine.singleton.getFramesDrawn();
   final clock = Stopwatch()..start();
@@ -240,16 +241,6 @@ Future<void> _captureRuntime(Node scene) async {
   final output = Directory(Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']!);
   output.createSync(recursive: true);
   final image = await _saveViewport(scene, 'grid.png');
-  if (Platform.environment['BLACKSMITH_RESOURCE_CUBES_DEMO'] == '1') {
-    _check(scene.getNodeT<Node3D>('ResourceCubesDemo')!.getChildCount() == 4,
-        'All four static visuals must survive selection and scene reloads.');
-    final closeup =
-        image.getRegion(Rect2i.fromXYWidthHeight(340, 110, 390, 240))!;
-    _check(
-        closeup.savePng('${output.path}/resource_cubes_two_services.png') ==
-            GDError.ok,
-        'Save an unscaled native crop with two distinct service icons.');
-  }
   final averageMs = clock.elapsedMicroseconds / frames / 1000;
   final rendering = RenderingServer.singleton;
   final result = {
@@ -267,11 +258,11 @@ Future<void> _captureRuntime(Node scene) async {
         Performance.singleton.getMonitor(PerformanceMonitor.timeFps),
     'average_fps': 1000 / averageMs,
     'average_frame_ms': averageMs,
-    'selected_tile': {'row': 2, 'col': 3},
+    'selected_tile': {'row': selected?.row, 'col': selected?.col},
     'material_variant':
         Platform.environment['BLACKSMITH_ISSUE25_VARIANT'] ?? 'opaque',
-    'resource_cubes_demo':
-        Platform.environment['BLACKSMITH_RESOURCE_CUBES_DEMO'] == '1',
+    'resource_count': scene.getNodeT<Node3D>('ResourceRoot')!.getChildCount(),
+    'palette_items': 4,
     'note': 'Lightweight windowed check using native Godot frame counts; includes presentation. '
         'Not an uncapped benchmark or a measurement of the final visual target.',
   };

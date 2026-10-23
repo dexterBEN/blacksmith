@@ -176,6 +176,20 @@ void main() {
     expect(bloc.state.tiles, hasLength(3));
   });
 
+  test('all four GCP kinds replace the same tile and preserve its neighbor',
+      () async {
+    await select(const GridPos(0, 0));
+    await place(ResourceKind.computeEngine);
+    await select(const GridPos(2, 3));
+    for (final kind in ResourceKind.values) {
+      await place(kind);
+      expect(bloc.state.tiles, {
+        const GridPos(0, 0): ResourceKind.computeEngine,
+        const GridPos(2, 3): kind,
+      });
+    }
+  });
+
   test('local diagnostic mode retains the same placement semantics', () async {
     final local = IsomapGridBloc.local();
     addTearDown(local.close);

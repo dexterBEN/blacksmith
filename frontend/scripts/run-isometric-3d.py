@@ -27,16 +27,15 @@ def main():
     parser.add_argument('--timeout', type=int, default=300)
     parser.add_argument('--output', type=Path)
     parser.add_argument('--resource-cubes', action='store_true',
-                        help='Add four static resource visuals in the temporary scene; retain real Dart picking/BLoC tests.')
+                        help='Compatibility alias: state-driven cubes and the four-item palette are now enabled by default.')
     parser.add_argument('--material-variant',
                         choices=['opaque', 'alpha-top', 'refraction-top'],
                         default='opaque',
                         help='Isolated material comparison; transparent variants never change production assets.')
     args = parser.parse_args()
     source = Path(__file__).resolve().parents[1]
-    if args.resource_cubes:
-        dependencies = validate_assets(source)
-        print(f'Resource dependencies: PASS ({len(dependencies)} files)', flush=True)
+    dependencies = validate_assets(source)
+    print(f'Resource dependencies: PASS ({len(dependencies)} files)', flush=True)
     project = Path(tempfile.mkdtemp(prefix='blacksmith-isometric3d-'))
     output = args.output.resolve() if args.output else project / 'evidence'
     output.mkdir(parents=True, exist_ok=True)
@@ -60,20 +59,9 @@ def main():
                             ('scenes', '*.jpeg')]:
         for path in (source / folder).rglob(pattern):
             copy(path.relative_to(source))
-    if args.resource_cubes:
-        shutil.copytree(source / 'assets/models/resource_cubes',
-                        project / 'assets/models/resource_cubes',
-                        ignore=shutil.ignore_patterns('*.import', '*.uid'))
-        for name in ['resource_cubes_demo.gd', 'resource_cubes_preview.gd']:
-            copy(Path('tools') / name)
-        path = project / 'scenes/isometric_3d.tscn'
-        scene = path.read_text().replace('load_steps=6', 'load_steps=7', 1)
-        scene = scene.replace('[sub_resource type="Environment"',
-                              '[ext_resource type="Script" path="res://tools/resource_cubes_demo.gd" id="4_cubes"]\n\n'
-                              '[sub_resource type="Environment"', 1)
-        scene += ('\n[node name="ResourceCubesDemo" type="Node3D" parent="."]\n'
-                  'script = ExtResource("4_cubes")\n')
-        path.write_text(scene)
+    shutil.copytree(source / 'assets/models/resource_cubes',
+                    project / 'assets/models/resource_cubes',
+                    ignore=shutil.ignore_patterns('*.import', '*.uid'))
     if args.material_variant != 'opaque':
         top = project / 'scenes/isometric_3d/tile_material.tres'
         shutil.copyfile(
@@ -102,7 +90,6 @@ def main():
         'headless' if args.headless else 'check' if args.check else 'interactive')
     env['BLACKSMITH_ISSUE17_OUTPUT'] = str(output)
     env['BLACKSMITH_ISSUE25_VARIANT'] = args.material_variant
-    env['BLACKSMITH_RESOURCE_CUBES_DEMO'] = '1' if args.resource_cubes else '0'
     env['BLACKSMITH_ISSUE17_GODOT_VERSION'] = subprocess.check_output(
         [args.godot, '--version'], text=True).strip()
 
@@ -116,17 +103,19 @@ def main():
         contents = log.read_text(errors='replace')
         if result.returncode or marker not in contents:
             raise RuntimeError(f'{name} failed; inspect {log}')
-        if name == 'scene' and args.resource_cubes:
-            if ('BLACKSMITH_RESOURCE_CUBES_DEMO_READY' not in contents or
-                    any(line.startswith(('ERROR:', 'SCRIPT ERROR:', 'SHADER ERROR:'))
-                        for line in contents.splitlines())):
-                raise RuntimeError(f'{name} resource demo failed; inspect {log}')
+        if name == 'scene':
+            if (any(line.startswith(('ERROR:', 'SCRIPT ERROR:', 'SHADER ERROR:'))
+                    for line in contents.splitlines()) or
+                    'ObjectDB instances leaked at exit' in contents or
+                    ((args.check or args.headless) and
+                     'BLACKSMITH_ISSUE33_PLACEMENT_PASSED' not in contents)):
+                raise RuntimeError(f'{name} interactive placement failed; inspect {log}')
         print(f'{name}: PASS ({marker})', flush=True)
 
     # Import exit status alone is insufficient if native Dart loading fails.
     import_arguments = (['--editor', '--import', '--display-driver', 'x11',
                          '--rendering-method', 'gl_compatibility']
-                        if args.resource_cubes else ['--headless', '--editor', '--import'])
+                        if not args.headless else ['--headless', '--editor', '--import'])
     run('import', import_arguments,
         'BLACKSMITH_ISSUE17_DART_READY', args.timeout)
     arguments = ['--headless'] if args.headless else [
