@@ -10,7 +10,11 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
+
+sys.dont_write_bytecode = True
+from check_resource_cubes import validate_assets
 
 
 def main():
@@ -26,12 +30,16 @@ def main():
                         help='Validate native resources without rendering.')
     parser.add_argument('--generate-mesh', action='store_true',
                         help='Regenerate the shared corrected mesh in the repo.')
+    parser.add_argument('--generate-icons', action='store_true',
+                        help='Rasterize the unchanged official SVGs at 256 pixels.')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--timeout', type=int, default=180)
     args = parser.parse_args()
     if args.compare and not (args.check or args.headless):
         parser.error('--compare requires --check or --headless')
     source = Path(__file__).resolve().parents[1]
+    dependencies = validate_assets(source)
+    print(f'Resource dependencies: PASS ({len(dependencies)} files)', flush=True)
     project = Path(tempfile.mkdtemp(prefix='blacksmith-resource-cubes-'))
     output = args.output.resolve() if args.output else project / 'captures'
     output.mkdir(parents=True, exist_ok=True)
@@ -42,7 +50,8 @@ def main():
         shutil.copytree(source / folder, project / folder,
                         ignore=shutil.ignore_patterns('*.import', '*.uid'))
     (project / 'tools').mkdir()
-    for name in ['resource_cubes_preview.gd', 'generate_resource_cube.gd']:
+    for name in ['resource_cubes_preview.gd', 'generate_resource_cube.gd',
+                 'render_resource_icons.gd']:
         shutil.copyfile(source / 'tools' / name, project / 'tools' / name)
     scene = (source / 'scenes/isometric_3d.tscn').read_text()
     old = next(line for line in scene.splitlines()
@@ -94,6 +103,12 @@ def main():
                          'res://tools/generate_resource_cube.gd', '--',
                          str(destination)], 'BLACKSMITH_RESOURCE_CUBE_GENERATED')
         shutil.copyfile(destination, project / destination.relative_to(source))
+    if args.generate_icons:
+        directory = source / 'assets/models/resource_cubes/icons'
+        run('icons', ['--headless', '--script', 'res://tools/render_resource_icons.gd',
+                      '--', str(directory)], 'BLACKSMITH_OFFICIAL_ICONS_RENDERED')
+        for image in (directory / 'rendered').glob('*.png'):
+            shutil.copyfile(image, project / image.relative_to(source))
     # Godot 4.4's headless editor emits progress-dialog errors on this VM.
     # Import through the real editor; --headless only affects the scene check.
     run('import', ['--editor', '--import', '--display-driver', 'x11',

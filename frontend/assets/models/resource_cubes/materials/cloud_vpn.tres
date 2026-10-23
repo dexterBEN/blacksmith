@@ -3,7 +3,7 @@
 [ext_resource type="Shader" path="res://assets/models/resource_cubes/coated_blue_plastic.gdshader" id="1_shader"]
 [ext_resource type="Texture2D" path="res://assets/models/resource_cubes/source/cloud_vpn/cloud_vpn_texture.png" id="2_texture"]
 
-[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/icons/white/cloud_vpn.svg" id="3_icon"]
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/icons/rendered/cloud_vpn.png" id="3_icon"]
 
 [resource]
 resource_name = "cloud_vpn_CoatedBluePlastic"

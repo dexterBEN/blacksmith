@@ -92,7 +92,8 @@ func validate_model(model: Node3D, service: String, cell: Vector2i) -> void:
 			assert(service_icon != null)
 			assert(service_icon.get_size() == Vector2(256, 256))
 			service_icon_path = service_icon.resource_path
-			assert(service_icon_path.ends_with("/icons/white/%s.svg" % service))
+			var official_name: String = "cloud_load_balancing" if service == "load_balancer" else service
+			assert(service_icon_path.ends_with("/icons/rendered/%s.png" % official_name))
 		if shared_cube_mesh == null:
 			shared_cube_mesh = mesh
 		assert(mesh == shared_cube_mesh)
@@ -135,6 +136,7 @@ func capture() -> void:
 		var image := get_viewport().get_texture().get_image()
 		assert(image.get_width() == 1152 and image.get_height() == 648)
 		assert(image.save_png(output.path_join(variant + ".png")) == OK)
+		assert(image.get_region(Rect2i(340, 110, 390, 240)).save_png(output.path_join(variant + "_two_services.png")) == OK)
 		var models := get_node("ResourceModels")
 		for index in SERVICES.size():
 			var model: Node3D = models.get_child(index)

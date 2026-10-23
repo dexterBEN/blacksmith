@@ -1,0 +1,25 @@
+{
+  "godot": "4.4.stable.official.4c311cbee",
+  "adapter": "llvmpipe (LLVM 20.1.2, 256 bits)",
+  "graphics_api": "4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.2",
+  "viewport": {
+    "width": 1152,
+    "height": 648
+  },
+  "renderer": "Compatibility",
+  "frame_cap_fps": 60,
+  "warmup_seconds": 2,
+  "sample_seconds": 6,
+  "rendered_frames": 51,
+  "elapsed_sample_seconds": 6.531075,
+  "engine_reported_fps": 5.0,
+  "average_fps": 7.808821671776851,
+  "average_frame_ms": 128.06029411764706,
+  "selected_tile": {
+    "row": 2,
+    "col": 3
+  },
+  "material_variant": "opaque",
+  "resource_cubes_demo": true,
+  "note": "Lightweight windowed check using native Godot frame counts; includes presentation. Not an uncapped benchmark or a measurement of the final visual target."
+}
