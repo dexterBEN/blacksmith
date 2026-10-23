@@ -9,6 +9,7 @@ import '../lib/domain/models/grid_position.dart';
 import '../lib/domain/models/resource_kind.dart';
 import '../lib/prototypes/isometric_3d/grid_layout.dart';
 import '../lib/prototypes/isometric_3d/resource_visuals_3d.dart';
+import 'isometric_3d_framing_checks.dart';
 
 /// Real native input and scene ownership checks, using the shared local BLoC.
 Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
@@ -97,6 +98,8 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
   }
   await select(const GridPos(5, 5));
   if (capture) await _capture(scene, '07_selected_corner.jpg');
+  await checkEditorResizing(scene, bloc,
+      tileEvents: tileEvents, capture: capture);
 
   // Full state changes must render even when selection is unchanged.
   final removed = _cube(scene, storage).getInstanceId();

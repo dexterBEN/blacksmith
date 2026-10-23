@@ -97,8 +97,11 @@ python3 frontend/scripts/run-isometric-3d.py --check --timeout 600 --output /tmp
 
 The launcher uses a temporary project, leaving the production entry point intact.
 The check exercises native clicks, replacement and scene reload, and saves actual
-Godot screenshots. See [the Issue #33 report](issue_33_report.md) for results,
-prerequisites and integration limits. Full application restart clears placements.
+Godot screenshots. Interactive windows follow the actual window dimensions,
+with a minimum size of 480 × 360. Framing reserves room above the palette and
+includes the maximum cube height even on an empty board, so placement does not
+change the zoom. See [the Issue #35 report](issue_35_report.md) for validation,
+before/after evidence and limitations. Full application restart clears placements.
 
 ---
 

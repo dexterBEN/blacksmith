@@ -108,7 +108,10 @@ def main():
                     for line in contents.splitlines()) or
                     'ObjectDB instances leaked at exit' in contents or
                     ((args.check or args.headless) and
-                     'BLACKSMITH_ISSUE33_PLACEMENT_PASSED' not in contents)):
+                     ('BLACKSMITH_ISSUE33_PLACEMENT_PASSED' not in contents or
+                      'BLACKSMITH_ISSUE35_FRAMING_PASSED' not in contents)) or
+                    (args.check and
+                     'BLACKSMITH_ISSUE35_WINDOW_RESIZE_PASSED' not in contents)):
                 raise RuntimeError(f'{name} interactive placement failed; inspect {log}')
         print(f'{name}: PASS ({marker})', flush=True)
 

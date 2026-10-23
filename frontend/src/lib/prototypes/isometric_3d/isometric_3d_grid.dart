@@ -194,17 +194,26 @@ class Isometric3DGrid extends Node3D {
   void _fitCamera() {
     final size = getViewport()!.getVisibleRect().size;
     if (size.x <= 0 || size.y <= 0) return;
-    _palette?.resize(size);
-    // Fixed 45° yaw and 35.264° elevation. Fit the complete tile AABB with a
-    // 12% margin; the logical mapping remains independent of this projection.
+    final area = _palette!.resize(size);
+    // Fixed 45° yaw and 35.264° elevation. Reserve the maximum cube height
+    // even when empty: placement must never zoom/pan the board. The conservative
+    // envelope includes the board underside and a cube on any perimeter tile.
+    const bottom = -GridLayout3D.tileHeight / 2;
+    const top = GridLayout3D.tileHeight / 2 + resourceScale;
     final projectedWidth = (layout.width + layout.depth) / math.sqrt(2);
     final projectedHeight = (layout.width + layout.depth) / math.sqrt(6) +
-        GridLayout3D.tileHeight * math.sqrt(2 / 3);
+        (top - bottom) * math.sqrt(2 / 3);
+    final unitsPerPixel =
+        math.max(projectedWidth / area.size.x, projectedHeight / area.size.y) *
+            1.04;
+    final projectedCenter = (top + bottom) / 2 * math.sqrt(2 / 3);
     final camera = getNodeT<Camera3D>('Camera3D')!;
-    camera.setOrthogonal(
-      math.max(projectedHeight, projectedWidth * size.y / size.x) * 1.12,
-      0.1,
-      50,
-    );
+    // Keep the same camera transform/angle and fit into the area above the UI.
+    // Native unproject/project-ray methods include this offset, so picking uses
+    // viewport coordinates directly, without a second mouse-coordinate mapping.
+    camera
+      ..setOrthogonal(unitsPerPixel * size.y, 0.1, 50)
+      ..setVOffset(
+          projectedCenter + (area.getCenter().y - size.y / 2) * unitsPerPixel);
   }
 }
