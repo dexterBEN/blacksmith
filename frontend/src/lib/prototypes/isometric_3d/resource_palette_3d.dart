@@ -35,7 +35,9 @@ class ResourcePalette3D {
         : 'Select a tile first');
   }
 
-  void resize(Vector2 viewport) {
+  /// Lay out controls first, then return the unobstructed area for the board.
+  /// This is presentation geometry, independent of selection/placement state.
+  Rect2 resize(Vector2 viewport) {
     final width = math.min(880.0, math.max(1.0, viewport.x - 24));
     final columns = viewport.x >= 816 ? 4 : (viewport.x >= 416 ? 2 : 1);
     final rows = (4 / columns).ceil();
@@ -48,13 +50,22 @@ class ResourcePalette3D {
     _instruction
       ..setPosition(Vector2(x: 8, y: 6))
       ..setSize(Vector2(x: width - 16, y: 20));
-    _choices
-      ..setColumns(columns)
-      ..setPosition(Vector2(x: 8, y: 28))
-      ..setSize(Vector2(x: width - 16, y: height - 34));
+    // Update minimums before sizing the container. Otherwise a portrait ->
+    // landscape resize clamps it to the previous wider buttons' minimum width.
     for (final button in _buttons) {
       button.setCustomMinimumSize(Vector2(
           x: math.max(1.0, (width - 16 - (columns - 1) * 8) / columns), y: 40));
     }
+    _choices
+      ..setColumns(columns)
+      ..getCombinedMinimumSize()
+      ..setPosition(Vector2(x: 8, y: 28))
+      ..setSize(Vector2(x: width - 16, y: height - 34));
+    // Keep a 12-pixel gutter around the viewport and above the actual panel.
+    return Rect2.fromPositionSize(
+        Vector2(x: 12, y: 12),
+        Vector2(
+            x: math.max(1.0, viewport.x - 24),
+            y: math.max(1.0, _panel.getPosition().y - 24)));
   }
 }

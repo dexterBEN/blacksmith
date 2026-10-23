@@ -7,6 +7,7 @@ import 'package:godot_dart/godot_dart.dart';
 import '../godot_dart_scripts.g.dart';
 import '../lib/domain/models/grid_position.dart';
 import '../lib/prototypes/isometric_3d/grid_layout.dart';
+import 'isometric_3d_framing_checks.dart';
 import 'isometric_3d_selection_checks.dart';
 
 /// Isolated launch/test entrypoint: only a fake selection fixture is registered.
@@ -28,31 +29,46 @@ void main() {
         async.unawaited(fixture.dispose());
       });
       final window = tree.getRoot()!;
+      final mode = Platform.environment['BLACKSMITH_ISSUE17_MODE'];
       // X11's window manager can override requested window dimensions. Keep
-      // capture/framing assertions deterministic through an internal viewport.
-      window
-        ..setContentScaleMode(WindowContentScaleMode.viewport)
-        ..setContentScaleAspect(WindowContentScaleAspect.keep)
-        ..setContentScaleSize(Vector2i.fromXY(1152, 648));
+      // automated captures deterministic, but let the interactive viewport
+      // follow the actual window instead of scaling a fixed-size screenshot.
+      if (mode == 'interactive') {
+        window
+          ..setContentScaleMode(WindowContentScaleMode.disabled)
+          ..setContentScaleSize(Vector2i.fromXY(0, 0))
+          ..setMinSize(Vector2i.fromXY(480, 360));
+      } else {
+        window
+          ..setContentScaleMode(WindowContentScaleMode.viewport)
+          ..setContentScaleAspect(WindowContentScaleAspect.keep)
+          ..setContentScaleSize(Vector2i.fromXY(1152, 648));
+      }
       await _until(
           () => scene.getNodeT<Node3D>('GridRoot')!.getChildCount() == 36);
       await _pause();
       _validate(scene);
+      if (mode == 'interactive') {
+        GD.print(Variant('BLACKSMITH_ISSUE17_SCENE_PASSED tiles=36 '
+            'responsive_window=true local_placement=true'));
+        return;
+      }
       // Validate automatic framing at a narrow viewport too; no navigation
       // control or production camera is modified.
       final camera = scene.getNodeT<Camera3D>('Camera3D')!;
       final originalSize = camera.getSize();
       window.setContentScaleSize(Vector2i.fromXY(480, 640));
       await _until(() => camera.getSize() > originalSize);
+      // Container sorting is deferred; camera changes synchronously.
+      await _pause();
       _validateFraming(scene, camera);
       window.setContentScaleSize(Vector2i.fromXY(1152, 648));
       await _until(() => (camera.getSize() - originalSize).abs() < 1e-4);
+      await _pause();
       _validateFraming(scene, camera);
       GD.print(Variant('BLACKSMITH_ISSUE17_SCENE_PASSED tiles=36 beveled=true '
           'shared_mesh=true orthographic=true mapping=true resize=true'));
 
-      final mode = Platform.environment['BLACKSMITH_ISSUE17_MODE'];
-      if (mode == 'interactive') return;
       if (mode == 'check') {
         // Allow the update-once material reflection to finish before capture.
         final firstFrame = Engine.singleton.getFramesDrawn();
@@ -205,29 +221,7 @@ void _validate(Node scene) {
 }
 
 void _validateFraming(Node scene, Camera3D camera) {
-  const layout = GridLayout3D();
-  final viewport = scene.getViewport()!.getVisibleRect().size;
-  for (final x in [-layout.width / 2, layout.width / 2]) {
-    for (final z in [-layout.depth / 2, layout.depth / 2]) {
-      for (final y in [
-        -GridLayout3D.tileHeight / 2,
-        GridLayout3D.tileHeight / 2
-      ]) {
-        final screen = camera.unprojectPosition(Vector3(x: x, y: y, z: z));
-        _check(
-            screen.x > 5 &&
-                screen.x < viewport.x - 5 &&
-                screen.y > 5 &&
-                screen.y < viewport.y - 5,
-            'Every board corner must remain within the viewport.');
-      }
-    }
-  }
-  final center = camera.unprojectPosition(Vector3());
-  _check(
-      (center.x - viewport.x / 2).abs() < 1 &&
-          (center.y - viewport.y / 2).abs() < 1,
-      'The board must be centered.');
+  checkEditorFraming(scene);
 }
 
 Future<void> _captureRuntime(Node scene, GridPos? selected) async {
