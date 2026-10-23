@@ -2,9 +2,11 @@ import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 import 'package:blacksmith_front/core/di/service_locator.dart';
 import 'package:blacksmith_front/data/repositories/cloud_storage_repository.dart';
+import 'package:blacksmith_front/data/services/cloud_services_api.dart';
 import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import 'package:blacksmith_front/domain/models/grid_position.dart';
+import 'package:blacksmith_front/domain/models/resource_kind.dart';
 import 'support/fakes.dart';
 
 void main() {
@@ -26,8 +28,7 @@ void main() {
   });
 
   test('setup is idempotent and does not reset shared selection', () async {
-    final client = TrackedClient((_) async => http.Response('{}', 200));
-    setupServiceLocator(rows: 2, cols: 3, httpClient: client);
+    setupServiceLocator(rows: 2, cols: 3);
     final bloc = sl<IsomapGridBloc>();
     bloc.add(const TileClicked(GridPos(1, 2)));
     await bloc.stream
@@ -45,6 +46,7 @@ void main() {
     final client = TrackedClient((_) async => http.Response('{}', 200));
     setupServiceLocator(httpClient: client);
     final bloc = sl<IsomapGridBloc>();
+    sl<CloudServicesApi>(); // Explicit API usage adopts the client; editing does not.
     await disposeServiceLocator();
     expect(bloc.isClosed, isTrue);
     expect(client.closeCalls, 1);
@@ -52,13 +54,41 @@ void main() {
     expect(client.closeCalls, 1);
   });
 
-  test('unused lazy registrations are not constructed during teardown',
+  test('creating the editor leaves unused cloud registrations unconstructed',
       () async {
     final client = TrackedClient((_) async => http.Response('{}', 200));
     setupServiceLocator(httpClient: client);
+    final bloc = sl<IsomapGridBloc>();
     await disposeServiceLocator();
+    expect(bloc.isClosed, isTrue);
     expect(client.closeCalls, 0);
     // It was never adopted by an API instance, so the test still owns it.
     client.close();
+  });
+
+  test('placements stay local with an available cloud repository', () async {
+    final repository = FakeRepository();
+    sl.registerSingleton<CloudServicesApi>(repository.api,
+        dispose: (api) => api.close());
+    sl.registerSingleton<CloudStorageRepository>(repository);
+    setupServiceLocator();
+    final bloc = sl<IsomapGridBloc>();
+    bloc.add(const TileClicked(GridPos(2, 3)));
+    await bloc.stream
+        .firstWhere((state) => state.selected == const GridPos(2, 3));
+    for (final kind in [
+      ResourceKind.cloudStorage,
+      ResourceKind.computeEngine,
+      ResourceKind.cloudStorage,
+    ]) {
+      bloc.add(PlaceResource(kind));
+      await bloc.stream
+          .firstWhere((state) => state.tiles[const GridPos(2, 3)] == kind);
+    }
+    bloc.add(const PlaceResource(ResourceKind.cloudStorage));
+    await disposeServiceLocator();
+    expect(bloc.state.tiles, {const GridPos(2, 3): ResourceKind.cloudStorage});
+    expect(repository.calls, isEmpty);
+    expect(repository.client.requests, 0);
   });
 }

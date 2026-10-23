@@ -76,7 +76,7 @@ The backend uses a **layered architecture with ports-and-adapters principles**. 
 - Existing resource type strings remain supported for backward compatibility.
 - EF Core database migrations are applied deliberately; the API does **not** automatically apply them at startup.
 
-**Important integration boundary:** The current Godot frontend calls the cloud endpoint; it does **not yet** use the design/resource/catalog CRUD endpoints. Placing the Cloud Storage icon may trigger a real bucket creation, but it does not persist a `ResourceEntity` to PostgreSQL. Those are still **separate workflows**. A visual icon may remain displayed if the cloud call fails.
+**Important integration boundary:** Selecting a tile and placing or replacing Storage/Compute in the Godot editor updates **local BLoC state only**, with no backend request or GCP provisioning. The existing cloud API/repository remains available for separate explicit use. The frontend does **not yet** use the design/resource/catalog CRUD endpoints: placements survive a scene reload within the shared runtime, but disappear after a full application restart. No `ResourceEntity` is saved to PostgreSQL by placement.
 
 ---
 
@@ -152,7 +152,7 @@ From another terminal in that container:
 curl -i http://localhost:5100/cloud_services/ping
 ```
 
-**Port alignment:** The existing Godot HTTP client is configured for `http://localhost:5256`, while the documented manual devcontainer smoke test used port `5100`. Set the API bind address and client URL consistently before testing frontend-to-backend connectivity. The previous bucket smoke test did not validate Godot connectivity.
+**Port alignment:** The retained explicit cloud client defaults to `http://localhost:5100`, matching the documented manual devcontainer smoke test. Set the API bind address and client URL consistently before explicit frontend-to-backend tests. Local editor placement does not require the backend; the previous bucket smoke test did not validate Godot connectivity.
 
 ---
 
@@ -178,7 +178,7 @@ It does **not** verify deploying a whole architecture design or automatically sy
 
 - Integrate the existing **Design / Resource / ResourceType** backend API with the Godot/Dart UI.
 - Persist grid placements and load the resources belonging to a selected design.
-- Separate **editing a design** from **deploying cloud infrastructure**.
+- Keep any future deployment action explicit and separate from local architecture editing.
 - Add explicit provisioning state, error handling, and recovery before combining cloud operations with database persistence.
 - Introduce **ResourceConnection** later; its GitHub issue exists, but implementation is deferred.
 - Continue with **GCP only**; retain modular boundaries for future providers rather than implementing placeholder AWS/Azure adapters.
