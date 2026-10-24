@@ -1,0 +1,240 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Theme" path="res://scenes/isometric_3d/workspace_dark.tres" id="1_theme"]
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/icons/white/cloud_storage.svg" id="2_storage"]
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/source/compute_engine/compute_engine_texture.png" id="3_compute"]
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/icons/white/cloud_vpn.svg" id="4_vpn"]
+[ext_resource type="Texture2D" path="res://assets/models/resource_cubes/icons/white/load_balancer.svg" id="5_balancing"]
+
+[sub_resource type="AtlasTexture" id="ComputeIcon"]
+atlas = ExtResource("3_compute")
+region = Rect2(256, 256, 256, 256)
+
+[node name="Workspace" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme = ExtResource("1_theme")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.018, 0.028, 0.05, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+mouse_filter = 2
+
+[node name="Layout" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="PanelContainer" parent="Margin/Layout"]
+layout_mode = 2
+
+[node name="Rows" type="VBoxContainer" parent="Margin/Layout/Header"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Actions" type="HBoxContainer" parent="Margin/Layout/Header/Rows"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Brand" type="Label" parent="Margin/Layout/Header/Rows/Actions"]
+layout_mode = 2
+text = "Blacksmith"
+theme_override_font_sizes/font_size = 20
+mouse_filter = 2
+
+[node name="NewDesign" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
+custom_minimum_size = Vector2(112, 34)
+layout_mode = 2
+text = "New Design"
+tooltip_text = "Create a persistent Design. Resource placements remain local."
+
+[node name="Spacer" type="Control" parent="Margin/Layout/Header/Rows/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Appearance" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
+custom_minimum_size = Vector2(72, 34)
+layout_mode = 2
+text = "Light UI"
+tooltip_text = "Switch the UI appearance. The 3D materials remain unchanged."
+
+[node name="ActiveDesign" type="Label" parent="Margin/Layout/Header/Rows"]
+layout_mode = 2
+text = "No active Design · Local placements only"
+text_overrun_behavior = 3
+mouse_filter = 2
+
+[node name="Body" type="HBoxContainer" parent="Margin/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Sidebar" type="PanelContainer" parent="Margin/Layout/Body"]
+custom_minimum_size = Vector2(236, 0)
+layout_mode = 2
+
+[node name="Content" type="VBoxContainer" parent="Margin/Layout/Body/Sidebar"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Margin/Layout/Body/Sidebar/Content"]
+layout_mode = 2
+text = "GCP Resources"
+theme_override_font_sizes/font_size = 16
+mouse_filter = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/Layout/Body/Sidebar/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Choices" type="VBoxContainer" parent="Margin/Layout/Body/Sidebar/Content/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="Guidance" type="Label" parent="Margin/Layout/Body/Sidebar/Content"]
+layout_mode = 2
+text = "Select a tile first"
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Center" type="VBoxContainer" parent="Margin/Layout/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Canvas" type="SubViewportContainer" parent="Margin/Layout/Body/Center"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+stretch = true
+
+[node name="QuickPlacement" type="PanelContainer" parent="Margin/Layout/Body/Center"]
+layout_mode = 2
+
+[node name="Content" type="VBoxContainer" parent="Margin/Layout/Body/Center/QuickPlacement"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Instruction" type="Label" parent="Margin/Layout/Body/Center/QuickPlacement/Content"]
+layout_mode = 2
+text = "Quick placement · Select a tile first"
+text_overrun_behavior = 3
+mouse_filter = 2
+
+[node name="Choices" type="HBoxContainer" parent="Margin/Layout/Body/Center/QuickPlacement/Content"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="CloudStorage" type="Button" parent="Margin/Layout/Body/Sidebar/Content/Scroll/Choices"]
+custom_minimum_size = Vector2(44, 60)
+layout_mode = 2
+disabled = true
+text = "Cloud Storage"
+alignment = 0
+icon_alignment = 0
+tooltip_text = "Cloud Storage · Local placement"
+icon = ExtResource("2_storage")
+icon_max_width = 28
+expand_icon = true
+
+[node name="ComputeEngine" type="Button" parent="Margin/Layout/Body/Sidebar/Content/Scroll/Choices"]
+custom_minimum_size = Vector2(44, 60)
+layout_mode = 2
+disabled = true
+text = "Compute Engine"
+alignment = 0
+icon_alignment = 0
+tooltip_text = "Compute Engine · Local placement"
+icon = SubResource("ComputeIcon")
+icon_max_width = 28
+expand_icon = true
+
+[node name="CloudVpn" type="Button" parent="Margin/Layout/Body/Sidebar/Content/Scroll/Choices"]
+custom_minimum_size = Vector2(44, 60)
+layout_mode = 2
+disabled = true
+text = "Cloud VPN"
+alignment = 0
+icon_alignment = 0
+tooltip_text = "Cloud VPN · Local placement"
+icon = ExtResource("4_vpn")
+icon_max_width = 28
+expand_icon = true
+
+[node name="CloudLoadBalancing" type="Button" parent="Margin/Layout/Body/Sidebar/Content/Scroll/Choices"]
+custom_minimum_size = Vector2(44, 60)
+layout_mode = 2
+disabled = true
+text = "Load Balancing"
+alignment = 0
+icon_alignment = 0
+tooltip_text = "Load Balancing · Local placement"
+icon = ExtResource("5_balancing")
+icon_max_width = 28
+expand_icon = true
+
+[node name="CloudStorage" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+disabled = true
+tooltip_text = "Cloud Storage · Local placement"
+icon = ExtResource("2_storage")
+icon_max_width = 28
+expand_icon = true
+
+[node name="ComputeEngine" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+disabled = true
+tooltip_text = "Compute Engine · Local placement"
+icon = SubResource("ComputeIcon")
+icon_max_width = 28
+expand_icon = true
+
+[node name="CloudVpn" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+disabled = true
+tooltip_text = "Cloud VPN · Local placement"
+icon = ExtResource("4_vpn")
+icon_max_width = 28
+expand_icon = true
+
+[node name="CloudLoadBalancing" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+disabled = true
+tooltip_text = "Load Balancing · Local placement"
+icon = ExtResource("5_balancing")
+icon_max_width = 28
+expand_icon = true

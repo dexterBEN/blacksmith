@@ -4,6 +4,7 @@ import 'dart:async' as async;
 import 'dart:io';
 import 'package:bloc/bloc.dart' as bloc_core;
 import 'package:godot_dart/godot_dart.dart';
+import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import 'package:http/http.dart' as http;
 import '../lib/core/di/service_locator.dart' as di;
 import '../lib/data/repositories/cloud_storage_repository.dart';
@@ -219,7 +220,7 @@ class SelectionFixture {
 
     // Resize the viewport, then pick using the actual adjusted camera.
     final window = tree.getRoot()!;
-    final camera = scene.getNodeT<Camera3D>('Camera3D')!;
+    final camera = Workspace3D.camera(scene);
     final initialSize = camera.getSize();
     window.setContentScaleSize(Vector2i.fromXY(480, 640));
     await _until(() => camera.getSize() > initialSize);
@@ -357,8 +358,9 @@ Vector2 _project(Node scene, GridPos position) {
   return _projectPoint(scene, center.x, center.z);
 }
 
-Vector2 _projectPoint(Node scene, double x, double z) =>
-    scene.getNodeT<Camera3D>('Camera3D')!.unprojectPosition((scene as Node3D)
+Vector2 _projectPoint(Node scene, double x, double z) => Workspace3D.project(
+    scene,
+    (scene as Node3D)
         .toGlobal(Vector3(x: x, y: GridLayout3D.tileHeight / 2, z: z)));
 
 Future<void> _click(Node scene, Vector2 point,

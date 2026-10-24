@@ -1,71 +1,43 @@
-import 'dart:math' as math;
 import 'package:godot_dart/godot_dart.dart';
 import '../../domain/bloc/isomap_grid/isomap_grid_state.dart';
 import '../../domain/models/resource_kind.dart';
 import 'resource_visuals_3d.dart';
+import 'workspace_3d.dart';
 
 /// Native controls belong to the scene; this helper holds presentation references
 /// only. Signal ownership is the scene node, never an additional state owner.
 class ResourcePalette3D {
   ResourcePalette3D(Node owner, void Function(ResourceKind) onChosen) {
-    owner.getNodeT<CanvasLayer>('PaletteLayer')!.setVisible(true);
-    _panel = owner.getNodeT<Panel>('PaletteLayer/ResourcePalette/Panel')!;
-    _instruction = _panel.getNodeT<Label>('Instruction')!;
-    _choices = _panel.getNodeT<GridContainer>('Choices')!;
+    _instruction =
+        owner.getNodeT<Label>('${Workspace3D.quick}/Content/Instruction')!;
+    _guidance =
+        owner.getNodeT<Label>('${Workspace3D.sidebar}/Content/Guidance')!;
     for (final entry in resourceVisuals3D.entries) {
-      final button = _choices.getNodeT<Button>(entry.value.buttonName)!;
-      _buttons.add(button);
-      button.pressed.connect(owner, () => onChosen(entry.key));
+      for (final path in [Workspace3D.catalog, Workspace3D.choices]) {
+        final button =
+            owner.getNodeT<Button>('$path/${entry.value.buttonName}')!;
+        _buttons.add(button);
+        button.pressed.connect(owner, () => onChosen(entry.key));
+      }
     }
   }
 
-  late final Panel _panel;
-  late final Label _instruction;
-  late final GridContainer _choices;
+  late final Label _instruction, _guidance;
   final _buttons = <Button>[];
 
   void render(IsomapGridState state, {bool blocked = false}) {
     final selected = state.selected;
-    final enabled = !blocked && selected != null && state.contains(selected);
+    final hasSelection = selected != null && state.contains(selected);
+    final enabled = !blocked && hasSelection;
     for (final button in _buttons) {
       button.setDisabled(!enabled);
+      button.setFocusMode(
+          enabled ? ControlFocusMode.focusAll : ControlFocusMode.focusNone);
     }
-    _instruction.setText(enabled
+    final text = hasSelection
         ? 'Tile (${selected.row}, ${selected.col}) · Local placement'
-        : 'Select a tile first');
-  }
-
-  /// Lay out controls first, then return the unobstructed area for the board.
-  /// This is presentation geometry, independent of selection/placement state.
-  Rect2 resize(Vector2 viewport) {
-    final width = math.min(880.0, math.max(1.0, viewport.x - 24));
-    final columns = viewport.x >= 816 ? 4 : (viewport.x >= 416 ? 2 : 1);
-    final rows = (4 / columns).ceil();
-    final height = 36.0 + rows * 40 + (rows - 1) * 8;
-    _panel
-      ..setPosition(Vector2(
-          x: (viewport.x - width) / 2,
-          y: math.max(0.0, viewport.y - height - 12)))
-      ..setSize(Vector2(x: width, y: height));
-    _instruction
-      ..setPosition(Vector2(x: 8, y: 6))
-      ..setSize(Vector2(x: width - 16, y: 20));
-    // Update minimums before sizing the container. Otherwise a portrait ->
-    // landscape resize clamps it to the previous wider buttons' minimum width.
-    for (final button in _buttons) {
-      button.setCustomMinimumSize(Vector2(
-          x: math.max(1.0, (width - 16 - (columns - 1) * 8) / columns), y: 40));
-    }
-    _choices
-      ..setColumns(columns)
-      ..getCombinedMinimumSize()
-      ..setPosition(Vector2(x: 8, y: 28))
-      ..setSize(Vector2(x: width - 16, y: height - 34));
-    // Keep a 12-pixel gutter around the viewport and above the actual panel.
-    return Rect2.fromPositionSize(
-        Vector2(x: 12, y: 12),
-        Vector2(
-            x: math.max(1.0, viewport.x - 24),
-            y: math.max(1.0, _panel.getPosition().y - 24)));
+        : 'Select a tile first';
+    _instruction.setText(text);
+    _guidance.setText(text);
   }
 }

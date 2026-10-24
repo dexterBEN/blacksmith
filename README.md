@@ -85,6 +85,12 @@ The backend uses a **layered architecture with ports-and-adapters principles**. 
 Normal Godot project startup opens `scenes/isometric_3d.tscn`. The existing 3D
 scene supports selecting a tile and placing or replacing Cloud Storage,
 Compute Engine, Cloud VPN and Cloud Load Balancing cubes through a native palette.
+The workspace has a Blacksmith header, a scrollable GCP catalog and a compact
+quick-placement strip. Both resource entry points use the same tile-first action.
+The board renders in its own canvas between the panels; it does not extend under
+the menu. **Light UI / Dark UI** switches the controls and dialog appearance
+without changing selection, cubes or the active Design. The current 3D materials
+and background stay dark in both appearances; pale 3D presets are a follow-up.
 All placement stays in `IsomapGridBloc` memory. No backend or credentials are
 required, and no cloud operation runs.
 
@@ -132,9 +138,10 @@ optional Linux `strace` tool. See [the Dart workflow](frontend/src/README.md) fo
 source-generation prerequisites.
 
 The 3D window follows actual window dimensions, with a minimum size of
-480 × 360. Framing reserves room between the Design header and palette and
+480 × 360. Native containers reserve the header, sidebar and quick strip; camera
+framing uses the actual central render viewport and
 includes the maximum cube height even on an empty board, so placement does not
-change the zoom. See [the Issue #39 report](issue_39_report.md) for Design creation,
+change the zoom. See [the Issue #42 report](issue_42_report.md) for workspace layout,
 validation and native captures. Full application restart clears local placements
 and active Design selection; the created Design remains in PostgreSQL.
 

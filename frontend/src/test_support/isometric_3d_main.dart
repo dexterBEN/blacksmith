@@ -4,6 +4,7 @@ import 'dart:async' as async;
 import 'dart:convert';
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
+import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import '../godot_dart_scripts.g.dart';
 import '../lib/domain/models/grid_position.dart';
 import '../lib/prototypes/isometric_3d/grid_layout.dart';
@@ -55,7 +56,7 @@ void main() {
       }
       // Validate automatic framing at a narrow viewport too; no navigation
       // control or production camera is modified.
-      final camera = scene.getNodeT<Camera3D>('Camera3D')!;
+      final camera = Workspace3D.camera(scene);
       final originalSize = camera.getSize();
       window.setContentScaleSize(Vector2i.fromXY(480, 640));
       await _until(() => camera.getSize() > originalSize);
@@ -182,7 +183,7 @@ void _validate(Node scene) {
       }
     }
   }
-  final camera = scene.getNodeT<Camera3D>('Camera3D')!;
+  final camera = Workspace3D.camera(scene);
   _check(camera.getProjection() == Camera3DProjectionType.projectionOrthogonal,
       'An orthographic camera is required.');
   final finish = scene.getNodeT<Node3D>('SurfaceFinishReflection')!;
