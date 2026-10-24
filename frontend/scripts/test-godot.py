@@ -166,7 +166,7 @@ def main():
                 'BLACKSMITH_DEFAULT_APPLICATION_PASSED', headless=False,
                 trace=args.trace_network)
             if 'BLACKSMITH_WORKSPACE_PASSED' not in contents:
-                raise RuntimeError('The workspace layout/appearance checks did not complete.')
+                raise RuntimeError('The desktop workspace layout checks did not complete.')
         finally:
             (project / 'src/main.dart').write_bytes(original_main)
             (project / 'src/production_main.dart').unlink()

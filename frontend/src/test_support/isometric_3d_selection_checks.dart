@@ -222,13 +222,18 @@ class SelectionFixture {
     final window = tree.getRoot()!;
     final camera = Workspace3D.camera(scene);
     final initialSize = camera.getSize();
-    window.setContentScaleSize(Vector2i.fromXY(480, 640));
-    await _until(() => camera.getSize() > initialSize);
+    window.setContentScaleSize(
+        Vector2i.fromXY(Workspace3D.minimumWidth, Workspace3D.minimumHeight));
+    await _until(() =>
+        scene.getViewport()!.getVisibleRect().size.x ==
+        Workspace3D.minimumWidth);
+    await _pause();
     await _click(scene, _project(scene, const GridPos(0, 5)));
     await _until(() => _bloc.state.selected == const GridPos(0, 5));
     _checkHighlight(scene, const GridPos(0, 5));
     if (capture) {
-      await _capture(scene, 'selection_portrait.png', width: 480, height: 640);
+      await _capture(scene, 'selection_minimum.png',
+          width: Workspace3D.minimumWidth, height: Workspace3D.minimumHeight);
     }
     window.setContentScaleSize(Vector2i.fromXY(1152, 648));
     await _until(() => (camera.getSize() - initialSize).abs() < 1e-4);

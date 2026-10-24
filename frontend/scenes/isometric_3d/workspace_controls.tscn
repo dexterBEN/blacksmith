@@ -74,12 +74,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="Appearance" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
-custom_minimum_size = Vector2(72, 34)
-layout_mode = 2
-text = "Light UI"
-tooltip_text = "Switch the UI appearance. The 3D materials remain unchanged."
-
 [node name="ActiveDesign" type="Label" parent="Margin/Layout/Header/Rows"]
 layout_mode = 2
 text = "No active Design · Local placements only"

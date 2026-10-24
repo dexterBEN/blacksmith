@@ -184,7 +184,10 @@ void afterStartup() {
         await select(entry.key);
         await choose(entry.value);
       }
-      for (final size in const [(800, 600), (640, 480)]) {
+      for (final size in const [
+        (1152, 648),
+        (Workspace3D.minimumWidth, Workspace3D.minimumHeight)
+      ]) {
         tree.getRoot()!.setSize(Vector2i.fromXY(size.$1, size.$2));
         await _until(
             () => scene.getViewport()!.getVisibleRect().size.x == size.$1);
@@ -192,6 +195,27 @@ void afterStartup() {
         checkEditorFraming(scene);
         await select(const GridPos(5, 5));
       }
+      // Godot must clamp an undersized physical window, not enter a second
+      // presentation mode. Exercise this in the native X11 application too.
+      final window = tree.getRoot()!;
+      window.setSize(Vector2i.fromXY(640, 480));
+      await _until(() =>
+          window.getSize().x >= Workspace3D.minimumWidth &&
+          window.getSize().y >= Workspace3D.minimumHeight);
+      await _pause();
+      final minimum = window.getMinSize();
+      final actual = window.getSize();
+      _check(
+          minimum.x == Workspace3D.minimumWidth &&
+              minimum.y == Workspace3D.minimumHeight &&
+              actual.x >= minimum.x &&
+              actual.y >= minimum.y,
+          'The native window enforces the desktop minimum: '
+          'minimum=${minimum.x}x${minimum.y}, actual=${actual.x}x${actual.y}.');
+      GD.print(Variant('BLACKSMITH_DESKTOP_MINIMUM_PASSED '
+          'minimum=${minimum.x}x${minimum.y} actual=${actual.x}x${actual.y}'));
+      checkEditorFraming(scene);
+      await select(const GridPos(0, 0));
       final oldScene = scene.getInstanceId();
       final oldCube = _cube(scene, center).getInstanceId();
       _check(

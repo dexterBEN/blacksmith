@@ -38,7 +38,8 @@ void main() {
         window
           ..setContentScaleMode(WindowContentScaleMode.disabled)
           ..setContentScaleSize(Vector2i.fromXY(0, 0))
-          ..setMinSize(Vector2i.fromXY(480, 360));
+          ..setMinSize(Vector2i.fromXY(
+              Workspace3D.minimumWidth, Workspace3D.minimumHeight));
       } else {
         window
           ..setContentScaleMode(WindowContentScaleMode.viewport)
@@ -54,12 +55,15 @@ void main() {
             'responsive_window=true local_placement=true'));
         return;
       }
-      // Validate automatic framing at a narrow viewport too; no navigation
+      // Validate automatic framing at the desktop minimum; no navigation
       // control or production camera is modified.
       final camera = Workspace3D.camera(scene);
       final originalSize = camera.getSize();
-      window.setContentScaleSize(Vector2i.fromXY(480, 640));
-      await _until(() => camera.getSize() > originalSize);
+      window.setContentScaleSize(
+          Vector2i.fromXY(Workspace3D.minimumWidth, Workspace3D.minimumHeight));
+      await _until(() =>
+          scene.getViewport()!.getVisibleRect().size.x ==
+          Workspace3D.minimumWidth);
       // Container sorting is deferred; camera changes synchronously.
       await _pause();
       _validateFraming(scene, camera);

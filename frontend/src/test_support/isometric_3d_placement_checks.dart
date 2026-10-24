@@ -110,16 +110,17 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
   _check(!GD.isInstanceIdValid(removed), 'Removed state frees its visual.');
   _checkResources(scene, bloc.state);
   final cameraSize = Workspace3D.camera(scene).getSize();
-  tree.getRoot()!.setContentScaleSize(Vector2i.fromXY(480, 640));
+  tree.getRoot()!.setContentScaleSize(
+      Vector2i.fromXY(Workspace3D.minimumWidth, Workspace3D.minimumHeight));
   await _pause();
   for (final kind in ResourceKind.values) {
     final rect = _button(scene, kind).getGlobalRect();
     _check(
         rect.position.x >= 0 &&
             rect.position.y >= 0 &&
-            rect.position.x + rect.size.x <= 480 &&
-            rect.position.y + rect.size.y <= 640,
-        'Portrait palette must remain fully visible.');
+            rect.position.x + rect.size.x <= Workspace3D.minimumWidth &&
+            rect.position.y + rect.size.y <= Workspace3D.minimumHeight,
+        'Desktop palette must remain fully visible at the minimum size.');
   }
   await choose(ResourceKind.cloudLoadBalancing);
   tree.getRoot()!.setContentScaleSize(Vector2i.fromXY(1152, 648));

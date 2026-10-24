@@ -13,7 +13,7 @@ import '../lib/prototypes/isometric_3d/resource_visuals_3d.dart';
 import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import 'isometric_3d_framing_checks.dart';
 
-/// Native layout/pointer/appearance checks. The caller supplies the real runtime
+/// Native desktop layout/pointer checks. The caller supplies the real runtime
 /// Cubit/BLoC and a fail-closed Design repository, never a replacement grid.
 Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     {required int Function() tileEvents}) async {
@@ -28,10 +28,6 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     ..setContentScaleSize(Vector2i.fromXY(1280, 800));
   await _settle(scene);
   checkEditorFraming(scene);
-  final themeButton =
-      scene.getNodeT<Button>('${Workspace3D.header}/Rows/Actions/Appearance')!;
-  _check(themeButton.getText() == 'Light UI',
-      'A fresh application starts in the dark UI.');
   for (final group in [Workspace3D.catalog, Workspace3D.choices]) {
     for (final kind in ResourceKind.values) {
       final button = _button(scene, group, kind);
@@ -48,13 +44,13 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
   await _capture(scene, '$output/dark_empty.png');
 
   // Explicit fixture creation solely to test that a non-empty active Design
-  // survives appearance/layout changes. The repository sends no HTTP request.
+  // survives desktop resizing. The repository sends no HTTP request.
   design.open();
-  design.changeName('Workspace appearance validation');
+  design.changeName('Desktop workspace validation');
   await design.submit();
   await _settle(scene);
   final active = design.state.active;
-  _check(active != null, 'The appearance test must include an active Design.');
+  _check(active != null, 'The layout test must include an active Design.');
 
   Future<void> select(GridPos pos) async {
     final p = const GridLayout3D().worldPosition(pos);
@@ -108,24 +104,8 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
         ResourceKind.values[i]);
   }
   checkEditorFraming(scene);
-  final state = grid.state;
   final ids = {for (final p in corners) p: _cube(scene, p).getInstanceId()};
-  final camera = Workspace3D.camera(scene);
-  final cameraSize = camera.getSize();
-  final offset = camera.getVOffset();
   await _capture(scene, '$output/dark_resources.png');
-  await _click(scene, themeButton.getGlobalRect().getCenter());
-  _check(themeButton.getText() == 'Dark UI', 'Light UI is selectable.');
-  _check(
-      grid.state == state &&
-          design.state.active == active &&
-          corners.every((p) => _cube(scene, p).getInstanceId() == ids[p]) &&
-          (camera.getSize() - cameraSize).abs() < 1e-5 &&
-          (camera.getVOffset() - offset).abs() < 1e-5,
-      'Appearance preserves selection, placements, native nodes, active Design and camera.');
-  checkEditorFraming(scene);
-  await _capture(scene, '$output/light_resources.png');
-  await _click(scene, themeButton.getGlobalRect().getCenter());
 
   final beforeUiClicks = grid.state;
   for (final path in [
@@ -138,7 +118,11 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
   }
   _check(grid.state == beforeUiClicks,
       'UI margins and panels do not select tiles behind them.');
-  for (final size in const [(640, 480), (480, 360), (1920, 1080)]) {
+  for (final size in const [
+    (Workspace3D.minimumWidth, Workspace3D.minimumHeight),
+    (1024, 768),
+    (1920, 1080)
+  ]) {
     window.setContentScaleSize(Vector2i.fromXY(size.$1, size.$2));
     await _settle(scene);
     checkEditorFraming(scene);
@@ -148,26 +132,24 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     _check(
         design.state.active == active &&
             corners.every((p) => _cube(scene, p).getInstanceId() == ids[p]),
-        'Compact/wide layouts preserve the existing Design and cube nodes.');
-    if (size == (640, 480)) await _capture(scene, '$output/compact.png');
-    if (size.$1 <= 640) {
-      final scroll = scene
-          .getNodeT<ScrollContainer>('${Workspace3D.sidebar}/Content/Scroll')!;
-      for (final kind in ResourceKind.values) {
-        final button = _button(scene, Workspace3D.catalog, kind);
-        scroll.ensureControlVisible(button);
-        await _settle(scene);
-        final rect = scroll.getGlobalRect();
-        final bounds = button.getGlobalRect();
-        _check(
-            bounds.position.y >= rect.position.y - .1 &&
-                bounds.end.y <= rect.end.y + .1 &&
-                button.getText().replaceAll('\n', ' ') ==
-                    resourceVisuals3D[kind]!.label,
-            'Every supported catalog choice remains readable and scrollable in compact windows.');
-      }
-      scroll.setVScroll(0);
-      await _settle(scene);
+        'Desktop resizing preserves the existing Design and cube nodes.');
+    final sidebar = scene.getNodeT<Control>(Workspace3D.sidebar)!;
+    _check(sidebar.getSize().x == 236,
+        'The standard desktop sidebar keeps its width.');
+    final scroll = scene
+        .getNodeT<ScrollContainer>('${Workspace3D.sidebar}/Content/Scroll')!;
+    for (final kind in ResourceKind.values) {
+      final button = _button(scene, Workspace3D.catalog, kind);
+      final rect = scroll.getGlobalRect();
+      final bounds = button.getGlobalRect();
+      _check(
+          bounds.position.y >= rect.position.y - .1 &&
+              bounds.end.y <= rect.end.y + .1 &&
+              button.getText() == resourceVisuals3D[kind]!.label,
+          'All four full resource labels remain visible without wrapping or scrolling.');
+    }
+    if (size.$1 == Workspace3D.minimumWidth) {
+      await _capture(scene, '$output/minimum_resources.png');
     }
   }
   grid.add(const ResetGridForNewDesign());
@@ -178,7 +160,7 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
   await _settle(scene);
   checkEditorFraming(scene);
   GD.print(Variant('BLACKSMITH_WORKSPACE_PASSED resources=4 entry_points=2 '
-      'appearances=2 sizes=4 active_design_preserved=true native_nodes_preserved=true'));
+      'desktop_sizes=4 minimum=960x640 active_design_preserved=true native_nodes_preserved=true'));
 }
 
 Button _button(Node scene, String group, ResourceKind kind) =>

@@ -48,7 +48,7 @@ void checkEditorFraming(Node scene) {
       final button = container.getNodeT<Button>(entry.buttonName)!;
       final bounds = button.getGlobalRect();
       final panel = group == Workspace3D.catalog ? sidebar : quick;
-      // The sidebar scrolls vertically on compact-height windows; no horizontal
+      // The native sidebar retains its vertical scroll container; no horizontal
       // overflow is permitted. Quick choices must always be completely visible.
       _check(
           bounds.position.x >= panel.position.x &&
@@ -121,10 +121,10 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
   final camera = Workspace3D.camera(scene);
   for (final size in const [
     (1152, 648),
-    (640, 360),
-    (480, 360),
-    (800, 600),
-    (480, 640),
+    (Workspace3D.minimumWidth, Workspace3D.minimumHeight),
+    (1024, 768),
+    (1280, 800),
+    (1440, 900),
     (1600, 900)
   ]) {
     window.setContentScaleSize(Vector2i.fromXY(size.$1, size.$2));
@@ -187,7 +187,10 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
     window
       ..setContentScaleMode(WindowContentScaleMode.disabled)
       ..setContentScaleSize(Vector2i.fromXY(0, 0));
-    for (final size in const [(800, 600), (640, 480)]) {
+    for (final size in const [
+      (1152, 648),
+      (Workspace3D.minimumWidth, Workspace3D.minimumHeight)
+    ]) {
       window.setSize(Vector2i.fromXY(size.$1, size.$2));
       for (var i = 0; i < 80; i++) {
         final actual = scene.getViewport()!.getVisibleRect().size;

@@ -39,7 +39,6 @@ class Isometric3DGrid extends Node3D {
   async.StreamSubscription<IsomapGridState>? _stateSubscription;
   ResourcePalette3D? _palette;
   DesignEditor3D? _designEditor;
-  Workspace3D? _workspace;
   Node3D? _resourceRoot;
   // Render caches derived exclusively from BLoC state, not placement state.
   final _resources = <GridPos, ({ResourceKind kind, Node3D node})>{};
@@ -54,9 +53,10 @@ class Isometric3DGrid extends Node3D {
   void vReady() {
     _active = true;
     final window = getTree()!.getRoot()!;
-    window.setMinSize(Vector2i.fromXY(480, 360));
+    window.setMinSize(
+        Vector2i.fromXY(Workspace3D.minimumWidth, Workspace3D.minimumHeight));
     installRuntimeShutdownHook(window);
-    _workspace = Workspace3D(this);
+    Workspace3D.attach(this);
     final grid = getNodeT<Node3D>('GridRoot')!;
     final scene = ResourceLoader.singleton
         .load('res://scenes/isometric_3d/tile.tscn')! as PackedScene;
@@ -106,7 +106,6 @@ class Isometric3DGrid extends Node3D {
     _designEditor = DesignEditor3D(
         this, di.sl.isRegistered<DesignCubit>() ? di.sl<DesignCubit>() : null,
         (open) {
-      _workspace?.setBlocked(open);
       _palette?.render(bloc.state, blocked: open);
     });
     _resizeWorkspace();
@@ -206,8 +205,6 @@ class Isometric3DGrid extends Node3D {
     _active = false;
     _designEditor?.dispose();
     _designEditor = null;
-    _workspace?.dispose();
-    _workspace = null;
     final subscription = _stateSubscription;
     _stateSubscription = null;
     if (subscription != null) async.unawaited(subscription.cancel());
@@ -225,7 +222,6 @@ class Isometric3DGrid extends Node3D {
   }
 
   void _resizeWorkspace() {
-    _workspace?.resize();
     final size = getViewport()!.getVisibleRect().size;
     _designEditor?.resize(size);
     _fitCamera();
