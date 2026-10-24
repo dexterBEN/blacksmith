@@ -132,7 +132,7 @@ void afterStartup() {
       if (_phase == 'save') {
         await _click(
             scene, _header(scene, 'NewDesign').getGlobalRect().getCenter());
-        _input(scene).setText(
+        _enter(scene,
             'Blacksmith Issue44 smoke ${DateTime.now().toUtc().microsecondsSinceEpoch}');
         await _settle(scene);
         await _click(scene, _dialogButton(scene).getGlobalRect().getCenter());
@@ -185,7 +185,7 @@ void afterStartup() {
             'Reopen must run in a different complete Godot process.');
         await _click(
             scene, _header(scene, 'OpenDesign').getGlobalRect().getCenter());
-        _input(scene).setText(saved['design_id'] as String);
+        _enter(scene, saved['design_id'] as String);
         await _settle(scene);
         await _click(scene, _dialogButton(scene).getGlobalRect().getCenter());
         await _until(() =>
@@ -207,7 +207,9 @@ void afterStartup() {
         final oldCube = _cube(scene).getInstanceId();
         _check(tree.reloadCurrentScene() == GDError.ok,
             'Scene reload must succeed.');
-        await _until(() => tree.getCurrentScene()!.getInstanceId() != previous);
+        await _until(() =>
+            tree.getCurrentScene() != null &&
+            tree.getCurrentScene()!.getInstanceId() != previous);
         await _settle(tree.getCurrentScene()!);
         scene = tree.getCurrentScene()!;
         _check(
@@ -252,6 +254,13 @@ void afterStartup() {
       tree.quit(exitCode: 1);
     }
   });
+}
+
+void _enter(Node scene, String value) {
+  final field = _input(scene);
+  field.setText(value);
+  // Programmatic set_text does not emit the signal produced by actual typing.
+  field.textChanged.emit(value);
 }
 
 Button _header(Node scene, String name) =>
