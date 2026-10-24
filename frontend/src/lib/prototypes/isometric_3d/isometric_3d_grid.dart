@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:godot_dart/godot_dart.dart';
 import '../../core/di/service_locator.dart' as di;
 import '../../core/runtime_shutdown.dart';
+import '../../domain/bloc/design/design_cubit.dart';
 import '../../domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../../domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../../domain/bloc/isomap_grid/isomap_grid_state.dart';
@@ -12,6 +13,7 @@ import '../../domain/models/resource_kind.dart';
 import 'grid_layout.dart';
 import 'resource_palette_3d.dart';
 import 'resource_visuals_3d.dart';
+import 'design_editor_3d.dart';
 
 part 'isometric_3d_grid.g.dart';
 
@@ -35,6 +37,7 @@ class Isometric3DGrid extends Node3D {
   IsomapGridBloc? _bloc;
   async.StreamSubscription<IsomapGridState>? _stateSubscription;
   ResourcePalette3D? _palette;
+  DesignEditor3D? _designEditor;
   Node3D? _resourceRoot;
   // Render caches derived exclusively from BLoC state, not placement state.
   final _resources = <GridPos, ({ResourceKind kind, Node3D node})>{};
@@ -78,7 +81,6 @@ class Isometric3DGrid extends Node3D {
     // The camera is fixed: react to viewport changes instead of polling Godot
     // through Dart on every rendered frame. The connection is owned by this node.
     getViewport()!.sizeChanged.connect(this, _fitCamera);
-    _fitCamera();
     // The isolated launcher registers a shared local-only BLoC. When this
     // scene is run by the application, reuse its existing DI registration.
     // If DI is unavailable, own a local diagnostic BLoC, as AppRoot does.
@@ -94,6 +96,11 @@ class Isometric3DGrid extends Node3D {
       _ownsBloc = true;
     }
     final bloc = _bloc!;
+    _designEditor = DesignEditor3D(
+        this,
+        di.sl.isRegistered<DesignCubit>() ? di.sl<DesignCubit>() : null,
+        (open) => _palette?.render(bloc.state, blocked: open));
+    _fitCamera();
     _stateSubscription = bloc.stream.listen((state) {
       if (_active) _renderState(state);
     });
@@ -107,6 +114,7 @@ class Isometric3DGrid extends Node3D {
   void vUnhandledInput(InputEvent? event) {
     final bloc = _bloc;
     if (!_active ||
+        (_designEditor?.isOpen ?? false) ||
         bloc == null ||
         bloc.isClosed ||
         event is! InputEventMouseButton ||
@@ -147,7 +155,7 @@ class Isometric3DGrid extends Node3D {
 
   void _renderState(IsomapGridState state) {
     _renderSelection(state.selected);
-    _palette?.render(state);
+    _palette?.render(state, blocked: _designEditor?.isOpen ?? false);
     final root = _resourceRoot!;
     for (final position in _resources.keys.toList()) {
       if (state.tiles[position] != _resources[position]!.kind) {
@@ -180,6 +188,8 @@ class Isometric3DGrid extends Node3D {
   @override
   void vExitTree() {
     _active = false;
+    _designEditor?.dispose();
+    _designEditor = null;
     final subscription = _stateSubscription;
     _stateSubscription = null;
     if (subscription != null) async.unawaited(subscription.cancel());
@@ -199,7 +209,13 @@ class Isometric3DGrid extends Node3D {
   void _fitCamera() {
     final size = getViewport()!.getVisibleRect().size;
     if (size.x <= 0 || size.y <= 0) return;
-    final area = _palette!.resize(size);
+    final paletteArea = _palette!.resize(size);
+    _designEditor?.resize(size);
+    final area = Rect2.fromPositionSize(
+        Vector2(x: paletteArea.position.x, y: DesignEditor3D.boardTop),
+        Vector2(
+            x: paletteArea.size.x,
+            y: math.max(1, paletteArea.end.y - DesignEditor3D.boardTop)));
     // Fixed 45° yaw and 35.264° elevation. Reserve the maximum cube height
     // even when empty: placement must never zoom/pan the board. The conservative
     // envelope includes the board underside and a cube on any perimeter tile.

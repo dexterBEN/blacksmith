@@ -27,3 +27,9 @@ class PlaceResource extends IsomapGridEvent {
   @override
   List<Object?> get props => [kind];
 }
+
+/// Sent only after the user approved discarding placements and the API created
+/// a new persistent Design. Does not save resources or provision anything.
+class ResetGridForNewDesign extends IsomapGridEvent {
+  const ResetGridForNewDesign();
+}
