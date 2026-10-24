@@ -88,6 +88,14 @@ Compute Engine, Cloud VPN and Cloud Load Balancing cubes through a native palett
 All placement stays in `IsomapGridBloc` memory. No backend or credentials are
 required, and no cloud operation runs.
 
+The **New Design** action creates a persistent Design through the existing
+`POST /designs` API and displays its backend ID/name for the current session.
+This action requires the API and PostgreSQL. Set `BLACKSMITH_BACKEND_URL` before
+launching Godot to override `http://localhost:5100`; no GCP credentials are needed.
+Unsaved placements require explicit consent before they are cleared on successful
+creation. Cancellation and failures preserve them; placed resources remain local.
+See [the Dart workflow](frontend/src/README.md) for the isolated persistence test.
+
 Prepare the Dart sources and generated bindings once, with the existing compatible
 Godot/Dart native libraries installed in `frontend/`. These commands explicitly
 use this VM's Dart SDK at `/usr/lib/dart/bin/dart`:
@@ -124,11 +132,11 @@ optional Linux `strace` tool. See [the Dart workflow](frontend/src/README.md) fo
 source-generation prerequisites.
 
 The 3D window follows actual window dimensions, with a minimum size of
-480 × 360. Framing reserves room above the palette and
+480 × 360. Framing reserves room between the Design header and palette and
 includes the maximum cube height even on an empty board, so placement does not
-change the zoom. See [the Issue #37 report](issue_37_report.md) for startup,
-lifecycle, validation and actual 3D/2D captures. Full application restart clears
-placements.
+change the zoom. See [the Issue #39 report](issue_39_report.md) for Design creation,
+validation and native captures. Full application restart clears local placements
+and active Design selection; the created Design remains in PostgreSQL.
 
 ---
 
@@ -228,7 +236,7 @@ It does **not** verify deploying a whole architecture design or automatically sy
 
 ## 🧭 Roadmap and current limitations
 
-- Integrate the existing **Design / Resource / ResourceType** backend API with the Godot/Dart UI.
+- Extend the initial **Design** creation integration to support resource persistence and reopening Designs.
 - Persist grid placements and load the resources belonging to a selected design.
 - Keep any future deployment action explicit and separate from local architecture editing.
 - Add explicit provisioning state, error handling, and recovery before combining cloud operations with database persistence.

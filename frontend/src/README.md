@@ -42,6 +42,48 @@ Both commands use the production bootstrap. There is no dependency on
 database access or GCP credentials for local placement. Native libraries and
 package caches remain development prerequisites and are not committed.
 
+The 3D editor's **New Design** button uses the existing `POST /designs` API.
+Set `BLACKSMITH_BACKEND_URL` before launching Godot to override
+`http://localhost:5100`, for example when the backend runs at a Dev Container IP.
+The API and PostgreSQL must be running for this action; no GCP credentials are
+needed. Startup and local cube placement still work without a backend.
+
+Names are trimmed and must have 1–200 UTF-16 code units, matching the backend.
+If the grid contains unsaved placements, explicitly confirm clearing them after
+successful creation. Cancel and failure preserve them. While the POST is pending,
+the dialog cannot be cancelled and the grid/palette cannot be edited. No POST is
+automatically retried: a timeout or server failure can leave an already-created
+Design, so check `GET /designs` before manually submitting again.
+
+The active ID/name live in a shared `DesignCubit`, separate from `IsomapGridBloc`.
+They survive scene reloads but not application restarts. Resource placements are
+never saved, loaded, or provisioned by this workflow.
+
+From the repository root, with the same native prerequisites as the other tests:
+
+```bash
+# UI regression with controlled responses; no actual HTTP connections.
+python3 frontend/scripts/test-godot.py --design --trace-network --timeout 600 --output /tmp/blacksmith-design-ui
+
+# Start the unchanged API in the existing backend Dev Container against a NEW
+# disposable database (existing cached dependencies/database access required).
+python3 frontend/scripts/start-design-test-backend.py CONTAINER_ID --port 5139
+# Keep this running; note the printed RUN_PATH and the container's reachable IP.
+
+# Sends one real POST then GET; writes only to the dedicated database above.
+python3 frontend/scripts/test-godot.py --design --design-live http://CONTAINER_IP:5139 --timeout 600 --output /tmp/blacksmith-design-live
+# Use id/name from /tmp/blacksmith-design-live/design_result.json:
+python3 frontend/scripts/start-design-test-backend.py CONTAINER_ID --verify RUN_PATH DESIGN_ID 'DESIGN_NAME'
+# Stop only this test API and drop only its generated database, including the
+# dedicated test Design. Never use this command to stop the user's normal API.
+python3 frontend/scripts/start-design-test-backend.py CONTAINER_ID --stop RUN_PATH
+```
+
+The native checks invoke the unchanged production bootstrap with test-only HTTP
+instrumentation. Live mode forwards the successful Design POST/GET to the actual
+API; its error screenshot uses a deliberate local HTTP 503 response. Cloud calls
+are forbidden in both modes. Captures come directly from Godot's viewport.
+
 The current locked generator may warn that its analyzer predates Dart 3.12.
 Generation is verified with the installed versions; do not upgrade dependencies
 just to suppress that warning. See the root issue report for executed checks.

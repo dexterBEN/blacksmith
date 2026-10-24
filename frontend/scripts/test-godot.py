@@ -27,10 +27,20 @@ def main():
                         help='Maximum seconds per Godot process (cold Dart compilation can be slow).')
     parser.add_argument('--application', action='store_true',
                         help='Validate production bootstrap/default 3D, then capture clean 3D and explicit 2D launches.')
+    parser.add_argument('--design', action='store_true',
+                        help='Exercise the New Design UI with fail-closed HTTP doubles and native screenshots.')
+    parser.add_argument('--design-live', metavar='BASE_URL',
+                        help='With --design, send one real POST + GET to this dedicated test backend (writes a Design).')
     parser.add_argument('--trace-network', action='store_true',
                         help='Use installed Linux strace to reject outgoing IP connections in application runs.')
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
+    if args.design and args.application:
+        parser.error('--design and --application are separate checks.')
+    if args.design_live and not args.design:
+        parser.error('--design-live requires --design and a dedicated test database.')
+    if args.design_live and args.trace_network:
+        parser.error('--trace-network forbids IP connections; use it with the offline --design check.')
     source = args.source.resolve()
     native = (args.native_dir or source).resolve()
     project = Path(tempfile.mkdtemp(prefix='blacksmith-godot-smoke-'))
@@ -65,7 +75,7 @@ def main():
     shutil.copytree(source / 'assets/models/resource_cubes',
                     project / 'assets/models/resource_cubes',
                     ignore=shutil.ignore_patterns('*.import', '*.uid'))
-    if not args.application:
+    if not args.application and not args.design:
         (project / 'src/main.dart').write_text(
             "import 'test_support/godot_smoke_main.dart' as smoke;\n"
             "void main() => smoke.main();\n")
@@ -74,16 +84,21 @@ def main():
     for name in ['DATA', 'CONFIG', 'CACHE']:
         env[f'XDG_{name}_HOME'] = str(project / f'xdg-{name.lower()}')
     # Clean application launches must not depend on any old fixture environment.
-    if args.application:
+    if args.application or args.design:
         env = {key: value for key, value in env.items()
                if not key.startswith('BLACKSMITH_')}
+    if args.design:
+        env['BLACKSMITH_DESIGN_OUTPUT'] = str(output)
+        if args.design_live:
+            env['BLACKSMITH_BACKEND_URL'] = args.design_live
+            env['BLACKSMITH_DESIGN_LIVE'] = '1'
     if args.trace_network and not shutil.which('strace'):
         raise RuntimeError('--trace-network requires an installed Linux strace.')
 
     def run(name, arguments, marker, local=False, headless=True, trace=False):
         log = output / f'{name}.log'
         run_env = env.copy()
-        if not args.application:
+        if not args.application and not args.design:
             run_env['BLACKSMITH_SMOKE_LOCAL'] = '1' if local else '0'
         command = [args.godot, *(['--headless'] if headless else []),
                    '--path', str(project), *arguments]
@@ -98,7 +113,7 @@ def main():
         contents = log.read_text(errors='replace')
         if result.returncode or marker not in contents:
             raise RuntimeError(f'{name} failed; inspect {log}')
-        if args.application and (any(line.startswith(
+        if (args.application or args.design) and (any(line.startswith(
                 ('ERROR:', 'SCRIPT ERROR:', 'SHADER ERROR:'))
                 for line in contents.splitlines()) or
                 'ObjectDB instances leaked at exit' in contents):
@@ -107,6 +122,26 @@ def main():
             raise RuntimeError(f'{name} attempted an outgoing IP connection; inspect {network}')
         print(f'{name}: PASS ({marker})', flush=True)
         return contents
+
+    if args.design:
+        graphical = ['--display-driver', 'x11', '--rendering-method',
+                     'gl_compatibility', '--resolution', '1152x648']
+        run('design-import', ['--editor', '--import', *graphical],
+            '[main] Dart scripts attached.', headless=False)
+        original_main = (project / 'src/main.dart').read_bytes()
+        (project / 'src/production_main.dart').write_bytes(original_main)
+        (project / 'src/main.dart').write_text(
+            "import 'production_main.dart' as application;\n"
+            "import 'test_support/design_creation_checks.dart' as checks;\n"
+            'void main() { checks.beforeStartup(); application.main(); checks.afterStartup(); }\n')
+        try:
+            run('design-interactions', [*graphical, '--max-fps', '60'],
+                'BLACKSMITH_DESIGN_UI_PASSED', headless=False,
+                trace=args.trace_network and not args.design_live)
+        finally:
+            (project / 'src/main.dart').write_bytes(original_main)
+            (project / 'src/production_main.dart').unlink()
+        return
 
     if args.application:
         configuration = (project / 'project.godot').read_bytes()

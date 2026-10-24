@@ -24,9 +24,9 @@ class ResourcePalette3D {
   late final GridContainer _choices;
   final _buttons = <Button>[];
 
-  void render(IsomapGridState state) {
+  void render(IsomapGridState state, {bool blocked = false}) {
     final selected = state.selected;
-    final enabled = selected != null && state.contains(selected);
+    final enabled = !blocked && selected != null && state.contains(selected);
     for (final button in _buttons) {
       button.setDisabled(!enabled);
     }

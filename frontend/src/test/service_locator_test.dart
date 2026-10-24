@@ -8,10 +8,38 @@ import 'package:blacksmith_front/domain/bloc/isomap_grid/isomap_grid_event.dart'
 import 'package:blacksmith_front/domain/models/grid_position.dart';
 import 'package:blacksmith_front/domain/models/resource_kind.dart';
 import 'support/fakes.dart';
+import 'package:blacksmith_front/data/repositories/design_repository.dart';
+import 'package:blacksmith_front/domain/bloc/design/design_cubit.dart';
 
 void main() {
   setUp(disposeServiceLocator);
   tearDown(disposeServiceLocator);
+
+  test('Design runtime shares the grid, uses configured URL and disposes once',
+      () async {
+    final client = TrackedClient((request) async {
+      expect(request.url.toString(), 'http://configured.test:5139/designs');
+      return http.Response(
+          '{"id":"12345678-1234-1234-1234-123456789abc","name":"DI test"}',
+          201);
+    });
+    setupServiceLocator(
+        baseUrl: 'http://configured.test:5139', designHttpClient: client);
+    final cubit = sl<DesignCubit>();
+    setupServiceLocator();
+    expect(identical(cubit, sl<DesignCubit>()), true);
+    expect(client.requests, 0);
+    cubit.open();
+    cubit.changeName('DI test');
+    await cubit.submit();
+    expect(cubit.state.active!.name, 'DI test');
+    await disposeServiceLocator();
+    expect(cubit.isClosed, true);
+    expect(client.closeCalls, 1);
+    await disposeServiceLocator();
+    expect(client.closeCalls, 1);
+    expect(sl.isRegistered<DesignRepository>(), false);
+  });
 
   test('the existing defaults and request contract remain configured',
       () async {

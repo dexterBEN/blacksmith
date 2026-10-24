@@ -9,6 +9,8 @@ class IsomapGridBloc extends Bloc<IsomapGridEvent, IsomapGridState> {
   }) : super(IsomapGridState.initial(rows: rows, cols: cols)) {
     on<TileClicked>(_onTileClicked);
     on<PlaceResource>(_onPlaceResource);
+    on<ResetGridForNewDesign>((event, emit) =>
+        emit(IsomapGridState.initial(rows: state.rows, cols: state.cols)));
   }
 
   /// Preserves the existing visual-only diagnostic fallback without giving

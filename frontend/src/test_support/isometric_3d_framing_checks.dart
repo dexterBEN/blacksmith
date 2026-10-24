@@ -15,6 +15,15 @@ void checkEditorFraming(Node scene) {
   final viewport = scene.getViewport()!.getVisibleRect().size;
   final panel = scene.getNodeT<Panel>('PaletteLayer/ResourcePalette/Panel')!;
   final rect = panel.getGlobalRect();
+  final header = scene
+      .getNodeT<Panel>('DesignLayer/DesignControls/Header')!
+      .getGlobalRect();
+  _check(
+      header.position.x >= 0 &&
+          header.position.y >= 0 &&
+          header.end.x <= viewport.x &&
+          header.end.y < rect.position.y,
+      'Design header stays inside the viewport above the board.');
   _check(
       rect.position.x >= 0 &&
           rect.position.y > 24 &&
@@ -41,7 +50,7 @@ void checkEditorFraming(Node scene) {
     _check(
         screen.x > 12 &&
             screen.x < viewport.x - 12 &&
-            screen.y > 12 &&
+            screen.y > header.end.y + 12 &&
             screen.y < rect.position.y - 12,
         'Every tile/cube corner must clear the viewport and palette: '
         '${viewport.x}x${viewport.y}, point=${screen.x},${screen.y}.');

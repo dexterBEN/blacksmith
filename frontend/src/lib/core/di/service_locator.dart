@@ -4,6 +4,8 @@ import '../../domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../../domain/bloc/isomap_grid/isomap_grid_state.dart';
 import '../../data/services/cloud_services_api.dart';
 import '../../data/repositories/cloud_storage_repository.dart';
+import '../../data/repositories/design_repository.dart';
+import '../../domain/bloc/design/design_cubit.dart';
 
 final sl = GetIt.instance;
 const defaultBackendUrl = 'http://localhost:5100';
@@ -17,6 +19,7 @@ void setupServiceLocator({
   String baseUrl = defaultBackendUrl,
   String projectId = defaultGcpProjectId,
   http.Client? httpClient,
+  http.Client? designHttpClient,
 }) {
   if (!sl.isRegistered<CloudServicesApi>()) {
     sl.registerLazySingleton<CloudServicesApi>(
@@ -37,6 +40,18 @@ void setupServiceLocator({
         cols: cols,
       ),
       dispose: (bloc) => bloc.close(),
+    );
+  }
+  if (!sl.isRegistered<DesignRepository>()) {
+    sl.registerLazySingleton<DesignRepository>(
+      () => DesignRepository(baseUrl: baseUrl, client: designHttpClient),
+      dispose: (repository) => repository.close(),
+    );
+  }
+  if (!sl.isRegistered<DesignCubit>()) {
+    sl.registerLazySingleton<DesignCubit>(
+      () => DesignCubit(sl<DesignRepository>(), sl<IsomapGridBloc>()),
+      dispose: (cubit) => cubit.close(),
     );
   }
 }
