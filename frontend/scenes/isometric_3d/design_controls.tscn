@@ -1,21 +1,4 @@
-[gd_scene load_steps=3 format=3]
-
-[sub_resource type="StyleBoxFlat" id="HeaderStyle"]
-bg_color = Color(0.055, 0.07, 0.10, 0.96)
-border_width_bottom = 1
-border_color = Color(0.2, 0.28, 0.4, 1)
-
-[sub_resource type="StyleBoxFlat" id="DialogStyle"]
-bg_color = Color(0.07, 0.09, 0.13, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.25, 0.4, 0.65, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_left = 8
-corner_radius_bottom_right = 8
+[gd_scene format=3]
 
 [node name="DesignControls" type="Control"]
 layout_mode = 3
@@ -24,18 +7,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
-
-[node name="Header" type="Panel" parent="."]
-theme_override_styles/panel = SubResource("HeaderStyle")
-
-[node name="NewDesign" type="Button" parent="Header"]
-text = "New Design"
-tooltip_text = "Create a persistent Design. Resource placements remain local."
-
-[node name="ActiveDesign" type="Label" parent="Header"]
-text = "No active Design · Local placements only"
-text_overrun_behavior = 3
 mouse_filter = 2
 
 [node name="Shade" type="ColorRect" parent="."]
@@ -50,7 +21,6 @@ mouse_filter = 0
 color = Color(0.01, 0.02, 0.04, 0.65)
 
 [node name="Dialog" type="Panel" parent="Shade"]
-theme_override_styles/panel = SubResource("DialogStyle")
 
 [node name="Title" type="Label" parent="Shade/Dialog"]
 text = "Create a new Design"

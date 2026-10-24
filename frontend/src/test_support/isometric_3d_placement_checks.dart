@@ -2,6 +2,7 @@
 // ignore_for_file: avoid_relative_lib_imports
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
+import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_state.dart';
@@ -32,7 +33,8 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
 
   Future<void> select(GridPos position) async {
     final center = const GridLayout3D().worldPosition(position);
-    final point = scene.getNodeT<Camera3D>('Camera3D')!.unprojectPosition(
+    final point = Workspace3D.project(
+        scene,
         (scene as Node3D).toGlobal(
             Vector3(x: center.x, y: GridLayout3D.tileHeight / 2, z: center.z)));
     await _click(scene, point);
@@ -107,7 +109,7 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
   await _pause();
   _check(!GD.isInstanceIdValid(removed), 'Removed state frees its visual.');
   _checkResources(scene, bloc.state);
-  final cameraSize = scene.getNodeT<Camera3D>('Camera3D')!.getSize();
+  final cameraSize = Workspace3D.camera(scene).getSize();
   tree.getRoot()!.setContentScaleSize(Vector2i.fromXY(480, 640));
   await _pause();
   for (final kind in ResourceKind.values) {
@@ -122,9 +124,7 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
   await choose(ResourceKind.cloudLoadBalancing);
   tree.getRoot()!.setContentScaleSize(Vector2i.fromXY(1152, 648));
   await _pause();
-  _check(
-      (scene.getNodeT<Camera3D>('Camera3D')!.getSize() - cameraSize).abs() <
-          1e-4,
+  _check((Workspace3D.camera(scene).getSize() - cameraSize).abs() < 1e-4,
       'Viewport restoration preserves the original camera.');
 
   final oldIds = [
@@ -160,7 +160,7 @@ Node3D _root(Node scene) => scene.getNodeT<Node3D>('ResourceRoot')!;
 Node3D _cube(Node scene, GridPos position) =>
     _root(scene).getNodeT<Node3D>('Resource_${position.row}_${position.col}')!;
 Button _button(Node scene, ResourceKind kind) => scene.getNodeT<Button>(
-    'PaletteLayer/ResourcePalette/Panel/Choices/${resourceVisuals3D[kind]!.buttonName}')!;
+    '${Workspace3D.choices}/${resourceVisuals3D[kind]!.buttonName}')!;
 
 void _checkResources(Node scene, IsomapGridState state) {
   _check(_root(scene).getChildCount() == state.tiles.length,

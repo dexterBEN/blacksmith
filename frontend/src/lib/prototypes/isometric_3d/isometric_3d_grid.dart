@@ -14,6 +14,7 @@ import 'grid_layout.dart';
 import 'resource_palette_3d.dart';
 import 'resource_visuals_3d.dart';
 import 'design_editor_3d.dart';
+import 'workspace_3d.dart';
 
 part 'isometric_3d_grid.g.dart';
 
@@ -38,6 +39,7 @@ class Isometric3DGrid extends Node3D {
   async.StreamSubscription<IsomapGridState>? _stateSubscription;
   ResourcePalette3D? _palette;
   DesignEditor3D? _designEditor;
+  Workspace3D? _workspace;
   Node3D? _resourceRoot;
   // Render caches derived exclusively from BLoC state, not placement state.
   final _resources = <GridPos, ({ResourceKind kind, Node3D node})>{};
@@ -54,6 +56,7 @@ class Isometric3DGrid extends Node3D {
     final window = getTree()!.getRoot()!;
     window.setMinSize(Vector2i.fromXY(480, 360));
     installRuntimeShutdownHook(window);
+    _workspace = Workspace3D(this);
     final grid = getNodeT<Node3D>('GridRoot')!;
     final scene = ResourceLoader.singleton
         .load('res://scenes/isometric_3d/tile.tscn')! as PackedScene;
@@ -74,13 +77,17 @@ class Isometric3DGrid extends Node3D {
     _resourceRoot = getNodeT<Node3D>('ResourceRoot')!;
     _palette = ResourcePalette3D(this, (kind) {
       final bloc = _bloc;
-      if (_active && bloc != null && !bloc.isClosed) {
+      if (_active &&
+          !(_designEditor?.isOpen ?? false) &&
+          bloc != null &&
+          !bloc.isClosed) {
         bloc.add(PlaceResource(kind));
       }
     });
     // The camera is fixed: react to viewport changes instead of polling Godot
     // through Dart on every rendered frame. The connection is owned by this node.
-    getViewport()!.sizeChanged.connect(this, _fitCamera);
+    getViewport()!.sizeChanged.connect(this, _resizeWorkspace);
+    Workspace3D.viewport(this).sizeChanged.connect(this, _fitCamera);
     // The isolated launcher registers a shared local-only BLoC. When this
     // scene is run by the application, reuse its existing DI registration.
     // If DI is unavailable, own a local diagnostic BLoC, as AppRoot does.
@@ -97,10 +104,12 @@ class Isometric3DGrid extends Node3D {
     }
     final bloc = _bloc!;
     _designEditor = DesignEditor3D(
-        this,
-        di.sl.isRegistered<DesignCubit>() ? di.sl<DesignCubit>() : null,
-        (open) => _palette?.render(bloc.state, blocked: open));
-    _fitCamera();
+        this, di.sl.isRegistered<DesignCubit>() ? di.sl<DesignCubit>() : null,
+        (open) {
+      _workspace?.setBlocked(open);
+      _palette?.render(bloc.state, blocked: open);
+    });
+    _resizeWorkspace();
     _stateSubscription = bloc.stream.listen((state) {
       if (_active) _renderState(state);
     });
@@ -122,9 +131,16 @@ class Isometric3DGrid extends Node3D {
         !event.isPressed()) {
       return;
     }
-    final camera = getNodeT<Camera3D>('Camera3D')!;
-    final worldOrigin = camera.projectRayOrigin(event.getPosition());
-    final worldDirection = camera.projectRayNormal(event.getPosition());
+    final rect = Workspace3D.canvasRect(this);
+    if (!rect.hasPoint(event.getPosition())) return;
+    final viewportSize = Workspace3D.viewport(this).getVisibleRect().size;
+    final local = event.getPosition() - rect.position;
+    final point = Vector2(
+        x: local.x * viewportSize.x / rect.size.x,
+        y: local.y * viewportSize.y / rect.size.y);
+    final camera = Workspace3D.camera(this);
+    final worldOrigin = camera.projectRayOrigin(point);
+    final worldDirection = camera.projectRayNormal(point);
     // The ray and tile mapping use the same local axes, even if the scene
     // root is later translated or rotated. Camera/navigation is unchanged.
     final origin = toLocal(worldOrigin);
@@ -190,6 +206,8 @@ class Isometric3DGrid extends Node3D {
     _active = false;
     _designEditor?.dispose();
     _designEditor = null;
+    _workspace?.dispose();
+    _workspace = null;
     final subscription = _stateSubscription;
     _stateSubscription = null;
     if (subscription != null) async.unawaited(subscription.cancel());
@@ -206,16 +224,16 @@ class Isometric3DGrid extends Node3D {
     _selectionMaterial = null;
   }
 
-  void _fitCamera() {
+  void _resizeWorkspace() {
+    _workspace?.resize();
     final size = getViewport()!.getVisibleRect().size;
-    if (size.x <= 0 || size.y <= 0) return;
-    final paletteArea = _palette!.resize(size);
     _designEditor?.resize(size);
-    final area = Rect2.fromPositionSize(
-        Vector2(x: paletteArea.position.x, y: DesignEditor3D.boardTop),
-        Vector2(
-            x: paletteArea.size.x,
-            y: math.max(1, paletteArea.end.y - DesignEditor3D.boardTop)));
+    _fitCamera();
+  }
+
+  void _fitCamera() {
+    final size = Workspace3D.viewport(this).getVisibleRect().size;
+    if (size.x <= 24 || size.y <= 24) return;
     // Fixed 45° yaw and 35.264° elevation. Reserve the maximum cube height
     // even when empty: placement must never zoom/pan the board. The conservative
     // envelope includes the board underside and a cube on any perimeter tile.
@@ -224,17 +242,15 @@ class Isometric3DGrid extends Node3D {
     final projectedWidth = (layout.width + layout.depth) / math.sqrt(2);
     final projectedHeight = (layout.width + layout.depth) / math.sqrt(6) +
         (top - bottom) * math.sqrt(2 / 3);
-    final unitsPerPixel =
-        math.max(projectedWidth / area.size.x, projectedHeight / area.size.y) *
-            1.04;
+    final unitsPerPixel = math.max(
+            projectedWidth / (size.x - 24), projectedHeight / (size.y - 24)) *
+        1.04;
     final projectedCenter = (top + bottom) / 2 * math.sqrt(2 / 3);
-    final camera = getNodeT<Camera3D>('Camera3D')!;
-    // Keep the same camera transform/angle and fit into the area above the UI.
-    // Native unproject/project-ray methods include this offset, so picking uses
-    // viewport coordinates directly, without a second mouse-coordinate mapping.
+    final camera = Workspace3D.camera(this);
+    // Fit only the real render viewport; layout containers reserve all UI space.
+    // Selection input maps the main viewport point to this canvas before picking.
     camera
       ..setOrthogonal(unitsPerPixel * size.y, 0.1, 50)
-      ..setVOffset(
-          projectedCenter + (area.getCenter().y - size.y / 2) * unitsPerPixel);
+      ..setVOffset(projectedCenter);
   }
 }

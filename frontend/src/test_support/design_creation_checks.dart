@@ -4,6 +4,7 @@ import 'dart:async' as async;
 import 'dart:convert';
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
+import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import 'package:http/http.dart' as http;
 import '../lib/core/di/service_locator.dart' as di;
 import '../lib/data/repositories/design_repository.dart';
@@ -119,7 +120,7 @@ void afterStartup() {
         ..call('notify_mouse_entered');
       await _pause();
       Button action(String name) =>
-          scene.getNodeT<Button>('DesignLayer/DesignControls/Header/$name')!;
+          scene.getNodeT<Button>('${Workspace3D.header}/Rows/Actions/$name')!;
       Button dialogButton(String name) => scene
           .getNodeT<Button>('DesignLayer/DesignControls/Shade/Dialog/$name')!;
       LineEdit input() => scene
@@ -140,8 +141,8 @@ void afterStartup() {
 
       Future<void> select(GridPos pos) async {
         final p = const GridLayout3D().worldPosition(pos);
-        final screen = scene.getNodeT<Camera3D>('Camera3D')!.unprojectPosition(
-            (scene as Node3D).toGlobal(Vector3(x: p.x, y: .12, z: p.z)));
+        final screen = Workspace3D.project(
+            scene, (scene as Node3D).toGlobal(Vector3(x: p.x, y: .12, z: p.z)));
         await _click(scene, screen);
         _check(grid.state.selected == pos, '3D selection remains functional.');
       }
@@ -151,8 +152,7 @@ void afterStartup() {
         await _click(
             scene,
             scene
-                .getNodeT<Button>(
-                    'PaletteLayer/ResourcePalette/Panel/Choices/CloudStorage')!
+                .getNodeT<Button>('${Workspace3D.choices}/CloudStorage')!
                 .getGlobalRect()
                 .getCenter());
         _check(
@@ -180,8 +180,7 @@ void afterStartup() {
           dialogButton('Create').isDisabled(), 'Discard consent is required.');
       _check(
           scene
-              .getNodeT<Button>(
-                  'PaletteLayer/ResourcePalette/Panel/Choices/CloudStorage')!
+              .getNodeT<Button>('${Workspace3D.choices}/CloudStorage')!
               .isDisabled(),
           'Modal blocks keyboard and pointer placement behind the dialog.');
       await _capture(scene, 'new_design_dialog.png');
@@ -233,8 +232,7 @@ void afterStartup() {
           design.name == testName &&
               grid.state.selected == null &&
               scene
-                  .getNodeT<Label>(
-                      'DesignLayer/DesignControls/Header/ActiveDesign')!
+                  .getNodeT<Label>('${Workspace3D.header}/Rows/ActiveDesign')!
                   .getText()
                   .contains(testName),
           'Only API-confirmed success sets the active Design and empties the logical grid.');
