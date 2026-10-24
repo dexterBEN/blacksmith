@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'package:godot_dart/godot_dart.dart';
 
 import 'core/di/service_locator.dart' as di;
+import 'core/runtime_shutdown.dart';
 import 'domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import 'domain/bloc/isomap_grid/isomap_grid_event.dart';
 import 'domain/bloc/isomap_grid/isomap_grid_state.dart';
@@ -31,7 +32,6 @@ class AppRoot extends Node2D {
   StreamSubscription<IsomapGridState>? _stateSubscription;
   bool _active = false;
   bool _ownsBloc = false;
-  static bool _shutdownHookInstalled = false;
 
   @override
   void vReady() {
@@ -62,24 +62,13 @@ class AppRoot extends Node2D {
       if (_active) _renderState(state);
     });
     _renderState(bloc.state);
-    _installShutdownHook();
+    installRuntimeShutdownHook(getTree()!.getRoot()!);
     GD.print(Variant('[AppRoot] Grid and palette ready.'));
   }
 
   void _renderState(IsomapGridState state) {
     _grid?.render(state);
     _menu?.setEnabled(state.selected != null);
-  }
-
-  void _installShutdownHook() {
-    final window = getTree()?.getRoot();
-    if (_shutdownHookInstalled || window == null) return;
-    // The root window outlives individual scenes. This callback captures no
-    // scene instance; shared resources are disposed only on runtime exit.
-    window.treeExiting.connect(window, () {
-      unawaited(di.disposeServiceLocator());
-    });
-    _shutdownHookInstalled = true;
   }
 
   @override

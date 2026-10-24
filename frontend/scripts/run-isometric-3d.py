@@ -77,8 +77,6 @@ def main():
         'run/main_scene="res://scenes/isometric_3d.tscn"'
         if line.startswith('run/main_scene=') else line
         for line in config.splitlines())
-    config += ('\n\n[display]\nwindow/size/viewport_width=1152\n'
-               'window/size/viewport_height=648\n')
     (project / 'project.godot').write_text(config)
     (project / 'src/main.dart').write_text(
         "import 'test_support/isometric_3d_main.dart' as preview;\n"
