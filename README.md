@@ -41,7 +41,7 @@ https://github.com/user-attachments/assets/6a8570f7-8b87-4de8-8a9c-fb4c8ad4aaca
 
 | Component | Implementation |
 | --- | --- |
-| Frontend | Godot 4 + Dart (`godot_dart`), `AppRoot`, `IsoMapGrid`, `MenuOverlay`, `IsomapGridBloc` |
+| Frontend | Godot 4 + Dart (`godot_dart`), default `Isometric3DGrid`, shared `IsomapGridBloc`; legacy 2D `AppRoot`/`IsoMapGrid`/`MenuOverlay` |
 | HTTP API | ASP.NET Core 8 (`CloudServices.Api`) |
 | Application | `Blacksmith.Application` services, DTOs, and repository interfaces |
 | Domain | `Blacksmith.Domain`: `DesignEntity`, `ResourceEntity`, `ResourceTypeEntity` |
@@ -76,32 +76,59 @@ The backend uses a **layered architecture with ports-and-adapters principles**. 
 - Existing resource type strings remain supported for backward compatibility.
 - EF Core database migrations are applied deliberately; the API does **not** automatically apply them at startup.
 
-**Important integration boundary:** Selecting a tile and placing or replacing Storage/Compute in the Godot editor updates **local BLoC state only**, with no backend request or GCP provisioning. The existing cloud API/repository remains available for separate explicit use. The frontend does **not yet** use the design/resource/catalog CRUD endpoints: placements survive a scene reload within the shared runtime, but disappear after a full application restart. No `ResourceEntity` is saved to PostgreSQL by placement.
+**Important integration boundary:** Selecting a tile and placing or replacing a service in the Godot editor updates **local BLoC state only**, with no backend request or GCP provisioning. The existing cloud API/repository remains available for separate explicit use. The frontend does **not yet** use the design/resource/catalog CRUD endpoints: placements survive a scene reload within the shared runtime, but disappear after a full application restart. No `ResourceEntity` is saved to PostgreSQL by placement.
 
 ---
 
-## Standalone local 3D editor
+## Local 3D editor
 
-The production `main.tscn` remains the 2D editor. The existing standalone 3D
-scene now supports selecting a tile and placing or replacing Cloud Storage,
+Normal Godot project startup opens `scenes/isometric_3d.tscn`. The existing 3D
+scene supports selecting a tile and placing or replacing Cloud Storage,
 Compute Engine, Cloud VPN and Cloud Load Balancing cubes through a native palette.
 All placement stays in `IsomapGridBloc` memory. No backend or credentials are
 required, and no cloud operation runs.
 
-From the repository root, with the existing Godot/Dart development prerequisites:
+Prepare the Dart sources and generated bindings once, with the existing compatible
+Godot/Dart native libraries installed in `frontend/`. These commands explicitly
+use this VM's Dart SDK at `/usr/lib/dart/bin/dart`:
 
 ```bash
-python3 frontend/scripts/run-isometric-3d.py
+cd frontend/src
+/usr/lib/dart/bin/dart pub get
+/usr/lib/dart/bin/dart run build_runner build --delete-conflicting-outputs
+cd ../..
+
+# First command-line run after checkout: import native Godot resources once.
+# Opening the project in the Godot editor also performs this import.
+godot --path frontend --editor --import
+
+# Normal application: actual project settings and production Dart bootstrap.
+godot --path frontend
+
+# Legacy 2D fallback, explicitly launched in its own application process.
+godot --path frontend res://main.tscn
+
+# Production-bootstrap checks, clean-launch captures and optional Linux tracing.
+python3 frontend/scripts/test-godot.py --application --trace-network --timeout 600 --output /tmp/blacksmith-startup
+
+# Existing detailed 3D and explicit legacy 2D regression fixtures.
 python3 frontend/scripts/run-isometric-3d.py --check --timeout 600 --output /tmp/blacksmith-placement
+python3 frontend/scripts/test-godot.py --timeout 600
 ```
 
-The launcher uses a temporary project, leaving the production entry point intact.
-The check exercises native clicks, replacement and scene reload, and saves actual
-Godot screenshots. Interactive windows follow the actual window dimensions,
-with a minimum size of 480 × 360. Framing reserves room above the palette and
+Use Godot's **Run Project (F5)** for the default 3D editor. `main.tscn` and its
+two-choice legacy palette remain available; no production 2D/3D switch is added.
+The regression tools use temporary projects; normal application startup needs
+neither a fixture nor test environment variables. `--trace-network` requires the
+optional Linux `strace` tool. See [the Dart workflow](frontend/src/README.md) for
+source-generation prerequisites.
+
+The 3D window follows actual window dimensions, with a minimum size of
+480 × 360. Framing reserves room above the palette and
 includes the maximum cube height even on an empty board, so placement does not
-change the zoom. See [the Issue #35 report](issue_35_report.md) for validation,
-before/after evidence and limitations. Full application restart clears placements.
+change the zoom. See [the Issue #37 report](issue_37_report.md) for startup,
+lifecycle, validation and actual 3D/2D captures. Full application restart clears
+placements.
 
 ---
 

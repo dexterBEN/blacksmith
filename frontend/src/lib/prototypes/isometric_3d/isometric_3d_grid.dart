@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'dart:math' as math;
 import 'package:godot_dart/godot_dart.dart';
 import '../../core/di/service_locator.dart' as di;
+import '../../core/runtime_shutdown.dart';
 import '../../domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../../domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../../domain/bloc/isomap_grid/isomap_grid_state.dart';
@@ -47,6 +48,9 @@ class Isometric3DGrid extends Node3D {
   @override
   void vReady() {
     _active = true;
+    final window = getTree()!.getRoot()!;
+    window.setMinSize(Vector2i.fromXY(480, 360));
+    installRuntimeShutdownHook(window);
     final grid = getNodeT<Node3D>('GridRoot')!;
     final scene = ResourceLoader.singleton
         .load('res://scenes/isometric_3d/tile.tscn')! as PackedScene;
@@ -95,7 +99,8 @@ class Isometric3DGrid extends Node3D {
     });
     _renderState(bloc.state);
     setProcessUnhandledInput(true);
-    GD.print(Variant('[Isometric3DGrid] 36 shared beveled tiles ready.'));
+    GD.print(Variant('[Isometric3DGrid] 36 shared beveled tiles ready. '
+        'bloc=${_ownsBloc ? "local" : "shared"} resources=${_resources.length}'));
   }
 
   @override
