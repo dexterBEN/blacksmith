@@ -1,64 +1,230 @@
-# Issue #44 — First persistent 3D Design workflow
+# Issue #44 — Persistent 3D Design workflow
 
-## Contract audit (baseline `1f3f9f6`)
+Explicit Save and Open-by-ID now connect the 3D editor to the existing ASP.NET Core
+API and PostgreSQL. The supported slice is an empty Design or **one Cloud Storage
+representation**. Saving metadata never creates a GCP bucket.
 
-- `POST /designs` accepts `{name, description?}` and returns 201 with server-generated
-  `id`, `name`, `description`, `createdAtUtc`, `updatedAtUtc`. `GET /designs`,
-  `GET /designs/{id}` return the existing Design DTO; invalid/missing GUIDs yield 404.
-- `POST /resources` accepts `designId`, `resourceTypeId`, `name`, integer `x`, `y`,
-  and legacy/provider-specific `type`. The API generates the Resource GUID.
-  `GET /resources`, `GET /resources/{id}`, `PUT /resources/{id}`, and
-  `DELETE /resources/{id}` exist. Create/read responses omit ownership/type FK.
-- `GET /designs/{id}/resources` returns the authoritative ownership list, including
-  `id`, `designId`, `name`, `x`, `y`, `type`, `createdAtUtc`, but no `resourceTypeId`.
-  Save confirmation must use this scoped read-back, not only the POST response.
-- `GET /resource-types` and `GET /resource-types/{id}` return `id`, `code`,
-  `displayName`, `category`. Seeded codes are `virtual-machine`, `storage`,
-  `database`, `network`, `gateway`, `load-balancer`.
-- Cloud Storage mapping: provider-specific persisted `type = gcp.storage.bucket`,
-  generic catalog `code = storage`. This legacy/provider type is already exercised
-  by backend tests; explicit catalog IDs are supported with unknown legacy codes.
-  Resolve the storage catalog GUID at runtime, never invent or hardcode it.
-- Coordinates: `GridPos(row: 2, col: 3)` maps to `{x: 3, y: 2}` and back.
-- Resources belong to exactly one Design; deleting a nonempty Design is restricted.
-  There is no unique `(design_id, x, y)` constraint or idempotency token. The API
-  accepts duplicate positions and arbitrary integer coordinates. Frontend reads
-  must validate the supported grid bounds and reject duplicates/unsupported data.
+## User workflow
 
-## Implementation approach and limits
+1. Create a Design with New Design; the API supplies its ID.
+2. Select row **2**, column **3**, then choose Cloud Storage from either palette.
+3. Press Save. Only a successful Design/resource read-back marks the snapshot saved.
+4. Use Copy ID, completely quit the application, relaunch, and Open that ID.
+5. The persisted Cloud Storage cube returns on the same logical tile.
 
-Retain DesignCubit as the one coordinator. Repositories own HTTP, JSON, catalog
-resolution and persisted-record validation. IsomapGridBloc remains the sole visible
-local grid state, with a narrow hydration event. Save takes an immutable snapshot;
-Open hydrates only after all reads and validation succeed. A single grid subscription
-updates save/unsaved feedback and is cancelled on Cubit shutdown.
+Save is disabled without an active Design, without a valid supported placement,
+while busy, and when the current snapshot is already confirmed. Other GCP kinds
+and multi-resource arrangements remain available locally but are not persisted.
+Replacement/deletion synchronization is explicitly unsupported. Open requires
+confirmation before replacing unsaved placements; read failures preserve the
+previous Design and grid. A changed local snapshot during Save remains unsaved.
 
-Add only Save and Open-by-ID controls to the existing dark workspace. Keep four
-local placement kinds, native viewport/camera/input mapping, New Design behavior,
-and the legacy 2D scene. Persist only an empty Design or one Cloud Storage cube;
-reject multi-resource/other-kind saves and replacement/deletion synchronization.
+## Verified existing contracts and mapping
 
-Before POST, read existing Design resources. After POST, independently read the
-Design ownership list and confirm the exact one record. Disable duplicate requests
-while busy and unchanged repeated saves. An ambiguous write is never blindly
-retried: retain a per-Design attempted-write guard and expose read-only reconciliation.
-An empty read while the outcome is unknown does not prove that a late commit cannot
-still occur. Without backend idempotency, this cannot provide a cross-process or
-multi-writer exactly-once guarantee. This API limitation is explicitly raised before
-implementation; the issue prefers the existing contracts and excludes new uniqueness
-features. No backend production change or migration is planned unless this scope
-is explicitly revised. The user explicitly selected the existing API with guarded
-read-back recovery; no backend idempotency extension is authorized for this slice.
+| API | Contract used / inspected |
+| --- | --- |
+| `POST /designs` | `{name, description?}` → 201; backend-generated GUID, name, description, UTC timestamps |
+| `GET /designs`, `GET /designs/{id}` | Existing Design list/read DTOs; Open uses the ID read |
+| `POST /resources` | `designId`, `resourceTypeId`, `name`, integer `x`/`y`, `type` → 201, backend-generated Resource GUID |
+| `GET /resources`, `GET /resources/{id}` | Legacy response omits Design/type FK fields |
+| `GET /designs/{id}/resources` | Ownership-scoped records with `id`, `designId`, `name`, `x`, `y`, `type`, `createdAtUtc` |
+| `PUT /resources/{id}`, `DELETE /resources/{id}` | Existing full update/delete; production UI does not add synchronization |
+| `GET /resource-types`, `GET /resource-types/{id}` | `id`, `code`, `displayName`, `category`; resolve the `storage` ID at runtime |
 
-## Validation
+Catalog codes are `virtual-machine`, `storage`, `database`, `network`, `gateway`,
+and `load-balancer`. Cloud Storage uses the existing provider-specific legacy
+value **`gcp.storage.bucket`**, explicitly associated with generic catalog code
+**`storage`**. Backend tests already exercise this provider value, and the service
+accepts an explicit catalog ID for it. No new catalog entry or invented GUID is
+introduced. Generic `type=storage` alone is not assumed to mean GCP Cloud Storage.
 
-Implementation and validation in progress. Results will be recorded after checks.
-Use an isolated PostgreSQL database with existing migrations, never the development
-database. No GCP credential or cloud operation is needed. Dedicated Resource rows
-must be deleted before their Design during test-data cleanup.
+Coordinates map **`x = column = 3`, `y = row = 2`**, independently of camera or
+screen coordinates. Backend coordinates are integers and historically unbounded;
+frontend reads validate actual grid bounds. Missing/wrong ownership, unknown types,
+malformed records and multiple records/duplicate positions are rejected before
+hydration, rather than partly loading or silently discarding data.
 
-## Branch and preservation
+Neither Resource read DTO exposes `resourceTypeId`; SQL independently verifies that
+foreign key. Designs with Resources use Restrict-delete. Resource IDs are generated
+by the backend, not assigned by the frontend.
 
-Started with a clean `issue_42`, switched to `master`, ran `git pull --rebase origin
-master` (fast-forward to `1f3f9f6`), then created `issue_44`. Preserve all three
-existing stashes and unrelated branch tips. No automatic merge.
+## Responsibilities and lifecycle
+
+```text
+Godot header / dialog → DesignCubit → DesignRepository / ResourceRepository
+                                         → existing API → PostgreSQL
+Sidebar / quick placement → IsomapGridBloc → existing 3D renderer
+DesignCubit → validated RestoreDesignResources event → IsomapGridBloc
+Grid tile changes → DesignCubit feedback only (no automatic HTTP)
+```
+
+DesignCubit remains the one coordination point: it snapshots placements for Save,
+tracks confirmed server state and write uncertainty, and hydrates only after all
+Open reads succeed. Its one grid subscription is cancelled on shutdown. The grid
+BLoC remains the sole visible tile/selection state; hydration clears selection.
+Repositories own HTTP/JSON and catalog/record validation, with no Godot dependency.
+GetIt owns both repositories and shared state with their existing runtime lifetime.
+
+The dark theme, standard sidebar, all four local resource choices, native layout
+containers, SubViewport canvas, camera fitting, input mapping and legacy 2D scene
+are preserved. Header additions are Save, Open and Copy ID; the existing dialog
+handles creation or ID entry. No renderer/model/shader/provider change.
+
+## Duplicate prevention and agreed limit
+
+The existing API has no idempotency token or unique `(design_id, x, y)` constraint.
+The user explicitly chose **the existing API with guarded read-back recovery**.
+No backend production change or migration was made.
+
+- Save preflights the current Design and scoped Resources. An existing matching
+  single record is adopted, not duplicated. Conflicting data is not overwritten.
+- Pending/unchanged repeated saves issue no additional POST. A 201 alone does not
+  confirm persistence: Design and scoped Resource reads must also match.
+- An ambiguous write retains a per-Design attempt guard. Check Save performs reads
+  only; an empty/error read does not prove that a delayed commit cannot still occur.
+  Positive matching reconciliation clears uncertainty without another POST.
+- The guard survives scene reload and switching dialogs/Designs within the shared
+  runtime. It is not a server idempotency key or a durable cross-process journal.
+  Exactly-once writes across crashes, concurrent clients or external writers are
+  **not guaranteed** by this API. Restarting must not be treated as proof that an
+  uncertain write failed. Backend idempotency remains a separate follow-up.
+
+## Validation and provenance
+
+Feature commit: `91c2ff4`. Corrected native test harness: `e6a16b4`.
+Validated frontend Git tree: `605fb04ff78dd4645c17c58d607c7a7c2f1a6f53`.
+Sources come from a reproducible Git export. Ignored Dart parts are generated
+fresh; installed native artifacts and package configuration are supplied as
+explicit environment prerequisites. The native retry reuses imported Godot assets
+only after byte-comparing production code, scenes and models to the corrected
+export; generated binding inputs/output remain identical.
+
+Environment: Godot **4.4**, Dart **3.12.2**, Compatibility/Mesa llvmpipe on the VM,
+.NET **8.0.426** in existing Dev Container `d26cb899e251`, and PostgreSQL **16**.
+The stopped Dev Container was restarted; the graphical Godot tests run on the host.
+The existing API was compiled and run against a new unique test database using
+only existing migrations. The API process was given an unusable GCP credential
+path. Cloud repository/HTTP tripwires and a metadata-only HTTP allowlist were active.
+
+| Check | Actual result | Wall time (seconds) |
+| --- | --- | ---: |
+| Fresh Dart bindings | Passed, exit 0 | 139.6 |
+| Dart analysis | Passed, exit 0 | 3.3 |
+| Dart tests (122) | Passed, exit 0 | 14.5 |
+| Native Save / full quit / Open | Passed, exit 0 | 799.4 |
+| Independent PostgreSQL read-back | Passed, exit 0 | 1.4 |
+| Production startup / workspace | Passed, exit 0 | 1064.2 |
+| New Design regressions | Passed, exit 0 | 381.6 |
+| Detailed 3D regressions | Passed, exit 0 | 230.5 |
+| Legacy 2D regressions | Passed, exit 0 | 190.4 |
+
+Durations include cold compilation and imports; these are not performance benchmarks.
+The unit suite includes the original 93 tests plus 29 persistence tests: catalog,
+coordinates/payload, invalid records, failed/ambiguous writes, empty read-back after
+201, lost response after commit, duplicate clicks, failed Open, shutdown and reinit.
+
+### Network and regression guards
+
+Four offline runtime phases have **zero outgoing IP connections**. The two real
+persistence phases connect only to the dedicated local API (`172.18.0.4:5144`),
+with **zero external destinations** and cloud repository/HTTP counters **0**.
+The live traces contain 6 local API connect calls total.
+Detailed framing validates six desktop sizes, 216 tile-center selections, complete
+cube bounds and panel separation, including the configured 960×640 minimum.
+Local four-kind placement/replacement, replay/removal, node disposal and both
+shared/local 2D modes pass.
+
+### Real desktop / API / SQL evidence
+
+- Saved Design: `e7f03eae-f51a-4a70-baf4-806bca36222b`.
+- Resource: `7c0352d8-b611-4d4c-9810-3bddcc610d06`.
+- API writes: one `POST /designs` → **201**, one `POST /resources` → **201**.
+- Before successful Save, the harness deliberately redirected one read to a missing
+  Design ID. The real backend returned **404**; the unsaved cube remained visible
+  and no Resource POST was sent by the failed attempt. The next explicit Save
+  recovered successfully. This is deliberate fault injection, not a production
+  request rewrite.
+- Save process **77031** fully exited. Open process **79625** began with
+  an empty grid and no active Design, then restored the exact original cube.
+- Open, local replacement/reversion and scene reload sent **0 Resource POSTs and
+  0 Design POSTs**. Old cube nodes were freed; one current cube remained.
+- Scoped API read-back and independent SQL before/after Open agree on this result:
+
+```json
+{
+  "resource_id": "7c0352d8-b611-4d4c-9810-3bddcc610d06",
+  "design_id": "e7f03eae-f51a-4a70-baf4-806bca36222b",
+  "x": 3,
+  "y": 2,
+  "type": "gcp.storage.bucket",
+  "resource_type_id": "10000000-0000-0000-0000-000000000002",
+  "catalog_code": "storage",
+  "count": 1
+}
+```
+
+Real desktop captures at 1280×800, unmodified Godot viewport output:
+
+![Local placement before Save](docs/frontend/issue_44/before_save.png)
+
+![Same cube after complete exit, relaunch and Open](docs/frontend/issue_44/after_relaunch.png)
+
+### Failures and diagnostics
+
+The first native attempt on `91c2ff4` timed out before form submission because the
+harness used `LineEdit.setText()` without emitting `text_changed`. Godot intentionally
+does not emit that signal for programmatic text changes. `e6a16b4` fixes the harness
+using the same input signal pattern as existing tests, and guards the deferred
+scene reload. Production code was unchanged by this test correction. The corrected
+Save/quit/Open journey passes. All further results above reflect actual exit codes.
+
+The binding generator's existing analyzer-version warning and Godot UID-to-path /
+V-Sync warnings are recorded in the temporary logs. Runtime logs contain no `ERROR`, script/shader error or ObjectDB leak messages.
+Headless 3D and legacy editor imports each print eight existing
+`progress_dialog.cpp` errors while exiting 0 with required completion markers;
+these editor diagnostics are distinct from the clean runtime results. The legacy
+diagnostic mode intentionally exercises the missing-DI fallback and passes.
+
+## Cleanup and reproduction
+
+Dedicated database: `blacksmith_front_smoke_0772d0fd232e4f979f883fb052d18865`. Test data was verified by exact fixture
+Design name and scoped Resource ID before deletion. Actual cleanup statuses:
+parent deletion while nonempty **409**, Resource deletion **204**, empty Design
+deletion **204**; both IDs then returned **404**. The test API was stopped and its
+owned database was dropped (`BLACKSMITH_DESIGN_BACKEND_CLEANED` recorded).
+The development database and GCP resources were not modified. No container or
+volume was removed. The existing Dev Container was restarted and remains running.
+
+With the existing SDK/caches, database configuration and Dev Container available:
+
+```bash
+python3 frontend/scripts/start-design-test-backend.py CONTAINER --port 5144
+# Retain its RUN_PATH; obtain the container's numeric local IP.
+python3 frontend/scripts/test-godot.py --persistence http://CONTAINER_IP:5144 --trace-network --timeout 900 --output /tmp/blacksmith-persistence
+python3 frontend/scripts/start-design-test-backend.py CONTAINER --verify-resource RUN_PATH DESIGN_ID
+# Delete only that owned Resource, then its Design, through the API.
+python3 frontend/scripts/start-design-test-backend.py CONTAINER --stop RUN_PATH
+```
+
+Dart checks: fresh `build_runner build --delete-conflicting-outputs`, `dart analyze`,
+`dart test --reporter expanded`. Existing native checks: `test-godot.py --application
+--trace-network`, `test-godot.py --design --trace-network`,
+`run-isometric-3d.py --headless`, and `test-godot.py` for legacy 2D.
+
+Local evidence is under `/tmp/blacksmith-issue44-final-validation`,
+`/tmp/blacksmith-issue44-final-persistence`, `/tmp/blacksmith-issue44-final-application`,
+`/tmp/blacksmith-issue44-final-design`, `/tmp/blacksmith-issue44-final-3d`, and
+`/tmp/blacksmith-issue44-final-2d`. The native retry driver is
+`/tmp/blacksmith-issue44-native-retry.py`; the ordinary committed driver includes the
+corrected harness for fresh reproduction. Temporary logs are not durable artifacts;
+the selected results and two real captures are published with this report.
+
+## Branch / scope
+
+Started clean on `issue_42`, switched to `master`, ran `git pull --rebase origin
+master` (fast-forward to `1f3f9f6`), then created `issue_44`. All three existing
+stashes and unrelated branch tips are preserved. No automatic merge.
+
+No backend production, schema/migration, GCP provisioning, new provider,
+configuration forms, resource connections, account/authentication, batch saving,
+move/delete synchronization or rendering refactor is included.
