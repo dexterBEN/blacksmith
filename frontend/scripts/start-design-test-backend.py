@@ -29,13 +29,18 @@ def main():
     action = parser.add_mutually_exclusive_group()
     action.add_argument('--stop', metavar='RUN_PATH')
     action.add_argument('--verify', nargs=3, metavar=('RUN_PATH', 'DESIGN_ID', 'DESIGN_NAME'))
+    action.add_argument('--verify-resource', metavar='DESIGN_ID_AND_RUN', nargs=2)
     args = parser.parse_args()
-    if args.stop or args.verify:
-        run = args.stop or args.verify[0]
+    if args.stop or args.verify or args.verify_resource:
+        run = args.stop or (args.verify[0] if args.verify else args.verify_resource[0])
         if not run.startswith('/tmp/blacksmith-design-backend-') or '/' in run[len('/tmp/'):]:
             parser.error('Expected the exact temporary RUN_PATH printed at startup.')
         if args.stop:
             docker('exec', args.container, 'touch', f'{run}/stop')
+        elif args.verify_resource:
+            docker('exec', args.container, 'dotnet',
+                   f'{run}/test-host/bin/Release/net8.0/DesignTestBackend.dll',
+                   run, 'verify-resource', args.verify_resource[1])
         else:
             docker('exec', args.container, 'dotnet',
                    f'{run}/test-host/bin/Release/net8.0/DesignTestBackend.dll',

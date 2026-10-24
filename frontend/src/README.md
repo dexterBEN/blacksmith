@@ -108,3 +108,34 @@ are forbidden in both modes. Captures come directly from Godot's viewport.
 The current locked generator may warn that its analyzer predates Dart 3.12.
 Generation is verified with the installed versions; do not upgrade dependencies
 just to suppress that warning. See the root issue report for executed checks.
+
+## Explicit one-resource persistence
+
+The 3D header adds Save, Open-by-ID and Copy ID. DesignCubit coordinates a snapshot
+of the existing grid with ResourceRepository and DesignRepository. Save supports
+one Cloud Storage representation (`gcp.storage.bucket`, generic catalog code
+`storage`), with `x = column` and `y = row`. Only a matching Design/resource
+read-back marks the snapshot saved. Ambiguous writes expose read-only Check Save;
+no automatic POST retry is performed. Cross-process idempotency is outside the
+existing backend contract and this slice. Other kinds and multi-resource edits
+remain local. No GCP provisioning occurs.
+
+The existing test backend launcher creates a dedicated database from the existing
+migrations and sets an unusable GCP credential path for its API process. With that
+backend running, use its numeric container IP and test port:
+
+```bash
+python3 frontend/scripts/test-godot.py --persistence http://CONTAINER_IP:5144 --trace-network --timeout 900 --output /tmp/blacksmith-persistence
+```
+
+Run from the repository root (unlike the Dart commands above). This native test
+creates one dedicated Design, injects a genuine API 404 before saving, saves one
+Resource, fully exits Godot, then starts another process and opens the Design.
+It captures before-save and after-relaunch views. Network tracing permits only
+the dedicated API address. The normal production bootstrap is invoked in both
+phases; only test clients add cloud tripwires and the one read-fault injection.
+
+Use `start-design-test-backend.py CONTAINER --verify-resource RUN_PATH DESIGN_ID`
+for independent SQL verification. Delete the dedicated Resource before its Design
+through the API, then use the launcher's `--stop RUN_PATH` to drop only the owned
+test database. See `issue_44_report.md` for actual results and evidence.

@@ -33,3 +33,12 @@ class PlaceResource extends IsomapGridEvent {
 class ResetGridForNewDesign extends IsomapGridEvent {
   const ResetGridForNewDesign();
 }
+
+/// Apply a validated backend snapshot; selection is intentionally cleared.
+class RestoreDesignResources extends IsomapGridEvent {
+  RestoreDesignResources(Map<GridPos, ResourceKind> tiles)
+      : tiles = Map.unmodifiable(tiles);
+  final Map<GridPos, ResourceKind> tiles;
+  @override
+  List<Object?> get props => [tiles];
+}

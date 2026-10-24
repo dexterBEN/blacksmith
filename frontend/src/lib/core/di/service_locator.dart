@@ -5,6 +5,7 @@ import '../../domain/bloc/isomap_grid/isomap_grid_state.dart';
 import '../../data/services/cloud_services_api.dart';
 import '../../data/repositories/cloud_storage_repository.dart';
 import '../../data/repositories/design_repository.dart';
+import '../../data/repositories/resource_repository.dart';
 import '../../domain/bloc/design/design_cubit.dart';
 
 final sl = GetIt.instance;
@@ -20,6 +21,7 @@ void setupServiceLocator({
   String projectId = defaultGcpProjectId,
   http.Client? httpClient,
   http.Client? designHttpClient,
+  http.Client? resourceHttpClient,
 }) {
   if (!sl.isRegistered<CloudServicesApi>()) {
     sl.registerLazySingleton<CloudServicesApi>(
@@ -48,9 +50,16 @@ void setupServiceLocator({
       dispose: (repository) => repository.close(),
     );
   }
+  if (!sl.isRegistered<ResourceRepository>()) {
+    sl.registerLazySingleton<ResourceRepository>(
+      () => ResourceRepository(baseUrl: baseUrl, client: resourceHttpClient),
+      dispose: (repository) => repository.close(),
+    );
+  }
   if (!sl.isRegistered<DesignCubit>()) {
     sl.registerLazySingleton<DesignCubit>(
-      () => DesignCubit(sl<DesignRepository>(), sl<IsomapGridBloc>()),
+      () => DesignCubit(sl<DesignRepository>(), sl<IsomapGridBloc>(),
+          resources: sl<ResourceRepository>()),
       dispose: (cubit) => cubit.close(),
     );
   }

@@ -76,7 +76,12 @@ The backend uses a **layered architecture with ports-and-adapters principles**. 
 - Existing resource type strings remain supported for backward compatibility.
 - EF Core database migrations are applied deliberately; the API does **not** automatically apply them at startup.
 
-**Important integration boundary:** Selecting a tile and placing or replacing a service in the Godot editor updates **local BLoC state only**, with no backend request or GCP provisioning. The existing cloud API/repository remains available for separate explicit use. The frontend does **not yet** use the design/resource/catalog CRUD endpoints: placements survive a scene reload within the shared runtime, but disappear after a full application restart. No `ResourceEntity` is saved to PostgreSQL by placement.
+**Integration boundary:** Selecting a tile and placing or replacing a service still
+updates local BLoC state only. **Save** explicitly persists one Cloud Storage
+representation to the active Design, using Blacksmith's Resource API and PostgreSQL.
+**Open** reads an existing Design by ID and restores its supported placement after
+a complete application restart. These operations do not provision GCP resources.
+The other three GCP representations and multi-resource arrangements remain local.
 
 ---
 
@@ -90,15 +95,20 @@ quick-placement strip. Both resource entry points use the same tile-first action
 The board renders in its own canvas between the panels; it does not extend under
 the menu. The sidebar keeps its desktop width and full resource labels when the
 window is resized. The workspace and New Design dialog share one dark UI theme.
-All placement stays in `IsomapGridBloc` memory. No backend or credentials are
-required, and no cloud operation runs.
+Local placement stays in `IsomapGridBloc` memory and requires no backend.
+Explicit Save/Open requires the API and PostgreSQL; GCP credentials are not needed.
 
 The **New Design** action creates a persistent Design through the existing
 `POST /designs` API and displays its backend ID/name for the current session.
 This action requires the API and PostgreSQL. Set `BLACKSMITH_BACKEND_URL` before
 launching Godot to override `http://localhost:5100`; no GCP credentials are needed.
 Unsaved placements require explicit consent before they are cleared on successful
-creation. Cancellation and failures preserve them; placed resources remain local.
+creation. Cancellation and failures preserve them. Save supports exactly one Cloud
+Storage cube; repeated unchanged Save creates no additional row. A lost write response
+exposes **Check Save**, which reconciles through reads without blindly posting again.
+Cross-process/concurrent-write idempotency is not provided by the existing API.
+Use **Copy ID**, completely quit, relaunch, then **Open** and paste that ID to restore
+the saved cube. Unsaved local changes require confirmation before Open replaces them.
 See [the Dart workflow](frontend/src/README.md) for the isolated persistence test.
 
 Prepare the Dart sources and generated bindings once, with the existing compatible
@@ -140,9 +150,10 @@ The 3D window follows actual window dimensions, with a minimum size of
 960 × 640. Native containers reserve the header, sidebar and quick strip; camera
 framing uses the actual central render viewport and
 includes the maximum cube height even on an empty board, so placement does not
-change the zoom. See [the Issue #42 report](issue_42_report.md) for workspace layout,
-validation and native captures. Full application restart clears local placements
-and active Design selection; the created Design remains in PostgreSQL.
+change the zoom. Full application restart clears in-memory placements
+and active Design selection; use Open to load a previously saved Design. See
+[the Issue #44 report](issue_44_report.md) for contracts, safeguards and the real
+PostgreSQL / close-and-reopen validation.
 
 ---
 
