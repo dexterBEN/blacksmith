@@ -92,6 +92,8 @@ def main():
         if args.design_live:
             env['BLACKSMITH_BACKEND_URL'] = args.design_live
             env['BLACKSMITH_DESIGN_LIVE'] = '1'
+    if args.application:
+        env['BLACKSMITH_WORKSPACE_OUTPUT'] = str(output)
     if args.trace_network and not shutil.which('strace'):
         raise RuntimeError('--trace-network requires an installed Linux strace.')
 
@@ -160,9 +162,11 @@ def main():
             "import 'test_support/application_startup_checks.dart' as checks;\n"
             'void main() { checks.beforeStartup(); application.main(); checks.afterStartup(); }\n')
         try:
-            run('application-interactions', [*graphical, '--max-fps', '60'],
+            contents = run('application-interactions', [*graphical, '--max-fps', '60'],
                 'BLACKSMITH_DEFAULT_APPLICATION_PASSED', headless=False,
                 trace=args.trace_network)
+            if 'BLACKSMITH_WORKSPACE_PASSED' not in contents:
+                raise RuntimeError('The desktop workspace layout checks did not complete.')
         finally:
             (project / 'src/main.dart').write_bytes(original_main)
             (project / 'src/production_main.dart').unlink()

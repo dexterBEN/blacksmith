@@ -3,10 +3,14 @@
 import 'dart:async' as async;
 import 'package:bloc/bloc.dart' as bloc_core;
 import 'package:godot_dart/godot_dart.dart';
+import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import 'package:http/http.dart' as http;
 import '../lib/core/di/service_locator.dart' as di;
 import '../lib/data/repositories/cloud_storage_repository.dart';
 import '../lib/data/services/cloud_services_api.dart';
+import '../lib/data/repositories/design_repository.dart';
+import '../lib/domain/bloc/design/design_cubit.dart';
+import '../lib/domain/models/design.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../lib/domain/models/grid_position.dart';
@@ -14,6 +18,17 @@ import '../lib/domain/models/resource_kind.dart';
 import '../lib/prototypes/isometric_3d/grid_layout.dart';
 import '../lib/prototypes/isometric_3d/resource_visuals_3d.dart';
 import 'isometric_3d_framing_checks.dart';
+import 'workspace_checks.dart';
+
+class _FixtureDesignRepository extends DesignRepository {
+  _FixtureDesignRepository() : super(baseUrl: 'http://forbidden.invalid');
+  int calls = 0;
+  @override
+  Future<Design> create(String name) async {
+    calls++;
+    return Design(id: '12345678-1234-1234-1234-123456789abc', name: name);
+  }
+}
 
 class _NoNetworkClient extends http.BaseClient {
   int requests = 0;
@@ -65,6 +80,7 @@ class _RuntimeObserver extends bloc_core.BlocObserver {
 final _client = _NoNetworkClient();
 final _observer = _RuntimeObserver();
 late final _NoProvisioningRepository _repository;
+final _designRepository = _FixtureDesignRepository();
 
 /// The runner wraps the unchanged production main function only for this
 /// instrumented phase. It injects cloud tripwires, never a replacement BLoC.
@@ -74,6 +90,8 @@ void beforeStartup() {
   _repository = _NoProvisioningRepository(api);
   di.sl.registerSingleton<CloudServicesApi>(api, dispose: (api) => api.close());
   di.sl.registerSingleton<CloudStorageRepository>(_repository);
+  di.sl.registerSingleton<DesignRepository>(_designRepository,
+      dispose: (repository) => repository.close());
   bloc_core.Bloc.observer = _observer;
 }
 
@@ -111,10 +129,15 @@ void afterStartup() {
       }
       _check(bloc.state.selected == null && bloc.state.tiles.isEmpty,
           'Disabled buttons cannot place or select.');
+      await checkWorkspace(scene, bloc, di.sl<DesignCubit>(),
+          tileEvents: () => _observer.tileEvents);
+      _check(_designRepository.calls == 1,
+          'Only explicit fixture Design creation may call its repository.');
 
       Future<void> select(GridPos position) async {
         final point = const GridLayout3D().worldPosition(position);
-        final screen = scene.getNodeT<Camera3D>('Camera3D')!.unprojectPosition(
+        final screen = Workspace3D.project(
+            scene,
             (scene as Node3D)
                 .toGlobal(Vector3(x: point.x, y: .12, z: point.z)));
         final before = _observer.tileEvents;
@@ -161,7 +184,10 @@ void afterStartup() {
         await select(entry.key);
         await choose(entry.value);
       }
-      for (final size in const [(800, 600), (640, 480)]) {
+      for (final size in const [
+        (1152, 648),
+        (Workspace3D.minimumWidth, Workspace3D.minimumHeight)
+      ]) {
         tree.getRoot()!.setSize(Vector2i.fromXY(size.$1, size.$2));
         await _until(
             () => scene.getViewport()!.getVisibleRect().size.x == size.$1);
@@ -169,6 +195,27 @@ void afterStartup() {
         checkEditorFraming(scene);
         await select(const GridPos(5, 5));
       }
+      // Godot must clamp an undersized physical window, not enter a second
+      // presentation mode. Exercise this in the native X11 application too.
+      final window = tree.getRoot()!;
+      window.setSize(Vector2i.fromXY(640, 480));
+      await _until(() =>
+          window.getSize().x >= Workspace3D.minimumWidth &&
+          window.getSize().y >= Workspace3D.minimumHeight);
+      await _pause();
+      final minimum = window.getMinSize();
+      final actual = window.getSize();
+      _check(
+          minimum.x == Workspace3D.minimumWidth &&
+              minimum.y == Workspace3D.minimumHeight &&
+              actual.x >= minimum.x &&
+              actual.y >= minimum.y,
+          'The native window enforces the desktop minimum: '
+          'minimum=${minimum.x}x${minimum.y}, actual=${actual.x}x${actual.y}.');
+      GD.print(Variant('BLACKSMITH_DESKTOP_MINIMUM_PASSED '
+          'minimum=${minimum.x}x${minimum.y} actual=${actual.x}x${actual.y}'));
+      checkEditorFraming(scene);
+      await select(const GridPos(0, 0));
       final oldScene = scene.getInstanceId();
       final oldCube = _cube(scene, center).getInstanceId();
       _check(
@@ -217,7 +264,7 @@ Node3D _root(Node scene) => scene.getNodeT<Node3D>('ResourceRoot')!;
 Node3D _cube(Node scene, GridPos pos) =>
     _root(scene).getNodeT<Node3D>('Resource_${pos.row}_${pos.col}')!;
 Button _button(Node scene, ResourceKind kind) => scene.getNodeT<Button>(
-    'PaletteLayer/ResourcePalette/Panel/Choices/${resourceVisuals3D[kind]!.buttonName}')!;
+    '${Workspace3D.choices}/${resourceVisuals3D[kind]!.buttonName}')!;
 void _checkResources(Node scene, IsomapGridBloc bloc) {
   _check(_root(scene).getChildCount() == bloc.state.tiles.length,
       'Exactly one existing scene per logical resource.');

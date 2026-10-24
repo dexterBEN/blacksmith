@@ -4,6 +4,7 @@ import 'dart:async' as async;
 import 'dart:io';
 import 'package:bloc/bloc.dart' as bloc_core;
 import 'package:godot_dart/godot_dart.dart';
+import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import 'package:http/http.dart' as http;
 import '../lib/core/di/service_locator.dart' as di;
 import '../lib/data/repositories/cloud_storage_repository.dart';
@@ -219,15 +220,20 @@ class SelectionFixture {
 
     // Resize the viewport, then pick using the actual adjusted camera.
     final window = tree.getRoot()!;
-    final camera = scene.getNodeT<Camera3D>('Camera3D')!;
+    final camera = Workspace3D.camera(scene);
     final initialSize = camera.getSize();
-    window.setContentScaleSize(Vector2i.fromXY(480, 640));
-    await _until(() => camera.getSize() > initialSize);
+    window.setContentScaleSize(
+        Vector2i.fromXY(Workspace3D.minimumWidth, Workspace3D.minimumHeight));
+    await _until(() =>
+        scene.getViewport()!.getVisibleRect().size.x ==
+        Workspace3D.minimumWidth);
+    await _pause();
     await _click(scene, _project(scene, const GridPos(0, 5)));
     await _until(() => _bloc.state.selected == const GridPos(0, 5));
     _checkHighlight(scene, const GridPos(0, 5));
     if (capture) {
-      await _capture(scene, 'selection_portrait.png', width: 480, height: 640);
+      await _capture(scene, 'selection_minimum.png',
+          width: Workspace3D.minimumWidth, height: Workspace3D.minimumHeight);
     }
     window.setContentScaleSize(Vector2i.fromXY(1152, 648));
     await _until(() => (camera.getSize() - initialSize).abs() < 1e-4);
@@ -357,8 +363,9 @@ Vector2 _project(Node scene, GridPos position) {
   return _projectPoint(scene, center.x, center.z);
 }
 
-Vector2 _projectPoint(Node scene, double x, double z) =>
-    scene.getNodeT<Camera3D>('Camera3D')!.unprojectPosition((scene as Node3D)
+Vector2 _projectPoint(Node scene, double x, double z) => Workspace3D.project(
+    scene,
+    (scene as Node3D)
         .toGlobal(Vector3(x: x, y: GridLayout3D.tileHeight / 2, z: z)));
 
 Future<void> _click(Node scene, Vector2 point,

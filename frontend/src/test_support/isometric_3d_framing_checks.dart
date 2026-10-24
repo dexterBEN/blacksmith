@@ -2,6 +2,7 @@
 // ignore_for_file: avoid_relative_lib_imports
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
+import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../lib/domain/models/grid_position.dart';
 import '../lib/domain/models/resource_kind.dart';
@@ -11,49 +12,62 @@ import '../lib/prototypes/isometric_3d/resource_visuals_3d.dart';
 /// Assert actual native projections against the actual panel, not the fitting
 /// formula. Also reserve hypothetical cubes on every tile of an empty board.
 void checkEditorFraming(Node scene) {
-  final camera = scene.getNodeT<Camera3D>('Camera3D')!;
+  final camera = Workspace3D.camera(scene);
   final viewport = scene.getViewport()!.getVisibleRect().size;
-  final panel = scene.getNodeT<Panel>('PaletteLayer/ResourcePalette/Panel')!;
-  final rect = panel.getGlobalRect();
-  final header = scene
-      .getNodeT<Panel>('DesignLayer/DesignControls/Header')!
-      .getGlobalRect();
+  final rect = Workspace3D.canvasRect(scene);
+  final renderSize = Workspace3D.viewport(scene).getVisibleRect().size;
+  final header =
+      scene.getNodeT<PanelContainer>(Workspace3D.header)!.getGlobalRect();
+  final sidebar =
+      scene.getNodeT<PanelContainer>(Workspace3D.sidebar)!.getGlobalRect();
+  final quick =
+      scene.getNodeT<PanelContainer>(Workspace3D.quick)!.getGlobalRect();
   _check(
-      header.position.x >= 0 &&
-          header.position.y >= 0 &&
-          header.end.x <= viewport.x &&
-          header.end.y < rect.position.y,
-      'Design header stays inside the viewport above the board.');
-  _check(
-      rect.position.x >= 0 &&
-          rect.position.y > 24 &&
-          rect.position.x + rect.size.x <= viewport.x &&
-          rect.position.y + rect.size.y <= viewport.y,
-      'Palette must fit inside the viewport.');
-  for (final entry in resourceVisuals3D.values) {
-    final button = panel.getNodeT<Button>('Choices/${entry.buttonName}')!;
-    final bounds = button.getGlobalRect();
+      rect.size.x > 24 &&
+          rect.size.y > 24 &&
+          (renderSize.x - rect.size.x).abs() <= 1 &&
+          (renderSize.y - rect.size.y).abs() <= 1,
+      'A real render viewport must follow the canvas container dimensions.');
+  for (final panel in [header, sidebar, quick, rect]) {
     _check(
-        bounds.position.x >= rect.position.x &&
-            bounds.position.y >= rect.position.y &&
-            bounds.position.x + bounds.size.x <=
-                rect.position.x + rect.size.x + .1 &&
-            bounds.position.y + bounds.size.y <=
-                rect.position.y + rect.size.y + .1,
-        'Each palette button must stay inside its panel: ${entry.buttonName} '
-        'at ${bounds.position.x},${bounds.position.y} '
-        '${bounds.size.x}x${bounds.size.y}, panel '
-        '${rect.position.x},${rect.position.y} ${rect.size.x}x${rect.size.y}.');
+        panel.position.x >= 0 &&
+            panel.position.y >= 0 &&
+            panel.end.x <= viewport.x + .1 &&
+            panel.end.y <= viewport.y + .1,
+        'Every workspace panel must fit the actual main viewport.');
+  }
+  _check(
+      rect.position.x >= sidebar.end.x + 11 &&
+          rect.position.y >= header.end.y + 11 &&
+          rect.end.y <= quick.position.y - 11,
+      'The render canvas is physically between header/sidebar/quick strip.');
+  for (final group in [Workspace3D.catalog, Workspace3D.choices]) {
+    final container = scene.getNodeT<Control>(group)!;
+    _check(container.getChildCount() == 4, 'Exactly four supported choices.');
+    for (final entry in resourceVisuals3D.values) {
+      final button = container.getNodeT<Button>(entry.buttonName)!;
+      final bounds = button.getGlobalRect();
+      final panel = group == Workspace3D.catalog ? sidebar : quick;
+      // The native sidebar retains its vertical scroll container; no horizontal
+      // overflow is permitted. Quick choices must always be completely visible.
+      _check(
+          bounds.position.x >= panel.position.x &&
+              bounds.end.x <= panel.end.x + .1 &&
+              (group == Workspace3D.catalog ||
+                  bounds.position.y >= panel.position.y &&
+                      bounds.end.y <= panel.end.y + .1),
+          'Resource buttons stay inside their panel (or its vertical scroll area).');
+    }
   }
   void point(Vector3 world) {
     final screen = camera.unprojectPosition(world);
     _check(
         screen.x > 12 &&
-            screen.x < viewport.x - 12 &&
-            screen.y > header.end.y + 12 &&
-            screen.y < rect.position.y - 12,
-        'Every tile/cube corner must clear the viewport and palette: '
-        '${viewport.x}x${viewport.y}, point=${screen.x},${screen.y}.');
+            screen.x < renderSize.x - 12 &&
+            screen.y > 12 &&
+            screen.y < renderSize.y - 12,
+        'Every tile/cube corner must fit inside the allocated render viewport: '
+        '${renderSize.x}x${renderSize.y}, point=${screen.x},${screen.y}.');
   }
 
   void meshBounds(MeshInstance3D mesh) {
@@ -104,13 +118,13 @@ void checkEditorFraming(Node scene) {
 Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
     {required int Function() tileEvents, required bool capture}) async {
   final window = (Engine.singleton.getMainLoop()! as SceneTree).getRoot()!;
-  final camera = scene.getNodeT<Camera3D>('Camera3D')!;
+  final camera = Workspace3D.camera(scene);
   for (final size in const [
     (1152, 648),
-    (640, 360),
-    (480, 360),
-    (800, 600),
-    (480, 640),
+    (Workspace3D.minimumWidth, Workspace3D.minimumHeight),
+    (1024, 768),
+    (1280, 800),
+    (1440, 900),
     (1600, 900)
   ]) {
     window.setContentScaleSize(Vector2i.fromXY(size.$1, size.$2));
@@ -122,16 +136,18 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
       for (var col = 0; col < 6; col++) {
         final position = GridPos(row, col);
         final center = const GridLayout3D().worldPosition(position);
-        final screen = camera.unprojectPosition((scene as Node3D)
-            .toGlobal(Vector3(x: center.x, y: .12, z: center.z)));
+        final screen = Workspace3D.project(
+            scene,
+            (scene as Node3D)
+                .toGlobal(Vector3(x: center.x, y: .12, z: center.z)));
         final before = tileEvents();
         await _click(scene, screen);
         _check(bloc.state.selected == position && tileEvents() == before + 1,
             'All 36 tile centers remain selectable after resize.');
       }
     }
-    final button = scene.getNodeT<Button>(
-        'PaletteLayer/ResourcePalette/Panel/Choices/CloudStorage')!;
+    final button =
+        scene.getNodeT<Button>('${Workspace3D.choices}/CloudStorage')!;
     final before = tileEvents();
     await _click(scene, button.getGlobalRect().getCenter());
     _check(
@@ -171,7 +187,10 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
     window
       ..setContentScaleMode(WindowContentScaleMode.disabled)
       ..setContentScaleSize(Vector2i.fromXY(0, 0));
-    for (final size in const [(800, 600), (640, 480)]) {
+    for (final size in const [
+      (1152, 648),
+      (Workspace3D.minimumWidth, Workspace3D.minimumHeight)
+    ]) {
       window.setSize(Vector2i.fromXY(size.$1, size.$2));
       for (var i = 0; i < 80; i++) {
         final actual = scene.getViewport()!.getVisibleRect().size;

@@ -37,6 +37,27 @@ godot --path frontend res://main.tscn
 The first command imports Godot's resources after a fresh checkout. Opening the
 project in the editor performs the same import before Run Project (F5).
 
+The 3D workspace uses native containers for its header, four-service GCP sidebar
+and quick-placement strip. Its `SubViewportContainer` renders the existing world
+inside the remaining area. Camera fitting uses that viewport's real dimensions;
+main-window pointer coordinates are mapped to the canvas before ray picking.
+The resource palette helper connects both sets of buttons to the same existing
+placement action and derives enabled state from `IsomapGridBloc`.
+
+The workspace and New Design dialog use the same `workspace_dark.tres` theme.
+The sidebar stays 236 pixels wide with full, single-line resource labels. The
+native application window has a 960 × 640 minimum. Native containers continue
+to allocate the canvas as the window resizes; there is no alternate narrow-window
+presentation. Quick icons retain full service-name tooltips.
+
+`test-godot.py --application --trace-network --output OUTPUT --timeout 600`
+checks both entry points, desktop resizing, the native minimum-size constraint,
+state preservation and native screenshots (`dark_empty.png`, `dark_resources.png`,
+`minimum_resources.png`). Its explicit fixture Design is local to
+the test; local placement makes no HTTP call. Separate clean launches still use
+the unchanged production entrypoint. The existing `--design --trace-network`
+scenario checks New Design dialog behavior without a live backend.
+
 Both commands use the production bootstrap. There is no dependency on
 `test_support/`, a test launcher, a test environment variable, backend services,
 database access or GCP credentials for local placement. Native libraries and
