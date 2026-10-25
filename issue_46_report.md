@@ -2,6 +2,8 @@
 
 Resources previously stored placement metadata only. This change adds an optional, versioned JSON configuration document per Resource, while existing API requests/responses and editor behavior remain unchanged.
 
+Implements [Issue #46](https://github.com/dexterBEN/blacksmith/issues/46).
+
 Scope: backend persistence foundation only. The issue's generic `ResourceConfiguration` / `jsonb` choice supersedes the audit's earlier typed Cloud Storage suggestion. Multiple independently configured Resources in one Design are supported; no one-resource-per-Design or tile-uniqueness invariant is introduced.
 
 ## Implementation
@@ -50,13 +52,26 @@ The new PostgreSQL tests verify:
 
 ## Validation
 
-Environment: existing backend Dev Container `d26cb899e251`, .NET 8, EF Core/Npgsql 8.0.11, existing PostgreSQL 16 server. The stopped Dev Container was restarted; no container or volume was removed.
+Environment: existing backend Dev Container `d26cb899e251`, .NET SDK **8.0.426**, EF Core/Npgsql **8.0.11**, PostgreSQL **16.15**. The stopped Dev Container was restarted; no container or volume was removed.
 
 The temporary backend copy and logs are under `/tmp/blacksmith-issue46-work-xrjed51h`. EF migration generation used an intentionally unreachable connection (`127.0.0.1:1`) and an unusable GCP credential path. No database was migrated by the generation command.
 
 Initial offline restore failed because test dependencies were absent from the container cache. Restoring the already-declared packages from NuGet resolved this; no package versions or project files were changed. Preliminary Release build: 0 warnings/errors. Preliminary tests: **31 application + 49 integration + 18 PostgreSQL = 98 passed, 0 failed, 0 skipped**.
 
-Committed-state build/test evidence: pending final Git export verification.
+Committed-state validation used a fresh Git export of **`70716bdcb566a8840d8509732b5fe1e8b4ba1028`**, with no copied build outputs or uncommitted source. Exact backend Git tree: **`c1b06fa6c0d3e406265905d1ce3e9474ab0b4a0d`**. The report-only follow-up preserves that tested backend tree.
+
+| Final check | Actual result |
+|---|---|
+| Restore from populated local package cache | Exit 0 |
+| Release solution build | Exit 0; 0 warnings, 0 errors |
+| Application tests | 31 passed, 0 failed, 0 skipped |
+| Integration/HTTP/model tests | 49 passed, 0 failed, 0 skipped |
+| Real PostgreSQL tests | 18 passed, 0 failed, 0 skipped; includes 7 new configuration tests |
+| Total | **98 passed; no tests skipped** |
+| Development schema/history check | Unchanged: original four migrations; configuration table absent |
+| Temporary test database cleanup | No `blacksmith_issue7_*` databases remain |
+
+Final logs and all three TRX files are retained under `/tmp/blacksmith-issue46-final-_6p72wjk`; commands/results metadata is in `/tmp/blacksmith-issue46-final.json`. Temporary logs are local evidence, not committed artifacts. No build or test failure occurred after dependency restoration.
 
 Actual generation command, executed from the temporary backend root:
 
