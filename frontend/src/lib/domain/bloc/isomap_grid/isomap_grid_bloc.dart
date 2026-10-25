@@ -7,6 +7,11 @@ class IsomapGridBloc extends Bloc<IsomapGridEvent, IsomapGridState> {
     int rows = IsomapGridState.defaultRows,
     int cols = IsomapGridState.defaultCols,
   }) : super(IsomapGridState.initial(rows: rows, cols: cols)) {
+    on<RestoreDesignResources>((event, emit) {
+      if (event.tiles.keys.every(state.contains)) {
+        emit(state.copyWith(tiles: event.tiles, clearSelection: true));
+      }
+    });
     on<TileClicked>(_onTileClicked);
     on<PlaceResource>(_onPlaceResource);
     on<ResetGridForNewDesign>((event, emit) =>

@@ -100,6 +100,11 @@ void afterStartup() {
   async.Timer.run(() async {
     final tree = Engine.singleton.getMainLoop()! as SceneTree;
     try {
+      // This automated window shares the developer's desktop. Keep physical
+      // mouse/keyboard input from racing the native pushInput checks below.
+      tree.getRoot()!
+        ..setFlag(WindowFlags.flagMousePassthrough, true)
+        ..setFlag(WindowFlags.flagNoFocus, true);
       await _until(() => tree.getCurrentScene() != null);
       var scene = tree.getCurrentScene()!;
       _check(

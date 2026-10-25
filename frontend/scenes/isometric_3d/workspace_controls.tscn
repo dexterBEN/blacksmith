@@ -69,6 +69,26 @@ layout_mode = 2
 text = "New Design"
 tooltip_text = "Create a persistent Design. Resource placements remain local."
 
+[node name="OpenDesign" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
+custom_minimum_size = Vector2(80, 34)
+layout_mode = 2
+text = "Open"
+tooltip_text = "Open an existing Design by ID. Resources are read from Blacksmith, never deployed."
+
+[node name="SaveDesign" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
+custom_minimum_size = Vector2(96, 34)
+layout_mode = 2
+text = "Save"
+disabled = true
+tooltip_text = "Save one Cloud Storage description to the active Design. No GCP provisioning."
+
+[node name="CopyDesignId" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
+custom_minimum_size = Vector2(80, 34)
+layout_mode = 2
+text = "Copy ID"
+disabled = true
+tooltip_text = "Copy the active Design ID so it can be reopened after quitting."
+
 [node name="Spacer" type="Control" parent="Margin/Layout/Header/Rows/Actions"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -129,6 +149,21 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 mouse_filter = 2
 stretch = true
+
+[node name="WorldViewport" type="SubViewport" parent="Margin/Layout/Body/Center/Canvas"]
+handle_input_locally = false
+gui_disable_input = true
+size = Vector2i(2, 2)
+render_target_update_mode = 4
+
+[node name="Camera3D" type="Camera3D" parent="Margin/Layout/Body/Center/Canvas/WorldViewport"]
+cull_mask = 5
+transform = Transform3D(0.707107, -0.408248, 0.57735, 0, 0.816497, 0.57735, -0.707107, -0.408248, 0.57735, 10, 10, 10)
+projection = 1
+current = true
+size = 6.0
+near = 0.1
+far = 50.0
 
 [node name="QuickPlacement" type="PanelContainer" parent="Margin/Layout/Body/Center"]
 layout_mode = 2

@@ -11,6 +11,20 @@ class DesignEditor3D {
     _controls = owner.getNodeT<Control>('DesignLayer/DesignControls')!;
     _new =
         owner.getNodeT<Button>('${Workspace3D.header}/Rows/Actions/NewDesign')!;
+    _open = owner
+        .getNodeT<Button>('${Workspace3D.header}/Rows/Actions/OpenDesign')!;
+    _save = owner
+        .getNodeT<Button>('${Workspace3D.header}/Rows/Actions/SaveDesign')!;
+    _copy = owner
+        .getNodeT<Button>('${Workspace3D.header}/Rows/Actions/CopyDesignId')!;
+    _open.pressed.connect(owner, () => _cubit?.openExisting());
+    _save.pressed.connect(owner, () {
+      if (_cubit != null) async.unawaited(_cubit.save());
+    });
+    _copy.pressed.connect(owner, () {
+      final id = _cubit?.state.active?.id;
+      if (id != null) DisplayServer.singleton.clipboardSet(id);
+    });
     _active = owner.getNodeT<Label>('${Workspace3D.header}/Rows/ActiveDesign')!;
     _shade = _controls.getNodeT<ColorRect>('Shade')!;
     _dialog = _shade.getNodeT<Panel>('Dialog')!;
@@ -25,7 +39,13 @@ class DesignEditor3D {
       final cubit = _cubit;
       if (cubit != null) async.unawaited(cubit.submit());
     });
-    _name.textChanged.connect(owner, (name) => _cubit?.changeName(name));
+    _name.textChanged.connect(owner, (name) {
+      if (_cubit?.state.mode == DesignDialogMode.open) {
+        _cubit?.changeOpenId(name);
+      } else {
+        _cubit?.changeName(name);
+      }
+    });
     _name.textSubmitted.connect(owner, (_) {
       final cubit = _cubit;
       if (cubit != null && cubit.state.canSubmit) {
@@ -48,40 +68,70 @@ class DesignEditor3D {
   late final Control _controls;
   late final Panel _dialog;
   late final ColorRect _shade;
-  late final Button _new, _create, _cancel;
+  late final Button _new, _create, _cancel, _open, _save, _copy;
   late final Label _active, _feedback;
   late final LineEdit _name;
   late final CheckButton _discard;
   bool _wasOpen = false;
   bool _disposed = false;
-  bool get isOpen => _cubit?.state.dialogOpen ?? false;
+  bool get isOpen =>
+      (_cubit?.state.dialogOpen ?? false) || (_cubit?.state.pending ?? false);
 
   void _render(DesignState state) {
     if (_disposed) return;
-    _new.setDisabled(_cubit == null || state.dialogOpen);
+    final blocked = state.dialogOpen || state.pending;
+    final opening = state.mode == DesignDialogMode.open;
+    _new.setDisabled(_cubit == null || blocked);
+    _open.setDisabled(!(_cubit?.supportsPersistence ?? false) || blocked);
+    _save
+      ..setDisabled(!state.canSave || blocked)
+      ..setText(state.saveUncertain ? 'Check Save' : 'Save')
+      ..setTooltipText(state.persistenceMessage);
+    _copy.setDisabled(state.active == null || blocked);
     _active.setText(state.active == null
-        ? 'No active Design · Local placements only'
-        : '${state.active!.name} · Placements not saved');
-    _active.setTooltipText(
-        state.active == null ? '' : 'Design ID: ${state.active!.id}');
+        ? 'No active Design · ${state.persistenceMessage}'
+        : '${state.active!.name} · ${state.persistenceMessage}');
+    _active.setTooltipText(state.active == null
+        ? state.persistenceMessage
+        : 'Design ID: ${state.active!.id}\n${state.persistenceMessage}');
     _shade.setVisible(state.dialogOpen);
-    _onModalChanged(state.dialogOpen);
-    if (_name.getText() != state.name) _name.setText(state.name);
+    _onModalChanged(blocked);
+    _dialog
+        .getNodeT<Label>('Title')!
+        .setText(opening ? 'Open an existing Design' : 'Create a new Design');
+    _dialog
+        .getNodeT<Label>('NameLabel')!
+        .setText(opening ? 'Design ID' : 'Design name (1–200 characters)');
+    _name.setPlaceholder(
+        opening ? 'Paste the saved Design ID' : 'My infrastructure design');
+    final input = opening ? state.openId : state.name;
+    if (_name.getText() != input) _name.setText(input);
     _name.setEditable(!state.pending);
     _discard
+      ..setText(opening
+          ? 'Replace unsaved placements after a successful load'
+          : 'Clear unsaved placements after creation')
       ..setVisible(state.requiresDiscard)
       ..setDisabled(state.pending)
       ..setPressedNoSignal(state.discardApproved);
     _create
       ..setDisabled(!state.canSubmit)
-      ..setText(state.pending ? 'Creating…' : 'Create');
+      ..setText(state.pending
+          ? (opening ? 'Opening…' : 'Creating…')
+          : (opening ? 'Open' : 'Create'));
     _cancel.setDisabled(state.pending);
     _feedback.setText(state.pending
-        ? 'Creating Design… Please wait. Closing this dialog cannot cancel a request already sent.'
+        ? (opening
+            ? 'Opening Design… Local placements are preserved until loading succeeds.'
+            : 'Creating Design… Please wait. Closing this dialog cannot cancel a request already sent.')
         : state.error ??
             (state.requiresDiscard
-                ? 'Current placements are unsaved. Confirm clearing them only after the API creates the new Design.'
-                : 'The new Design starts empty. Resource placements remain local and are not saved.'));
+                ? (opening
+                    ? 'Unsaved local placements will be replaced only after a successful load.'
+                    : 'Current placements are unsaved. Confirm clearing them only after the API creates the new Design.')
+                : (opening
+                    ? 'Loads an empty Design or one saved Cloud Storage cube. No GCP operations.'
+                    : 'The new Design starts empty. Save one Cloud Storage placement explicitly.')));
     if (state.dialogOpen && !_wasOpen) _name.grabFocus();
     if (!state.dialogOpen && _wasOpen) _new.grabFocus();
     _wasOpen = state.dialogOpen;

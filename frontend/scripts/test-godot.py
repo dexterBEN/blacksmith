@@ -11,6 +11,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import json
+from urllib.parse import urlparse
 import sys
 
 sys.dont_write_bytecode = True
@@ -34,8 +36,10 @@ def main():
     parser.add_argument('--trace-network', action='store_true',
                         help='Use installed Linux strace to reject outgoing IP connections in application runs.')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--persistence', metavar='BASE_URL',
+                        help='Real dedicated local API/PostgreSQL save, full quit, open journey; never GCP.')
     args = parser.parse_args()
-    if args.design and args.application:
+    if sum(bool(mode) for mode in [args.design, args.application, args.persistence]) > 1:
         parser.error('--design and --application are separate checks.')
     if args.design_live and not args.design:
         parser.error('--design-live requires --design and a dedicated test database.')
@@ -75,7 +79,7 @@ def main():
     shutil.copytree(source / 'assets/models/resource_cubes',
                     project / 'assets/models/resource_cubes',
                     ignore=shutil.ignore_patterns('*.import', '*.uid'))
-    if not args.application and not args.design:
+    if not args.application and not args.design and not args.persistence:
         (project / 'src/main.dart').write_text(
             "import 'test_support/godot_smoke_main.dart' as smoke;\n"
             "void main() => smoke.main();\n")
@@ -84,7 +88,7 @@ def main():
     for name in ['DATA', 'CONFIG', 'CACHE']:
         env[f'XDG_{name}_HOME'] = str(project / f'xdg-{name.lower()}')
     # Clean application launches must not depend on any old fixture environment.
-    if args.application or args.design:
+    if args.application or args.design or args.persistence:
         env = {key: value for key, value in env.items()
                if not key.startswith('BLACKSMITH_')}
     if args.design:
@@ -94,13 +98,16 @@ def main():
             env['BLACKSMITH_DESIGN_LIVE'] = '1'
     if args.application:
         env['BLACKSMITH_WORKSPACE_OUTPUT'] = str(output)
+    if args.persistence:
+        env['BLACKSMITH_BACKEND_URL'] = args.persistence
+        env['BLACKSMITH_PERSISTENCE_OUTPUT'] = str(output)
     if args.trace_network and not shutil.which('strace'):
         raise RuntimeError('--trace-network requires an installed Linux strace.')
 
     def run(name, arguments, marker, local=False, headless=True, trace=False):
         log = output / f'{name}.log'
         run_env = env.copy()
-        if not args.application and not args.design:
+        if not args.application and not args.design and not args.persistence:
             run_env['BLACKSMITH_SMOKE_LOCAL'] = '1' if local else '0'
         command = [args.godot, *(['--headless'] if headless else []),
                    '--path', str(project), *arguments]
@@ -115,15 +122,50 @@ def main():
         contents = log.read_text(errors='replace')
         if result.returncode or marker not in contents:
             raise RuntimeError(f'{name} failed; inspect {log}')
-        if (args.application or args.design) and (any(line.startswith(
+        if (args.application or args.design or args.persistence) and (any(line.startswith(
                 ('ERROR:', 'SCRIPT ERROR:', 'SHADER ERROR:'))
                 for line in contents.splitlines()) or
                 'ObjectDB instances leaked at exit' in contents):
             raise RuntimeError(f'{name} native errors; inspect {log}')
-        if trace and 'AF_INET' in network.read_text(errors='replace'):
-            raise RuntimeError(f'{name} attempted an outgoing IP connection; inspect {network}')
+        if trace:
+            connections = [line for line in network.read_text(errors='replace').splitlines() if 'AF_INET' in line]
+            if args.persistence:
+                target = urlparse(args.persistence)
+                allowed = f'inet_addr("{target.hostname}")'
+                port = f'sin_port=htons({target.port or 80})'
+                if any(allowed not in line or port not in line for line in connections):
+                    raise RuntimeError(f'{name}: connection outside the dedicated API; inspect {network}')
+            elif connections:
+                raise RuntimeError(f'{name} attempted an outgoing IP connection; inspect {network}')
         print(f'{name}: PASS ({marker})', flush=True)
         return contents
+
+    if args.persistence:
+        graphical = ['--display-driver', 'x11', '--rendering-method',
+                     'gl_compatibility', '--resolution', '1152x648']
+        run('persistence-import', ['--editor', '--import', *graphical],
+            '[main] Dart scripts attached.', headless=False)
+        original_main = (project / 'src/main.dart').read_bytes()
+        (project / 'src/production_main.dart').write_bytes(original_main)
+        (project / 'src/main.dart').write_text(
+            "import 'production_main.dart' as application;\n"
+            "import 'test_support/persistence_journey_checks.dart' as checks;\n"
+            'void main() { checks.beforeStartup(); application.main(); checks.afterStartup(); }\n')
+        try:
+            for phase in ['save', 'open']:
+                env['BLACKSMITH_PERSISTENCE_PHASE'] = phase
+                run(f'persistence-{phase}', [*graphical, '--max-fps', '60'],
+                    f'BLACKSMITH_PERSISTENCE_{phase.upper()}_PASSED',
+                    headless=False, trace=args.trace_network)
+            saved = json.loads((output / 'journey.json').read_text())
+            opened = json.loads((output / 'reopened.json').read_text())
+            if saved['save_pid'] == opened['open_pid'] or not opened['restored']:
+                raise RuntimeError('A real complete application restart was not proved.')
+            print('BLACKSMITH_PERSISTENCE_RESTART_PASSED real_api=true resources=1 cloud_calls=0', flush=True)
+        finally:
+            (project / 'src/main.dart').write_bytes(original_main)
+            (project / 'src/production_main.dart').unlink()
+        return
 
     if args.design:
         graphical = ['--display-driver', 'x11', '--rendering-method',
@@ -146,6 +188,7 @@ def main():
         return
 
     if args.application:
+        copy('scripts/check-workspace-scene-save.gd')
         configuration = (project / 'project.godot').read_bytes()
         original_main = (project / 'src/main.dart').read_bytes()
         if b'run/main_scene="res://scenes/isometric_3d.tscn"' not in configuration:
@@ -154,6 +197,12 @@ def main():
                      'gl_compatibility', '--resolution', '1152x648']
         run('application-import', ['--editor', '--import', *graphical],
             '[main] Dart scripts attached.', headless=False)
+        # Re-save both real scenes with editor ownership rules. Subsequent
+        # native launches use these saved files, so losing the viewport fails
+        # here instead of escaping startup-only coverage.
+        run('workspace-scene-save', ['--script',
+            'res://scripts/check-workspace-scene-save.gd'],
+            'BLACKSMITH_WORKSPACE_SCENE_SAVE_PASSED', trace=args.trace_network)
         # Instrument only this phase. The actual bootstrap function is unchanged
         # and creates the real BLoC; only cloud dependencies are fail-closed doubles.
         (project / 'src/production_main.dart').write_bytes(original_main)

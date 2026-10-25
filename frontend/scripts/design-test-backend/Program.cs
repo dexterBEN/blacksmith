@@ -11,6 +11,32 @@ var configured = Environment.GetEnvironmentVariable("ConnectionStrings__Blacksmi
 var admin = new NpgsqlConnectionStringBuilder(configured) { Database = "postgres", Pooling = false };
 var directory = Path.GetFullPath(args[0]);
 var metadataPath = Path.Combine(directory, "metadata.json");
+if (args.Length > 1 && args[1] == "verify-resource")
+{
+    using var metadata = JsonDocument.Parse(await File.ReadAllTextAsync(metadataPath));
+    var db = metadata.RootElement.GetProperty("database").GetString()!;
+    if (!db.StartsWith("blacksmith_front_smoke_", StringComparison.Ordinal)) throw new InvalidOperationException();
+    var cs = new NpgsqlConnectionStringBuilder(admin.ConnectionString) { Database = db };
+    await using var connection = new NpgsqlConnection(cs.ConnectionString);
+    await connection.OpenAsync();
+    await using var query = new NpgsqlCommand("""
+        SELECT r."Id", r.design_id, r.x, r.y, r."Type", r.resource_type_id,
+               t."Code", d."Name", (SELECT COUNT(*) FROM resources WHERE design_id = @id)
+        FROM resources r JOIN resource_types t ON r.resource_type_id = t."Id"
+        JOIN designs d ON d."Id" = r.design_id WHERE r.design_id = @id
+        """, connection);
+    query.Parameters.AddWithValue("id", Guid.Parse(args[2]));
+    await using var row = await query.ExecuteReaderAsync();
+    if (!await row.ReadAsync() || row.GetGuid(1) != Guid.Parse(args[2]) ||
+        row.GetInt32(2) != 3 || row.GetInt32(3) != 2 ||
+        row.GetString(4) != "gcp.storage.bucket" || row.GetString(6) != "storage" ||
+        !row.GetString(7).StartsWith("Blacksmith Issue44 smoke ", StringComparison.Ordinal) || row.GetInt64(8) != 1)
+        throw new InvalidOperationException("SQL resource read-back did not match the dedicated frontend fixture.");
+    Console.WriteLine(JsonSerializer.Serialize(new { verified = true, database = db,
+        resource_id = row.GetGuid(0), design_id = row.GetGuid(1), x = row.GetInt32(2), y = row.GetInt32(3),
+        type = row.GetString(4), resource_type_id = row.GetGuid(5), catalog_code = row.GetString(6), count = row.GetInt64(8) }));
+    return;
+}
 if (args.Length > 1 && args[1] == "verify")
 {
     using var metadata = JsonDocument.Parse(await File.ReadAllTextAsync(metadataPath));
