@@ -53,7 +53,11 @@ presentation. Quick icons retain full service-name tooltips.
 `test-godot.py --application --trace-network --output OUTPUT --timeout 600`
 checks both entry points, desktop resizing, the native minimum-size constraint,
 state preservation and native screenshots (`dark_empty.png`, `dark_resources.png`,
-`minimum_resources.png`). Its explicit fixture Design is local to
+`minimum_resources.png`). It also saves and reloads the workspace and parent
+scenes twice using Godot's editor ownership rules before running the application.
+The workspace scene owns its `WorldViewport` and `Camera3D`, so saving the parent
+cannot discard children injected into a non-editable scene instance.
+Its explicit fixture Design is local to
 the test; local placement makes no HTTP call. Separate clean launches still use
 the unchanged production entrypoint. The existing `--design --trace-network`
 scenario checks New Design dialog behavior without a live backend.

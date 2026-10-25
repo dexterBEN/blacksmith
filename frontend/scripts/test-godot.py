@@ -188,6 +188,7 @@ def main():
         return
 
     if args.application:
+        copy('scripts/check-workspace-scene-save.gd')
         configuration = (project / 'project.godot').read_bytes()
         original_main = (project / 'src/main.dart').read_bytes()
         if b'run/main_scene="res://scenes/isometric_3d.tscn"' not in configuration:
@@ -196,6 +197,12 @@ def main():
                      'gl_compatibility', '--resolution', '1152x648']
         run('application-import', ['--editor', '--import', *graphical],
             '[main] Dart scripts attached.', headless=False)
+        # Re-save both real scenes with editor ownership rules. Subsequent
+        # native launches use these saved files, so losing the viewport fails
+        # here instead of escaping startup-only coverage.
+        run('workspace-scene-save', ['--script',
+            'res://scripts/check-workspace-scene-save.gd'],
+            'BLACKSMITH_WORKSPACE_SCENE_SAVE_PASSED', trace=args.trace_network)
         # Instrument only this phase. The actual bootstrap function is unchanged
         # and creates the real BLoC; only cloud dependencies are fail-closed doubles.
         (project / 'src/production_main.dart').write_bytes(original_main)

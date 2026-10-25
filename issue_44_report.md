@@ -228,3 +228,82 @@ stashes and unrelated branch tips are preserved. No automatic merge.
 No backend production, schema/migration, GCP provisioning, new provider,
 configuration forms, resource connections, account/authentication, batch saving,
 move/delete synchronization or rendering refactor is included.
+
+## Follow-up: preserve the viewport when saving in the Godot editor
+
+An editor save exposed a scene-ownership defect: `isometric_3d.tscn` added
+`WorldViewport` and its `Camera3D` below a descendant of the instanced workspace,
+without marking that instance editable. They worked when the scene was loaded
+directly, but Godot's scene packing could omit them when saving the parent.
+The local editor-saved file had lost both declarations. The subsequent Dart
+viewport lookup returned null and its non-null assertion failed during startup.
+
+Both nodes now belong directly to `workspace_controls.tscn`, under its existing
+`Canvas`. The parent scene no longer declares them. Their settings and full
+runtime paths are preserved; Dart, camera fitting, input mapping, BLoC/Cubit,
+backend operations and layout behavior are unchanged. Existing local editor/theme
+changes are retained rather than discarded.
+
+`test-godot.py --application` now runs `check-workspace-scene-save.gd` in its
+temporary project after importing resources. It instantiates both real scenes
+with `PackedScene.GEN_EDIT_STATE_MAIN`, packs/saves/reloads them twice and checks
+the viewport/camera. The following graphical application checks run against those
+saved files. This covers the ownership round trip missed by the original
+runtime-only validation. The source checkout is never re-saved by this test.
+
+Follow-up results on 2026-10-24, from the corrected working tree on `issue_44`:
+
+- Dart analysis: passed, no issues.
+- Dart unit tests: all 122 passed.
+- Workspace/parent save and reload: passed, both nodes retained.
+
+The first test-launcher attempt used `--editor --script`; its scene assertions
+passed, but Godot reported editor progress-dialog and shutdown leaks. The launcher
+now runs `--script` with the explicit editor instantiation flag, avoiding an
+unneeded editor UI lifecycle. The corrected save/reload check exits cleanly.
+An initial sandbox-only Dart telemetry permission failure was resolved by
+re-running with SDK filesystem access. Neither failure required production Dart
+changes. Bindings were not regenerated because no Dart signatures changed.
+
+Two initial graphical interaction runs failed the expected-empty-selection
+assertion. The diagnostic capture showed a manually entered Design name and a
+placed Compute cube before the fixture's own creation step; physical input on
+the shared desktop had changed the test state. The automated startup harness
+now marks only its temporary window mouse-passthrough and non-focusable. Injected
+native `pushInput` events still exercise the same UI; normal application windows
+retain their usual input behavior. No HTTP connections occurred in either failed
+attempt. Diagnostic logging and the failure capture remain outside the repository.
+
+The final native interaction run passed with physical-input isolation:
+
+- All four GCP kinds placed and replaced through both sidebar and quick placement.
+- Full perimeter-cube visibility at the desktop sizes, including 960 × 640;
+  the native window also clamped an attempted 640 × 480 resize to 960 × 640.
+- Scene reload retained the single shared BLoC and eight local resource cubes;
+  shutdown completed without native errors or object leaks.
+- Separate, unwrapped production 3D and legacy 2D launches passed and each
+  produced 16 real Godot movie-writer frames. This is a legacy startup check,
+  not a repeat of the dedicated legacy interaction suite.
+- Cloud repository/HTTP tripwires stayed at zero, and all runtime network traces
+  contained zero outgoing IP connections. No backend or GCP operation was run.
+
+The successful retry reused the imported temporary fixture and the two scenes
+already saved by the passing round-trip check; its final test helpers were copied
+from the working tree. All production Dart files were byte-compared with the
+checkout. The earlier import and round-trip results remain applicable because
+only the interaction helper's input isolation changed afterward.
+
+Actual follow-up logs/captures are in
+`/tmp/blacksmith-workspace-fix-y8slkgi7/validated`, including
+`workspace-scene-save.log`, `isolated-interactions.log`,
+`application-normal.log`, `application-legacy.log`, `dark_empty.png`,
+`dark_resources.png`, `minimum_resources.png`, `normal_3d.png` and `legacy_2d.png`.
+The minimum-size capture was visually inspected. These temporary artifacts are
+local evidence, not committed assets. Reproduce the complete sequence with:
+
+```bash
+python3 frontend/scripts/test-godot.py --application --trace-network --timeout 900 --output /tmp/blacksmith-workspace-save-check
+```
+
+All pre-existing local edits and the three stash identities were verified
+unchanged. This follow-up is left uncommitted; no merge or push was performed.
