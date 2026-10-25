@@ -69,9 +69,37 @@ The regional and naming subsets were checked against Google's [locations](https:
 
 ## Validation evidence
 
-Preliminary Release build: **0 warnings, 0 errors**. Preliminary suites: **82 application, 65 HTTP integration, 24 PostgreSQL tests passed** (171 total; no failures or skips).
+Validated implementation commit: **`94cd347a9a2782fe9b694027310841ae4424a146`**. A fresh `git archive` export of its committed `backend/src`, `backend/tests` and solution was built and tested outside the checkout. No pre-existing build output or uncommitted helper was included. The follow-up commit changes this report only; the delivered backend tree remains **`752fd9fcfe8bcd0922157e569ad07574d8f72eee`**, identical to the tested tree.
 
-The PostgreSQL concurrency tests were then strengthened to observe an actual competing database lock wait before releasing the first transaction. Validation of the committed backend, including those assertions, is pending and will be recorded here before delivery.
+| Check | Actual result |
+|---|---|
+| Cached-package restore | Passed; no package additions/upgrades. |
+| Full solution Release build | Passed; **0 warnings, 0 errors** (24.67 seconds). |
+| Application suite | **82 passed**, 0 failed, 0 skipped. |
+| HTTP integration suite | **65 passed**, 0 failed, 0 skipped. |
+| Real PostgreSQL suite | **24 passed**, 0 failed, 0 skipped. |
+| Total | **171 passed**, 0 failed, 0 skipped; 73 added cases over the 98-test baseline. |
+| Cloud service counters | Zero calls in configuration HTTP/PostgreSQL tests; unexpected calls fail closed. |
+| Development database | Read-only before/after migration checks equal: four older migrations, configuration table still absent. |
+| Disposable databases | No `blacksmith_issue7_*` databases remain after the suites. |
+| Git protection | All three stash object IDs/order preserved; unrelated branch references unchanged. |
+
+The final run includes PostgreSQL tests that observe an actual competing database lock wait before releasing the first transaction. Both type/configuration race orderings and overlapping first PUTs pass. Preliminary validation also passed; there were no build or test failures during this increment.
+
+Commands executed in the committed export's backend directory (the loop below spells out the same per-project test commands):
+
+```bash
+dotnet restore BlacksmithBackend.sln --source /root/.nuget/packages -p:NuGetAudit=false --nologo
+dotnet build BlacksmithBackend.sln -c Release --no-restore --nologo
+EXPORT=/tmp/blacksmith-issue48-final-z_bpr98l/backend
+for suite in Blacksmith.Application.Tests Blacksmith.IntegrationTests Blacksmith.PostgreSql.Tests; do
+  dotnet test "tests/$suite/$suite.csproj" -c Release --no-build --no-restore \
+    --logger 'trx;LogFileName=results.trx' \
+    --results-directory "$EXPORT/results/$suite" --nologo --verbosity minimal
+done
+```
+
+Restore uses the container's existing package cache; online NuGet vulnerability auditing was disabled for this offline validation. Build logs, all three TRX files and parsed counters were retained outside Git at `/tmp/blacksmith-issue48-final-z_bpr98l`. Those local artifacts are temporary; the actual outcomes and source hashes above are recorded here for the PR.
 
 Tests execute inside the existing backend Dev Container with .NET SDK 8.0.426 and PostgreSQL 16.15. PostgreSQL tests use randomly named disposable `blacksmith_issue7_<guid>` databases, inherited from the existing fixture naming scheme; only those databases are migrated and removed by their fixtures. The administrative connection targets `postgres`, never the developer's database. Connection credentials are passed privately through the process environment and are not included in commands or artifacts. The ordinary API database connection is set to an unused endpoint and the Google credential path to a nonexistent file; test factories replace cloud access with a fail-closed counter.
 
@@ -83,4 +111,4 @@ The complete suite includes existing Design/Resource CRUD, ownership/catalog and
 2. The migration's jsonb column can hold historical arbitrary JSON; the API deliberately exposes only supported validated documents. Other services/versions need an explicit later contract.
 3. Persistence/restore of multiple frontend cubes, tile occupancy uniqueness, a JSON editor, deployment indicators and real deployment remain separate increments. These endpoints alone do not establish the future end-to-end editor workflow.
 4. The three-location subset and fixed policies are explicit MVP decisions. Expanding them requires a deliberate contract change; soft-delete policy still needs product approval.
-5. All existing stashes and unrelated work must remain unchanged. No shared history rewrite or automatic merge is part of this work.
+5. All three existing stashes and unrelated work were preserved. No shared history rewrite, development-database migration, cloud resource operation or automatic merge was performed.
