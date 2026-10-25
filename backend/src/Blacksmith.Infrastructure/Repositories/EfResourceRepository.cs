@@ -3,12 +3,14 @@ using Blacksmith.Application.Exceptions;
 using Blacksmith.Domain.Entities;
 using Blacksmith.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
 namespace Blacksmith.Infrastructure.Repositories;
 
-public sealed class EfResourceRepository(BlacksmithDbContext db) : IResourceRepository
+public sealed class EfResourceRepository(BlacksmithDbContext db) : IResourceRepository, IAsyncDisposable, IDisposable
 {
+    private IDbContextTransaction? _transaction;
     public async Task<IReadOnlyList<ResourceEntity>> ListByDesignIdAsync(Guid designId, CancellationToken ct) =>
         await db.Resources.AsNoTracking().Where(resource => resource.DesignId == designId)
             .OrderByDescending(resource => resource.CreatedAtUtc).ToListAsync(ct);
@@ -18,13 +20,35 @@ public sealed class EfResourceRepository(BlacksmithDbContext db) : IResourceRepo
     public Task<ResourceEntity?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.Resources.FirstOrDefaultAsync(resource => resource.Id == id, ct);
 
+    public async Task<ResourceEntity?> GetForUpdateAsync(Guid id, CancellationToken ct)
+    {
+        _transaction ??= await db.Database.BeginTransactionAsync(ct);
+        // Serialize configuration and metadata-type writes on the existing parent.
+        // The SQLite HTTP fixture uses its ordinary transaction instead.
+        return db.Database.IsNpgsql()
+            ? await db.Resources.FromSqlInterpolated($"""SELECT * FROM resources WHERE "Id"={id} FOR UPDATE""").SingleOrDefaultAsync(ct)
+            : await GetByIdAsync(id, ct);
+    }
+
+    public Task<ResourceConfiguration?> GetConfigurationAsync(Guid resourceId, CancellationToken ct) =>
+        db.ResourceConfigurations.FirstOrDefaultAsync(configuration => configuration.ResourceId == resourceId, ct);
+
+    public Task<bool> HasConfigurationAsync(Guid resourceId, CancellationToken ct) =>
+        db.ResourceConfigurations.AnyAsync(configuration => configuration.ResourceId == resourceId, ct);
+
+    public void AddConfiguration(ResourceConfiguration configuration) => db.ResourceConfigurations.Add(configuration);
+
     public void Add(ResourceEntity resource) => db.Resources.Add(resource);
 
     public void Remove(ResourceEntity resource) => db.Resources.Remove(resource);
 
     public async Task SaveChangesAsync(CancellationToken ct)
     {
-        try { await db.SaveChangesAsync(ct); }
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            if (_transaction is not null) await _transaction.CommitAsync(ct);
+        }
         catch (DbUpdateException exception) when (exception.InnerException is PostgresException
         { SqlState: PostgresErrorCodes.ForeignKeyViolation, ConstraintName: BlacksmithDbContext.ResourceDesignForeignKey })
         {
@@ -41,5 +65,19 @@ public sealed class EfResourceRepository(BlacksmithDbContext db) : IResourceRepo
             if (resource is null) throw;
             throw new ResourceTypeNotFoundException(resource.Entity.ResourceTypeId!.Value, exception);
         }
+        finally { await DisposeAsync(); }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_transaction is null) return;
+        await _transaction.DisposeAsync(); // Uncommitted validation failures roll back on scope disposal.
+        _transaction = null;
+    }
+
+    public void Dispose()
+    {
+        _transaction?.Dispose();
+        _transaction = null;
     }
 }

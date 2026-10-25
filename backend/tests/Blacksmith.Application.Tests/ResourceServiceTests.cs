@@ -297,6 +297,19 @@ public sealed class ResourceServiceTests
         }
 
         public void Add(ResourceEntity resource) => Resources.Add(resource);
+        public Task<ResourceEntity?> GetForUpdateAsync(Guid id, CancellationToken ct) => GetByIdAsync(id, ct);
+        public Task<ResourceConfiguration?> GetConfigurationAsync(Guid id, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult(Resources.FirstOrDefault(x => x.Id == id)?.Configuration);
+        }
+        public Task<bool> HasConfigurationAsync(Guid id, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult(Resources.Any(x => x.Id == id && x.Configuration is not null));
+        }
+        public void AddConfiguration(ResourceConfiguration configuration) =>
+            Resources.Single(x => x.Id == configuration.ResourceId).Configuration = configuration;
         public void Remove(ResourceEntity resource) => Resources.Remove(resource);
 
         public Task SaveChangesAsync(CancellationToken ct)

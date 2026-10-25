@@ -2,6 +2,7 @@ using Blacksmith.Application.DTOs;
 using Blacksmith.Application.Exceptions;
 using Blacksmith.Application.Interfaces;
 using Blacksmith.Domain.Entities;
+using Blacksmith.Application.Validation;
 
 namespace Blacksmith.Application.Services;
 
@@ -51,10 +52,18 @@ public sealed class ResourceService(
     {
         // Keep validation before the lookup, including when the id does not exist.
         Validate(request.Name, request.Type);
-        var resource = await repository.GetByIdAsync(id, ct);
+        var resource = await repository.GetForUpdateAsync(id, ct);
         if (resource is null) return null;
 
         var resourceTypeId = await ResolveResourceTypeAsync(request.Type.Trim(), request.ResourceTypeId, resource, ct);
+        if (await repository.HasConfigurationAsync(id, ct))
+        {
+            if (request.Type.Trim() != resource.Type)
+                throw new ResourceValidationException("A configured Resource cannot change type through metadata-only PUT.");
+            if (resource.Type == CloudStorageConfigurationV1.ResourceType && resourceTypeId is Guid catalogId &&
+                (await resourceTypes.GetByIdAsync(catalogId, ct))?.Code != CloudStorageConfigurationV1.CatalogCode)
+                throw new ResourceValidationException("The configured Resource requires the storage catalog classification.");
+        }
         if (request.DesignId is Guid designId)
         {
             if (!await designs.ExistsAsync(designId, ct)) throw new DesignNotFoundException(designId);
