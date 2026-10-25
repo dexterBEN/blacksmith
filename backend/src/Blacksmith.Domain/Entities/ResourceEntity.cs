@@ -7,6 +7,7 @@ public sealed class ResourceEntity
     public DesignEntity? Design { get; set; }
     public Guid? ResourceTypeId { get; set; }
     public ResourceTypeEntity? ResourceType { get; set; }
+    public ResourceConfiguration? Configuration { get; set; }
     public string Name { get; set; } = string.Empty;
     public int X { get; set; }
     public int Y { get; set; }
