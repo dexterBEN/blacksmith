@@ -53,6 +53,29 @@ namespace Blacksmith.Infrastructure.Migrations
                     b.ToTable("designs", (string)null);
                 });
 
+            modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceConfiguration", b =>
+                {
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_id");
+
+                    b.Property<string>("Configuration")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("configuration");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.HasKey("ResourceId");
+
+                    b.ToTable("resource_configurations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_resource_configurations_schema_version_positive", "schema_version > 0");
+                        });
+                });
+
             modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -175,6 +198,17 @@ namespace Blacksmith.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceConfiguration", b =>
+                {
+                    b.HasOne("Blacksmith.Domain.Entities.ResourceEntity", "Resource")
+                        .WithOne("Configuration")
+                        .HasForeignKey("Blacksmith.Domain.Entities.ResourceConfiguration", "ResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Resource");
+                });
+
             modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceEntity", b =>
                 {
                     b.HasOne("Blacksmith.Domain.Entities.DesignEntity", "Design")
@@ -198,6 +232,11 @@ namespace Blacksmith.Infrastructure.Migrations
             modelBuilder.Entity("Blacksmith.Domain.Entities.DesignEntity", b =>
                 {
                     b.Navigation("Resources");
+                });
+
+            modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceEntity", b =>
+                {
+                    b.Navigation("Configuration");
                 });
 
             modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceTypeEntity", b =>

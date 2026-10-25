@@ -12,9 +12,23 @@ public sealed class BlacksmithDbContext : DbContext
     public DbSet<ResourceEntity> Resources => Set<ResourceEntity>();
     public DbSet<DesignEntity> Designs => Set<DesignEntity>();
     public DbSet<ResourceTypeEntity> ResourceTypes => Set<ResourceTypeEntity>();
+    public DbSet<ResourceConfiguration> ResourceConfigurations => Set<ResourceConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ResourceConfiguration>(entity =>
+        {
+            entity.ToTable("resource_configurations", table =>
+                table.HasCheckConstraint("CK_resource_configurations_schema_version_positive", "schema_version > 0"));
+            entity.HasKey(x => x.ResourceId);
+            entity.Property(x => x.ResourceId).HasColumnName("resource_id").ValueGeneratedNever();
+            entity.Property(x => x.SchemaVersion).HasColumnName("schema_version").IsRequired();
+            entity.Property(x => x.Configuration).HasColumnName("configuration").HasColumnType("jsonb").IsRequired();
+            entity.HasOne(x => x.Resource).WithOne(x => x.Configuration)
+                .HasForeignKey<ResourceConfiguration>(x => x.ResourceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<ResourceTypeEntity>(entity =>
         {
             entity.ToTable("resource_types");
