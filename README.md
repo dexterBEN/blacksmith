@@ -68,6 +68,12 @@ The backend uses a **layered architecture with ports-and-adapters principles**. 
 
 ### Domain and persistence
 
+Existing Cloud Storage Resources also support a dedicated **Save-only configuration API**:
+`GET` / `PUT /resources/{resourceId}/configuration`. It validates and stores a v1
+JSON document without changing metadata CRUD contracts or provisioning GCP resources.
+See the [configuration API contract](docs/backend/resource-configuration-api.md) for
+fields, canonical defaults, limits and migration prerequisites. Godot integration is future work.
+
 - A **Design** contains zero or more **Resources**.
 - Every persisted **Resource** belongs to exactly one **Design**.
 - A **Design** with resources cannot be deleted (**restrictive deletion**).
