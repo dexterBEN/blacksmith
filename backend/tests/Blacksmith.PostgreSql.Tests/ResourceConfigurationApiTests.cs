@@ -28,6 +28,8 @@ public sealed class ResourceConfigurationApiTests : PostgreSqlTestDatabase
         Assert.Equal(await replace.Content.ReadAsStringAsync(), await client.GetStringAsync($"/resources/{ids[0]}/configuration"));
         Assert.Equal(sibling, await client.GetStringAsync($"/resources/{ids[1]}/configuration"));
         Assert.Equal(before, await ResourceRows());
+        Assert.Equal(3L, await Scalar<long>($"SELECT revision FROM resources WHERE \"Id\"='{ids[0]}'"));
+        Assert.Equal(2L, await Scalar<long>($"SELECT revision FROM resources WHERE \"Id\"='{ids[1]}'"));
         Assert.Equal("jsonb", await Scalar<string>("SELECT pg_typeof(configuration)::text FROM resource_configurations LIMIT 1"));
         Assert.Equal("object", await Scalar<string>("SELECT jsonb_typeof(configuration) FROM resource_configurations LIMIT 1"));
         Assert.Equal(2L, await Scalar<long>("SELECT count(*) FROM resource_configurations"));
@@ -162,7 +164,7 @@ public sealed class ResourceConfigurationApiTests : PostgreSqlTestDatabase
         return resources.Select(x => x.Id).ToArray();
     }
 
-    private Task<string> ResourceRows() => Scalar<string>("SELECT jsonb_agg(to_jsonb(r) ORDER BY \"Id\")::text FROM resources r");
+    private Task<string> ResourceRows() => Scalar<string>("SELECT jsonb_agg(to_jsonb(r)-'revision' ORDER BY \"Id\")::text FROM resources r");
     private static HttpClient Client(PostgreSqlApiFactory factory) => factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
     private static Task<HttpResponseMessage> Put(HttpClient client, Guid id, string json) =>
         client.PutAsync($"/resources/{id}/configuration", new StringContent(json, Encoding.UTF8, "application/json"));

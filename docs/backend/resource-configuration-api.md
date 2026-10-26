@@ -2,6 +2,11 @@
 
 These endpoints read/replace configuration for an **existing** Resource. They save design intent in PostgreSQL; they never create a bucket, contact GCP, validate IAM or change credentials. No frontend integration or deployment status is implied.
 
+For atomic Resource+configuration creation, stable client UUIDs, revisions and tile
+uniqueness, see [the configured persistence contract](resource-persistence-api.md).
+The dedicated configuration PUT remains unconditional and now advances the owning
+Resource's change revision; its document schemaVersion and response shape are unchanged.
+
 Prerequisite: the Issue #46 / PR #47 migration `20261025205111_AddResourceConfigurations` must be applied in the target environment. This increment adds no migration. Tests apply it only to their disposable databases.
 
 ## Routes and JSON contract

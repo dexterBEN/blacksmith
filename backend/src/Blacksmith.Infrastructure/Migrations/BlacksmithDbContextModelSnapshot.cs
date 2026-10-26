@@ -97,6 +97,13 @@ namespace Blacksmith.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision")
+                        .HasDefaultValue(1L);
+
                     b.Property<Guid?>("ResourceTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("resource_type_id");
@@ -118,6 +125,10 @@ namespace Blacksmith.Infrastructure.Migrations
 
                     b.HasIndex("DesignId")
                         .HasDatabaseName("IX_resources_design_id");
+
+                    b.HasIndex("DesignId", "X", "Y")
+                        .IsUnique()
+                        .HasDatabaseName("UX_resources_design_id_x_y");
 
                     b.HasIndex("ResourceTypeId")
                         .HasDatabaseName("IX_resources_resource_type_id");

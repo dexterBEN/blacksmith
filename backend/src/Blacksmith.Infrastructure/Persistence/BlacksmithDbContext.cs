@@ -7,6 +7,7 @@ public sealed class BlacksmithDbContext : DbContext
 {
     public const string ResourceDesignForeignKey = "FK_resources_designs_design_id";
     public const string ResourceTypeForeignKey = "FK_resources_resource_types_resource_type_id";
+    public const string ResourceTileIndex = "UX_resources_design_id_x_y";
     public BlacksmithDbContext(DbContextOptions<BlacksmithDbContext> options) : base(options) { }
 
     public DbSet<ResourceEntity> Resources => Set<ResourceEntity>();
@@ -63,6 +64,8 @@ public sealed class BlacksmithDbContext : DbContext
             entity.ToTable("resources");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.DesignId).HasColumnName("design_id").IsRequired();
+            entity.Property(x => x.Revision).HasColumnName("revision").HasDefaultValue(1L).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.DesignId, x.X, x.Y }).IsUnique().HasDatabaseName(ResourceTileIndex);
             entity.Property(x => x.ResourceTypeId).HasColumnName("resource_type_id");
             entity.HasIndex(x => x.ResourceTypeId).HasDatabaseName("IX_resources_resource_type_id");
             entity.HasOne(x => x.ResourceType).WithMany(x => x.Resources).HasForeignKey(x => x.ResourceTypeId)

@@ -99,7 +99,7 @@ public sealed class DesignApiTests : IDisposable
         var resourceIds = new List<Guid>();
         foreach (var owner in new[] { first, first, second })
         {
-            var response = await _client.PostAsJsonAsync("/resources", new { designId = owner, name = "Bucket", type = "generic" });
+            var response = await _client.PostAsJsonAsync("/resources", new { designId = owner, name = "Bucket", type = "generic", x = resourceIds.Count });
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
             resourceIds.Add((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid());
         }
@@ -167,7 +167,7 @@ public sealed class DesignApiTests : IDisposable
         var created = await _client.PostAsJsonAsync("/resources", new { name = "One", type = "generic" });
         var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         Assert.Equal(HttpStatusCode.OK, (await _client.PutAsJsonAsync($"/designs/{LegacyDesign.Id}", new { name = "My canvas" })).StatusCode);
-        Assert.Equal(HttpStatusCode.Created, (await _client.PostAsJsonAsync("/resources", new { name = "Two", type = "generic" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await _client.PostAsJsonAsync("/resources", new { name = "Two", type = "generic", x = 1 })).StatusCode);
         Assert.Equal("My canvas", (await _client.GetFromJsonAsync<JsonElement>($"/designs/{LegacyDesign.Id}")).GetProperty("name").GetString());
         Assert.Equal(HttpStatusCode.NoContent, (await _client.DeleteAsync($"/resources/{id}")).StatusCode);
     }

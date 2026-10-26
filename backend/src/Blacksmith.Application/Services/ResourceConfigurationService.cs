@@ -46,6 +46,7 @@ public sealed class ResourceConfigurationService(IResourceRepository resources, 
         }
         stored.SchemaVersion = 1;
         stored.Configuration = canonical.GetRawText();
+        resource.Revision = ResourceRevision.Next(resource.Revision);
         await resources.SaveChangesAsync(ct);
         return new(resourceId, 1, canonical);
     }

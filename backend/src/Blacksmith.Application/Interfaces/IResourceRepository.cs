@@ -13,6 +13,8 @@ public interface IResourceRepository
     Task<ResourceEntity?> GetForUpdateAsync(Guid id, CancellationToken ct);
     Task<ResourceConfiguration?> GetConfigurationAsync(Guid resourceId, CancellationToken ct);
     Task<bool> HasConfigurationAsync(Guid resourceId, CancellationToken ct);
+    Task<ResourceEntity?> GetAggregateAsync(Guid id, CancellationToken ct);
+    Task<IReadOnlyList<ResourceEntity>> ListAggregatesAsync(Guid designId, CancellationToken ct);
     void AddConfiguration(ResourceConfiguration configuration);
     void Add(ResourceEntity resource);
     void Remove(ResourceEntity resource);

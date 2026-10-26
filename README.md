@@ -74,6 +74,11 @@ JSON document without changing metadata CRUD contracts or provisioning GCP resou
 See the [configuration API contract](docs/backend/resource-configuration-api.md) for
 fields, canonical defaults, limits and migration prerequisites. Godot integration is future work.
 
+The backend also provides [atomic configured Resource persistence](docs/backend/resource-persistence-api.md):
+client UUIDs, conditional writes, per-resource revisions, unique Design/tile occupancy,
+and opt-in complete configuration read-back. These backend capabilities do not change
+the frontend's current single-placement Save/Open workflow.
+
 - A **Design** contains zero or more **Resources**.
 - Every persisted **Resource** belongs to exactly one **Design**.
 - A **Design** with resources cannot be deleted (**restrictive deletion**).

@@ -34,11 +34,12 @@ public sealed class DatabaseContractTests
         using var db = CreatePostgreSqlModel();
 
         var migrations = db.Database.GetMigrations().ToArray();
-        Assert.Equal(5, migrations.Length);
+        Assert.Equal(6, migrations.Length);
         Assert.Equal(new[] { "20251229003351_InitialCreate", "20251229011642_AddResourcesTable" }, migrations.Take(2));
         Assert.EndsWith("_AddDesignOwnership", migrations[2]);
         Assert.EndsWith("_AddResourceTypeCatalog", migrations[3]);
         Assert.EndsWith("_AddResourceConfigurations", migrations[4]);
+        Assert.EndsWith("_EnforceResourceIdentityAndOccupancy", migrations[5]);
         Assert.False(db.Database.HasPendingModelChanges());
     }
 
@@ -70,9 +71,12 @@ public sealed class DatabaseContractTests
         Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior);
         Assert.Equal(typeof(DesignEntity), foreignKey.PrincipalEntityType.ClrType);
         Assert.Equal(BlacksmithDbContext.ResourceDesignForeignKey, foreignKey.GetConstraintName());
-        Assert.Equal(2, entity.GetIndexes().Count());
-        Assert.Contains(entity.GetIndexes(), index => Assert.Single(index.Properties).Name == "DesignId");
-        Assert.Contains(entity.GetIndexes(), index => Assert.Single(index.Properties).Name == "ResourceTypeId");
+        Assert.Equal(3, entity.GetIndexes().Count());
+        Assert.Contains(entity.GetIndexes(), index => index.Properties.Count == 1 && index.Properties[0].Name == "DesignId");
+        Assert.Contains(entity.GetIndexes(), index => index.Properties.Count == 1 && index.Properties[0].Name == "ResourceTypeId");
+        Assert.Contains(entity.GetIndexes(), index => index.IsUnique && index.Properties.Select(x => x.Name).SequenceEqual(new[] { "DesignId", "X", "Y" }));
+        Assert.True(entity.FindProperty("Revision")!.IsConcurrencyToken);
+        Assert.Equal(1L, entity.FindProperty("Revision")!.GetDefaultValue());
         var typeKey = entity.GetForeignKeys().Single(key => key.PrincipalEntityType.ClrType == typeof(ResourceTypeEntity));
         Assert.Equal(DeleteBehavior.Restrict, typeKey.DeleteBehavior);
         Assert.Equal(BlacksmithDbContext.ResourceTypeForeignKey, typeKey.GetConstraintName());
