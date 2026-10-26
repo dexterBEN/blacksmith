@@ -50,8 +50,17 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
     final selected = bloc.state.selected;
     final before = tileEvents();
     final button = _button(scene, kind);
-    _check(!button.isDisabled(), 'Selected tile enables palette.');
-    await _click(scene, button.getGlobalRect().getCenter());
+    if (kind == ResourceKind.cloudStorage) {
+      _check(button.isDisabled(),
+          'Isolated preview cannot configure without an active Design.');
+      // Explicit legacy fixture for rendering checks; configured UI is tested
+      // through the production bootstrap and real API by --persistence.
+      bloc.add(const PlaceResource(ResourceKind.cloudStorage));
+      await _pause();
+    } else {
+      _check(!button.isDisabled(), 'Selected tile enables local placement.');
+      await _click(scene, button.getGlobalRect().getCenter());
+    }
     _check(bloc.state.selected == selected && tileEvents() == before,
         'Palette must consume input before the 3D grid.');
     _check(

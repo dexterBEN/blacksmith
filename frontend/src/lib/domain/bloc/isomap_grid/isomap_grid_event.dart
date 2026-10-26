@@ -59,6 +59,17 @@ class ConfirmResourceSaved extends IsomapGridEvent {
   final applied = Completer<bool>();
 }
 
+/// Publish a verified configured save only if the captured tile is unchanged.
+class ApplyConfiguredResource extends IsomapGridEvent {
+  ApplyConfiguredResource(
+      this.position, this.original, this.intent, this.record);
+  final GridPos position;
+  final PlacedResource? original;
+  final PlacedResource intent;
+  final PersistedResource record;
+  final applied = Completer<bool>();
+}
+
 /// Future configuration UI/test intents; rendering only projects the kind.
 class ChangeResourceConfiguration extends IsomapGridEvent {
   const ChangeResourceConfiguration(this.position, this.configuration);

@@ -14,7 +14,6 @@ import '../lib/domain/bloc/design/design_cubit.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../lib/domain/models/grid_position.dart';
 import '../lib/domain/models/resource_kind.dart';
-import '../lib/domain/models/placed_resource.dart';
 import '../lib/domain/models/resource_configuration.dart';
 import '../lib/prototypes/isometric_3d/grid_layout.dart';
 import '../lib/prototypes/isometric_3d/resource_visuals_3d.dart';
@@ -50,13 +49,15 @@ class _NoCloud extends CloudStorageRepository {
   }
 }
 
-/// Real HTTP with a narrow allowlist; one deliberate real backend 404 fault.
+/// Real metadata HTTP with explicit rejection, delay and response-loss faults.
 class _MetadataClient extends http.BaseClient {
   final _real = http.Client();
   final events = <Map<String, Object>>[];
-  bool failNextRead = false, closed = false;
+  bool closed = false;
   int posts = 0, puts = 0;
-  int losePostNumber = 0;
+  int losePutNumber = 0;
+  bool rejectNextPut = false, held = false;
+  async.Completer<void>? holdNextPut;
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     _check(
@@ -73,29 +74,32 @@ class _MetadataClient extends http.BaseClient {
     if (request.method == 'POST') posts++;
     if (request.method == 'PUT') puts++;
     var actual = request;
-    if (failNextRead &&
-        request.method == 'GET' &&
-        request.url.path.endsWith('/resources')) {
-      failNextRead = false;
-      actual = http.Request(
-          'GET',
-          _base.resolve(
-              '/designs/ffffffff-ffff-ffff-ffff-ffffffffffff/resources'))
-        ..headers.addAll(request.headers);
+    if (rejectNextPut && request.method == 'PUT') {
+      rejectNextPut = false;
+      final payload =
+          jsonDecode((request as http.Request).body) as Map<String, dynamic>;
+      payload['configuration']['configuration']['location'] =
+          'unsupported-region';
+      actual = http.Request(request.method, request.url)
+        ..headers.addAll(request.headers)
+        ..body = jsonEncode(payload);
     }
     final response = await _real.send(actual);
+    if (request.method == 'PUT' &&
+        holdNextPut != null &&
+        response.statusCode == 201) {
+      held = true;
+      await holdNextPut!.future;
+      held = false;
+      holdNextPut = null;
+    }
+
     events.add({
       'method': actual.method,
       'path': actual.url.path,
       'status': response.statusCode
     });
-    if (actual != request) {
-      _check(response.statusCode == 404, 'Fault must be a genuine API 404.');
-      GD.print(Variant('BLACKSMITH_ISSUE53_REAL_BACKEND_ERROR status=404'));
-    }
-    if (request.method == 'POST' &&
-        request.url.path == '/resources' &&
-        posts == losePostNumber) {
+    if (request.method == 'PUT' && puts == losePutNumber) {
       await response.stream.drain<void>();
       throw http.ClientException(
           'Injected lost response after the real Resource commit.');
@@ -150,106 +154,190 @@ void afterStartup() {
         await _click(
             scene, _header(scene, 'NewDesign').getGlobalRect().getCenter());
         _enter(scene,
-            'Blacksmith Issue53 smoke ${DateTime.now().toUtc().microsecondsSinceEpoch}');
+            'Blacksmith Issue55 smoke ${DateTime.now().toUtc().microsecondsSinceEpoch}');
         await _settle(scene);
         await _click(scene, _dialogButton(scene).getGlobalRect().getCenter());
         await _until(() => cubit.state.active != null && !cubit.state.pending);
         await _select(scene);
         await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
-        await _select(scene, _secondPosition);
-        await _choose(scene, Workspace3D.choices, ResourceKind.cloudStorage);
         _check(
-            cubit.state.canSave &&
-                !cubit.state.saved &&
-                grid.state.resources.length == 2,
-            'Both palette entry points must create distinct unsaved placements.');
-        final originalNodes = {
-          for (final pos in [_position, _secondPosition])
-            pos: _cube(scene, pos).getInstanceId()
-        };
-        await _capture(scene, 'before_save.png');
-        _resourceClient.failNextRead = true;
-        await _click(
-            scene, _header(scene, 'SaveDesign').getGlobalRect().getCenter());
-        await _until(() =>
-            !cubit.state.pending &&
-            cubit.state.persistenceMessage.contains('HTTP 404'));
-        _check(
-            !cubit.state.saved &&
-                grid.state.resources.length == 2 &&
-                _resourceClient.posts == 0,
-            'Failed real preflight must preserve both cubes without a write.');
-        await _capture(scene, 'save_error.png');
-        _resourceClient.losePostNumber = 2;
-        await _click(
-            scene, _header(scene, 'SaveDesign').getGlobalRect().getCenter());
-        await _until(() => !cubit.state.pending && cubit.state.saveUncertain);
-        _check(
-            !cubit.state.saved &&
-                _resourceClient.posts == 2 &&
-                grid.state.resources[_position]!.id != null &&
-                grid.state.resources[_secondPosition]!.id == null,
-            'A is confirmed; B committed but its lost response must not falsely mark the Design saved.');
-        await _capture(scene, 'save_unknown.png');
-        await _click(
-            scene, _header(scene, 'SaveDesign').getGlobalRect().getCenter());
-        await _until(() => cubit.state.saved && !cubit.state.pending);
-        _check(_resourceClient.posts == 2 && _resourceClient.puts == 0,
-            'Check Save is read-only and must not create another identity.');
-        await _click(
-            scene, _header(scene, 'SaveDesign').getGlobalRect().getCenter());
-        _check(_resourceClient.posts == 2 && _designClient.posts == 1,
-            'Repeated unchanged Save must be a no-op.');
-        final repository = di.sl<ResourceRepository>();
-        var records = await repository.listForDesign(cubit.state.active!.id);
-        _check(
-            records.length == 2 &&
-                records.map((r) => r.id).toSet().length == 2 &&
-                records.every((r) => r.configuration == null),
-            'Palette Save must not fabricate configuration.');
-        _check(
-            originalNodes.entries
-                .every((e) => _cube(scene, e.key).getInstanceId() == e.value),
-            'Confirming server metadata must preserve both mesh nodes.');
-        await _capture(scene, 'saved.png');
-
-        // Explicit test data, never defaults inserted by the production palette.
-        final first = records.singleWhere((r) => r.position == _position);
-        final configured = PlacedResource.fromPersisted(first)
-            .withConfiguration(ResourceConfiguration(schemaVersion: 1, values: {
-          'projectId': 'example-project-123',
-          'bucketName': 'blacksmith-native-fixture',
-          'location': 'europe-west9'
-        }));
-        await repository.writeConfigured(
-            cubit.state.active!.id, _position, configured);
-        await _open(scene, cubit, cubit.state.active!.id);
-        _check(
-            grid.state.resources[_position]!.configuration ==
-                    configured.configuration &&
-                originalNodes.entries.every(
-                    (e) => _cube(scene, e.key).getInstanceId() == e.value),
-            'Configuration-only aggregate Open must preserve existing cube nodes.');
-        records = await repository.listForDesign(cubit.state.active!.id);
+            cubit.state.configurationDraft != null &&
+                grid.state.resources.isEmpty,
+            'Cloud Storage opens a draft without a provisional cube.');
         final window = tree.getRoot()!;
         window
           ..setSize(Vector2i.fromXY(960, 640))
           ..setContentScaleSize(Vector2i.fromXY(960, 640));
         await _settle(scene);
-        checkEditorFraming(scene);
+        final dialog = scene.getNodeT<Control>(_configurationPath)!;
+        final bounds = dialog.getGlobalRect();
+        final editor = _json(scene);
         _check(
-            window.getSize().x >= 960 &&
-                window.getSize().y >= 640 &&
-                scene.getNodeT<Node3D>('ResourceRoot')!.getChildCount() == 2,
-            'The configured desktop minimum preserves the two resources and board framing.');
+            bounds.position.x >= 0 &&
+                bounds.position.y >= 0 &&
+                bounds.end.x <= 960 &&
+                bounds.end.y <= 640 &&
+                editor.getSize().y >= 180,
+            'The modal and usable editor fit the supported native minimum.');
+        final template = editor.getText();
+        _fillJson(scene, '${'\n' * 70}$template');
+        await _settle(scene);
+        _check(
+            editor.getVScrollBar()!.getMax() >
+                editor.getVScrollBar()!.getPage(),
+            'Long JSON has native vertical scrolling.');
+        editor.setCaretLine(editor.getLineCount() - 1);
+        await _capture(scene, 'minimum_json_dialog.png');
+        scene.getViewport()!.pushInput(InputEventKey()
+          ..setKeycode(Key.escape)
+          ..setPressed(true));
+        scene.getViewport()!.pushInput(InputEventKey()
+          ..setKeycode(Key.escape)
+          ..setPressed(false));
+        await _settle(scene);
+        _check(
+            cubit.state.configurationDraft == null &&
+                grid.state.resources.isEmpty &&
+                _resourceClient.puts == 0,
+            'Escape cancels without placement or write.');
+        await _choose(scene, Workspace3D.choices, ResourceKind.cloudStorage);
+        await _click(scene,
+            _configurationButton(scene, 'Close').getGlobalRect().getCenter());
+        _check(
+            cubit.state.configurationDraft == null &&
+                grid.state.resources.isEmpty &&
+                _resourceClient.puts == 0,
+            'The close button also cancels without placement or write.');
+        window
+          ..setSize(Vector2i.fromXY(1152, 648))
+          ..setContentScaleSize(Vector2i.fromXY(1280, 800));
+        await _settle(scene);
+        await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
+        final firstId = cubit.state.configurationDraft!.resource.localKey;
+        _fillJson(scene, '{broken');
+        await _click(scene,
+            _configurationButton(scene, 'Save').getGlobalRect().getCenter());
+        _check(
+            _resourceClient.puts == 0 &&
+                grid.state.resources.isEmpty &&
+                cubit.state.configurationDraft!.text == '{broken',
+            'Syntax errors preserve the form and grid.');
+        _fillJson(scene, _document('blacksmith-native-fixture'));
+        _resourceClient.rejectNextPut = true;
+        await _click(scene,
+            _configurationButton(scene, 'Save').getGlobalRect().getCenter());
+        await _until(() =>
+            !cubit.state.pending &&
+            cubit.state.configurationDraft?.error != null);
+        _check(
+            cubit.state.configurationDraft!.error!.contains('location') &&
+                grid.state.resources.isEmpty &&
+                cubit.state.configurationDraft!.resource.localKey == firstId,
+            'Real backend field rejection preserves text, UUID and empty tile.');
+        await _capture(scene, 'configuration_error.png');
+        _resourceClient.holdNextPut = async.Completer<void>();
+        await _click(scene,
+            _configurationButton(scene, 'Save').getGlobalRect().getCenter());
+        await _until(() => _resourceClient.held);
+        _check(grid.state.resources.isEmpty && cubit.state.pending,
+            'Even a committed write cannot show a cube before its response/read-back.');
+        await cubit.saveResourceConfiguration();
+        _check(_resourceClient.puts == 2,
+            'Double submit cannot send a second write.');
+        await _capture(scene, 'save_pending.png');
+        _resourceClient.holdNextPut!.complete();
+        await _until(() =>
+            cubit.state.configurationDraft == null && !cubit.state.pending);
+        _check(grid.state.resources[_position]!.id == firstId,
+            'Confirmed create uses the captured UUID.');
+        final firstNode = _cube(scene).getInstanceId();
+        await _select(scene, _secondPosition);
+        await _choose(scene, Workspace3D.choices, ResourceKind.cloudStorage);
+        final secondId = cubit.state.configurationDraft!.resource.localKey;
+        _fillJson(scene, _document('blacksmith-native-second'));
+        _resourceClient.losePutNumber = 3;
+        await _click(scene,
+            _configurationButton(scene, 'Save').getGlobalRect().getCenter());
+        await _until(() =>
+            !cubit.state.pending &&
+            (cubit.state.configurationDraft?.uncertain ?? false));
+        _check(grid.state.resources.length == 1 && secondId != firstId,
+            'A lost configured response leaves only the already confirmed cube visible.');
+        await _capture(scene, 'save_unknown.png');
+        await _click(scene,
+            _configurationButton(scene, 'Save').getGlobalRect().getCenter());
+        await _until(
+            () => cubit.state.configurationDraft == null && cubit.state.saved);
+        _check(
+            _resourceClient.puts == 3 &&
+                grid.state.resources[_secondPosition]!.id == secondId &&
+                _cube(scene).getInstanceId() == firstNode,
+            'Read-only recovery preserves both original UUIDs and existing nodes.');
+        await _select(scene);
+        await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
+        _check(_json(scene).getText().contains('blacksmith-native-fixture'),
+            'Edit opens canonical saved JSON.');
+        _fillJson(scene, _document('blacksmith-native-fixture-edited'));
+        await _click(scene,
+            _configurationButton(scene, 'Save').getGlobalRect().getCenter());
+        await _until(() =>
+            cubit.state.configurationDraft == null && !cubit.state.pending);
+        _check(
+            grid.state.resources[_position]!.id == firstId &&
+                grid.state.resources[_position]!.revision == 2 &&
+                _cube(scene).getInstanceId() == firstNode,
+            'Editing retains ID/tile/node and advances revision.');
+        await _choose(scene, Workspace3D.choices, ResourceKind.cloudStorage);
+        await _click(scene,
+            _configurationButton(scene, 'Save').getGlobalRect().getCenter());
+        await _until(() =>
+            cubit.state.configurationDraft == null && !cubit.state.pending);
+        _check(
+            grid.state.resources[_position]!.revision == 2 &&
+                _resourceClient.puts == 5,
+            'Unchanged configuration uses the same row and revision.');
+        await cubit.save();
+        _check(_resourceClient.posts == 0 && _resourceClient.puts == 5,
+            'Header Save does not write configured resources again.');
+        final repository = di.sl<ResourceRepository>();
+        final records = await repository.listForDesign(cubit.state.active!.id);
+        _check(
+            records.length == 2 &&
+                records.every((r) => r.configuration != null),
+            'Both resources have stored v1 configurations.');
+        await _capture(scene, 'saved.png');
+        window
+          ..setSize(Vector2i.fromXY(960, 640))
+          ..setContentScaleSize(Vector2i.fromXY(960, 640));
+        await _settle(scene);
+        checkEditorFraming(scene);
         await _capture(scene, 'minimum_two_resources.png');
         window
           ..setSize(Vector2i.fromXY(1152, 648))
           ..setContentScaleSize(Vector2i.fromXY(1280, 800));
         await _settle(scene);
+        final active = cubit.state.active!;
+        // A separate explicit legacy fixture verifies the unconfigured path.
+        final legacyDesign = await di
+            .sl<DesignRepository>()
+            .create('Blacksmith Issue55 legacy fixture');
+        await repository.createCloudStorage(legacyDesign.id, _position);
+        await _open(scene, cubit, legacyDesign.id);
+        await _select(scene);
+        await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
+        _check(
+            _json(scene).getText().contains('"projectId": ""') &&
+                _json(scene).getText().contains('"bucketName": ""'),
+            'Legacy configuration never fabricates identifiers.');
+        await _capture(scene, 'legacy_unconfigured.png');
+        await _click(scene,
+            _configurationButton(scene, 'Cancel').getGlobalRect().getCenter());
+        _check(grid.state.resources[_position]!.configuration == null,
+            'Cancel preserves the legacy resource.');
+        await _open(scene, cubit, active.id);
         await File('$_output/journey.json').writeAsString(jsonEncode({
-          'design_id': cubit.state.active!.id,
-          'design_name': cubit.state.active!.name,
+          'design_id': active.id,
+          'design_name': active.name,
           'resources': [
             for (final r in records)
               {
@@ -257,13 +345,15 @@ void afterStartup() {
                 'x': r.x,
                 'y': r.y,
                 'revision': r.revision,
-                'configured': r.configuration != null
+                'configured': true,
+                'configuration': r.configuration!.values
               }
           ],
           'count': records.length,
           'save_pid': pid,
           'resource_posts': _resourceClient.posts,
-          'fixture_puts': _resourceClient.puts
+          'configuration_puts': _resourceClient.puts,
+          'legacy_fixture_posts': 1
         }));
       } else {
         final saved =
@@ -290,13 +380,36 @@ void afterStartup() {
         _check(
             grid.state.resources[_position]!.configuration!
                     .values['bucketName'] ==
-                'blacksmith-native-fixture',
+                'blacksmith-native-fixture-edited',
             'Persisted explicit configuration survives full application restart.');
         final nodes = {
           for (final pos in [_position, _secondPosition])
             pos: _cube(scene, pos).getInstanceId()
         };
         await _capture(scene, 'after_relaunch.png');
+        for (final position in [_position, _secondPosition]) {
+          await _select(scene, position);
+          await _choose(
+              scene,
+              position == _position ? Workspace3D.catalog : Workspace3D.choices,
+              ResourceKind.cloudStorage);
+          final parsed = di
+              .sl<ResourceRepository>()
+              .parseConfiguration(_json(scene).getText());
+          _check(parsed == grid.state.resources[position]!.configuration,
+              'The restored JSON editor retains each canonical document.');
+          await _capture(
+              scene,
+              position == _position
+                  ? 'restored_configuration.png'
+                  : 'restored_second_configuration.png');
+          await _click(
+              scene,
+              _configurationButton(scene, 'Cancel')
+                  .getGlobalRect()
+                  .getCenter());
+        }
+
         await _open(scene, cubit, saved['design_id'] as String);
         _check(
             nodes.entries
@@ -453,3 +566,22 @@ Future<void> _click(Node scene, Vector2 point) async {
     await _settle(scene);
   }
 }
+
+const _configurationPath = 'DesignLayer/ConfigurationControls/Shade/Dialog';
+TextEdit _json(Node scene) =>
+    scene.getNodeT<TextEdit>('$_configurationPath/Json')!;
+Button _configurationButton(Node scene, String name) =>
+    scene.getNodeT<Button>('$_configurationPath/$name')!;
+void _fillJson(Node scene, String text) {
+  _json(scene)
+    ..setText(text)
+    ..textChanged.emit();
+}
+
+String _document(String bucket) => di
+    .sl<ResourceRepository>()
+    .configurationText(ResourceConfiguration(schemaVersion: 1, values: {
+      'projectId': 'example-project-123',
+      'bucketName': bucket,
+      'location': 'europe-west9'
+    }));

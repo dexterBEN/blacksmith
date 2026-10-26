@@ -38,16 +38,16 @@ if (args.Length > 1 && args[1] == "verify-resource")
         if (index > 1 || !ids.Add(row.GetGuid(0)) || row.GetGuid(1) != Guid.Parse(args[2]) ||
             row.GetInt32(2) != (first ? 3 : 1) || row.GetInt32(3) != (first ? 2 : 4) ||
             row.GetString(4) != "gcp.storage.bucket" || row.GetString(6) != "storage" ||
-            !row.GetString(7).StartsWith("Blacksmith Issue53 smoke ", StringComparison.Ordinal) || row.GetInt64(8) != 2 ||
+            !row.GetString(7).StartsWith("Blacksmith Issue55 smoke ", StringComparison.Ordinal) || row.GetInt64(8) != 2 ||
             row.GetInt64(9) != (first ? 2 : 1) ||
-            (first ? row.IsDBNull(10) || row.GetInt32(10) != 1 || row.GetString(11) != "blacksmith-native-fixture"
-                   : !row.IsDBNull(10)))
+            row.IsDBNull(10) || row.GetInt32(10) != 1 ||
+            row.GetString(11) != (first ? "blacksmith-native-fixture-edited" : "blacksmith-native-second"))
             throw new InvalidOperationException("SQL resource read-back did not match the dedicated two-resource frontend fixture.");
         index++;
     }
     if (index != 2) throw new InvalidOperationException("Expected exactly two dedicated resources.");
     Console.WriteLine(JsonSerializer.Serialize(new { verified = true, database = db,
-        resource_ids = ids, design_id = args[2], count = index, configurations = 1,
+        resource_ids = ids, design_id = args[2], count = index, configurations = 2,
         coordinates = new[] { new { x = 3, y = 2 }, new { x = 1, y = 4 } } }));
     return;
 }

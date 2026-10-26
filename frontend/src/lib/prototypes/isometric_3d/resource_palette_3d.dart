@@ -25,24 +25,37 @@ class ResourcePalette3D {
   late final Label _instruction, _guidance;
   final _buttons = <({Button button, ResourceKind kind})>[];
 
-  void render(IsomapGridState state, {bool blocked = false}) {
+  void render(IsomapGridState state,
+      {bool blocked = false, bool canConfigure = false}) {
     final selected = state.selected;
     final hasSelection = selected != null && state.contains(selected);
     final enabled = !blocked && hasSelection;
     final persisted = state.resources[selected]?.id != null;
     for (final choice in _buttons) {
       final button = choice.button;
+      final storage = choice.kind == ResourceKind.cloudStorage;
+      final available = !storage ||
+          canConfigure &&
+              (state.resources[selected] == null ||
+                  state.resources[selected]?.kind == ResourceKind.cloudStorage);
       final canChoose = enabled &&
+          available &&
           (!persisted || state.resources[selected]?.kind == choice.kind);
       button.setDisabled(!canChoose);
       button.setFocusMode(
           canChoose ? ControlFocusMode.focusAll : ControlFocusMode.focusNone);
-      button.setTooltipText(persisted && !canChoose && enabled
-          ? 'Replacing a persisted resource is not supported. Choose another tile.'
-          : resourceVisuals3D[choice.kind]!.label);
+      button.setTooltipText(storage && !canConfigure
+          ? 'Create or open a Design to configure Cloud Storage.'
+          : storage && !available
+              ? 'Choose an empty tile or an existing Cloud Storage resource.'
+              : persisted && !canChoose && enabled
+                  ? 'Replacing a persisted resource is not supported. Choose another tile.'
+                  : storage
+                      ? 'Configure Cloud Storage (Save only)'
+                      : resourceVisuals3D[choice.kind]!.label);
     }
     final text = hasSelection
-        ? 'Tile (${selected.row}, ${selected.col}) · ${persisted ? "Saved placement" : "Local placement"}'
+        ? 'Tile (${selected.row}, ${selected.col}) · ${persisted ? (state.resources[selected]?.configuration == null ? "Unconfigured" : "Saved configuration") : "Local placement"}'
         : 'Select a tile first';
     _instruction.setText(text);
     _guidance.setText(text);

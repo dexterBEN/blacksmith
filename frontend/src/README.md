@@ -58,7 +58,10 @@ scenes twice using Godot's editor ownership rules before running the application
 The workspace scene owns its `WorldViewport` and `Camera3D`, so saving the parent
 cannot discard children injected into a non-editable scene instance.
 Its explicit fixture Design is local to
-the test; local placement makes no HTTP call. Separate clean launches still use
+the test; the geometry regression cancels Cloud Storage dialogs and seeds legacy
+local cubes directly through the BLoC. Configured Save is verified separately by
+the real API persistence journey below. Other local placement makes no HTTP call.
+Separate clean launches still use
 the unchanged production entrypoint. The existing `--design --trace-network`
 scenario checks New Design dialog behavior without a live backend.
 
@@ -122,12 +125,28 @@ multiple Cloud Storage representations (`gcp.storage.bucket`, generic catalog co
 local intent key, server ID, configuration, revision and ETag; `tiles` is only a
 derived kind projection for the existing renderers.
 
-Palette placement has no configuration form yet. Its explicit Save uses the legacy
-metadata-only POST; it never fabricates a project, bucket name or location. The
-repository also supports conditional configured PUT for explicit configuration
-intents and reads full aggregates via `include=configuration`. Open restores both
-configured and unconfigured Cloud Storage resources, validating the entire result
-before changing the grid. Unsupported records are reported without a partial restore.
+Cloud Storage now requires an active Design. Selecting an empty tile and either
+Cloud Storage palette entry opens one native scrollable JSON editor. Save configuration
+uses a single conditional configured PUT; no new cube enters the grid before
+canonical aggregate read-back. Select an existing Cloud Storage tile and choose
+Cloud Storage again to edit its JSON with the same ID, coordinates and revision.
+New templates clearly identify example project/bucket values for review; legacy
+unconfigured records leave required identifiers empty. Only the merged v1 envelope
+and three supported regions are accepted. Unknown fields, duplicate keys and
+credential documents are rejected without echoing input in error messages.
+
+The modal's single draft lives in DesignCubit, outside the renderable grid. It
+captures Design/tile and stable UUID before asynchronous work. Cancel/Escape/close
+preserve the grid; pending requests cannot be cancelled through the modal. A failed
+Save preserves text and identity. An unknown result locks editing and exposes
+read-only Check Save; closing the form retains the shared header recovery guard.
+Save does not create a bucket, check GCP availability or contact Google APIs.
+
+Header Save skips already confirmed configured rows. Its metadata-only POST remains
+for legacy local unconfigured snapshots (including the unchanged 2D domain events).
+Other resource kinds keep local placement; Cloud Storage requires an empty or
+Cloud Storage tile and does not silently replace a different local kind. Open
+restores configured and unconfigured resources after validating the entire result.
 
 Only a matching Design/resource read-back marks a resource saved. If A succeeds
 and B fails, A stays confirmed and retry targets B. Ambiguous writes expose read-only
@@ -150,15 +169,19 @@ migrations and sets an unusable GCP credential path for its API process. With th
 backend running, use its numeric container IP and test port:
 
 ```bash
-python3 frontend/scripts/test-godot.py --persistence http://CONTAINER_IP:5144 --trace-network --timeout 900 --output /tmp/blacksmith-persistence
+python3 frontend/scripts/test-godot.py --persistence http://CONTAINER_IP:5144 --persistence-phase save --trace-network --timeout 600 --output /tmp/blacksmith-persistence
+python3 frontend/scripts/test-godot.py --persistence http://CONTAINER_IP:5144 --persistence-phase open --trace-network --timeout 600 --output /tmp/blacksmith-persistence
 ```
 
 Run from the repository root (unlike the Dart commands above). This native test
-creates one dedicated Design, injects a genuine API 404 before saving, saves two
-Resources, drops the second committed POST's response, and reconciles by reads.
-It attaches one explicit test-only configuration, fully exits Godot, then starts
-another process and opens the same Design. It verifies stable IDs/revisions,
-configuration restore, repeated Open, scene reload and 960 × 640 framing.
+creates one dedicated Design, configures two Resources through the actual popup,
+injects a real backend field rejection, delays a committed response to prove the
+cube remains hidden, loses another committed PUT response and reconciles by reads.
+It edits/no-ops the first resource, inspects a separate legacy fixture, fully exits
+Godot and opens the main Design in another process. It verifies both JSON documents,
+stable IDs/revisions, repeated Open, scene reload, 960 × 640 modal scrolling/Escape
+and grid framing. The two commands share their output directory; run native tests
+sequentially because godot_dart's optional VM debug service uses fixed ports.
 Captures come from the native viewport. Network tracing permits only the dedicated
 API address; test clients add cloud tripwires and fault injection around the
 unchanged production bootstrap.
@@ -177,4 +200,4 @@ Use `start-design-test-backend.py CONTAINER --verify-resource RUN_PATH DESIGN_ID
 for independent SQL verification of the two-resource native scenario. Use the
 launcher's `--stop RUN_PATH` to stop only that test API and drop only its owned
 test database. It does not remove a Docker container or volume. See
-`issue_53_report.md` at the repository root for actual results and evidence.
+`issue_55_report.md` at the repository root for actual results and evidence.

@@ -48,6 +48,37 @@ Map<String, Object?> aggregate(
 
 void main() {
   test(
+      'backend field errors use known literals without reflecting arbitrary response text',
+      () async {
+    for (final message in [
+      'location must be europe-west9, us-central1 or northamerica-northeast1.',
+      'password=never-echo-this'
+    ]) {
+      final repo = ResourceRepository(
+          baseUrl: 'http://api.test',
+          client: MockClient((_) async => http.Response(
+              jsonEncode({'code': 'invalid_payload', 'error': message}), 400)));
+      addTearDown(repo.close);
+      final intent = PlacedResource(
+              localKey: resource,
+              kind: ResourceKind.cloudStorage,
+              catalogId: catalog)
+          .withConfiguration(config());
+      try {
+        await repo.writeConfigured(owner, const GridPos(2, 3), intent);
+        fail('Must reject.');
+      } on ResourceFailure catch (error) {
+        expect(error.status, 400);
+        expect(error.ambiguous, isFalse);
+        expect(error.message, isNot(contains('never-echo-this')));
+        if (message.startsWith('location')) {
+          expect(error.message, contains('location must'));
+        }
+      }
+    }
+  });
+
+  test(
       'scoped aggregate read restores multiple identities, configuration absence and revisions',
       () async {
     final repo = ResourceRepository(

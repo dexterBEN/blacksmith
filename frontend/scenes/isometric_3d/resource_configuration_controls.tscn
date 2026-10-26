@@ -1,0 +1,61 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Theme" path="res://scenes/isometric_3d/workspace_dark.tres" id="1_theme"]
+
+[node name="ConfigurationControls" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme = ExtResource("1_theme")
+
+[node name="Shade" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.01, 0.02, 0.04, 0.75)
+
+[node name="Dialog" type="Panel" parent="Shade"]
+
+[node name="Title" type="Label" parent="Shade/Dialog"]
+text = "Configure Cloud Storage"
+theme_override_font_sizes/font_size = 22
+
+[node name="Close" type="Button" parent="Shade/Dialog"]
+text = "×"
+tooltip_text = "Close configuration (Escape). A pending request cannot be cancelled."
+
+[node name="Target" type="Label" parent="Shade/Dialog"]
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Notice" type="Label" parent="Shade/Dialog"]
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Json" type="TextEdit" parent="Shade/Dialog"]
+theme_override_font_sizes/font_size = 15
+wrap_mode = 1
+placeholder_text = "Cloud Storage configuration JSON"
+
+[node name="FeedbackScroll" type="ScrollContainer" parent="Shade/Dialog"]
+horizontal_scroll_mode = 0
+
+[node name="Feedback" type="Label" parent="Shade/Dialog/FeedbackScroll"]
+layout_mode = 2
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Cancel" type="Button" parent="Shade/Dialog"]
+text = "Cancel"
+
+[node name="Save" type="Button" parent="Shade/Dialog"]
+text = "Save configuration"

@@ -38,11 +38,17 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--persistence', metavar='BASE_URL',
                         help='Real dedicated local API/PostgreSQL save, full quit, open journey; never GCP.')
+    parser.add_argument('--persistence-phase', choices=['save', 'open'],
+                        help='Run one restart phase per invocation, sharing --output; useful on slow VMs.')
     args = parser.parse_args()
     if sum(bool(mode) for mode in [args.design, args.application, args.persistence]) > 1:
         parser.error('--design and --application are separate checks.')
     if args.design_live and not args.design:
         parser.error('--design-live requires --design and a dedicated test database.')
+    if args.persistence_phase and not args.persistence:
+        parser.error('--persistence-phase requires --persistence.')
+    if args.persistence_phase and not args.output:
+        parser.error('--persistence-phase requires a shared --output directory.')
     if args.design_live and args.trace_network:
         parser.error('--trace-network forbids IP connections; use it with the offline --design check.')
     source = args.source.resolve()
@@ -152,16 +158,18 @@ def main():
             "import 'test_support/persistence_journey_checks.dart' as checks;\n"
             'void main() { checks.beforeStartup(); application.main(); checks.afterStartup(); }\n')
         try:
-            for phase in ['save', 'open']:
+            phases = [args.persistence_phase] if args.persistence_phase else ['save', 'open']
+            for phase in phases:
                 env['BLACKSMITH_PERSISTENCE_PHASE'] = phase
                 run(f'persistence-{phase}', [*graphical, '--max-fps', '60'],
                     f'BLACKSMITH_PERSISTENCE_{phase.upper()}_PASSED',
                     headless=False, trace=args.trace_network)
-            saved = json.loads((output / 'journey.json').read_text())
-            opened = json.loads((output / 'reopened.json').read_text())
-            if saved['save_pid'] == opened['open_pid'] or not opened['restored']:
-                raise RuntimeError('A real complete application restart was not proved.')
-            print('BLACKSMITH_PERSISTENCE_RESTART_PASSED real_api=true resources=2 cloud_calls=0', flush=True)
+            if 'open' in phases:
+                saved = json.loads((output / 'journey.json').read_text())
+                opened = json.loads((output / 'reopened.json').read_text())
+                if saved['save_pid'] == opened['open_pid'] or not opened['restored']:
+                    raise RuntimeError('A real complete application restart was not proved.')
+                print('BLACKSMITH_PERSISTENCE_RESTART_PASSED real_api=true resources=2 cloud_calls=0', flush=True)
         finally:
             (project / 'src/main.dart').write_bytes(original_main)
             (project / 'src/production_main.dart').unlink()

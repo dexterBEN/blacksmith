@@ -5,6 +5,7 @@ import '../../domain/models/grid_position.dart';
 import '../../domain/models/persisted_resource.dart';
 import '../../domain/models/placed_resource.dart';
 import '../../domain/models/resource_configuration.dart';
+import 'cloud_storage_configuration_document.dart';
 
 class ResourceFailure implements Exception {
   const ResourceFailure(this.message,
@@ -34,6 +35,17 @@ class ResourceRepository {
   final http.Client _client;
   final Duration _timeout;
   bool _closed = false;
+
+  String configurationText(ResourceConfiguration? value,
+          {bool legacy = false}) =>
+      CloudStorageConfigurationDocument.format(value, legacy: legacy);
+  ResourceConfiguration parseConfiguration(String text) {
+    try {
+      return CloudStorageConfigurationDocument.parse(text);
+    } on FormatException catch (error) {
+      throw ResourceFailure(error.message, code: 'invalid_configuration');
+    }
+  }
 
   static String _validateUrl(String value) {
     final uri = Uri.tryParse(value);
@@ -121,9 +133,34 @@ class ResourceRepository {
       428 =>
         'The backend requires a write precondition. No replacement write was sent.',
       404 => 'The Design, Resource or catalog entry is missing.',
+      413 => 'The Resource request exceeds the 16 KiB limit.',
       _ => 'The backend operation failed.'
     };
-    throw ResourceFailure('$message (HTTP $status)',
+    String? fieldError;
+    if (status == 400) {
+      // The backend emits fixed validator messages, not a field dictionary.
+      // Accept only known literals; never echo arbitrary response/input text.
+      const safeErrors = {
+        'projectId is required and must be a non-empty string.',
+        'bucketName is required and must be a non-empty string.',
+        'location is required and must be a non-empty string.',
+        'projectId must be a supported 6-30 character lowercase Google project ID.',
+        'bucketName must use the supported 3-63 character lowercase letter/digit/hyphen format without reserved Google names.',
+        'location must be europe-west9, us-central1 or northamerica-northeast1.',
+        'storageClass must be STANDARD.',
+        'uniformBucketLevelAccess must be true.',
+        'publicAccessPrevention must be enforced.',
+        'Only schemaVersion 1 is supported.',
+        'Unsupported or duplicate fields are not allowed.'
+      };
+      try {
+        final body = jsonDecode(response.body);
+        if (body is Map && safeErrors.contains(body['error'])) {
+          fieldError = body['error'] as String;
+        }
+      } on FormatException {/* Keep fixed fallback. */}
+    }
+    throw ResourceFailure('${fieldError ?? message} (HTTP $status)',
         status: status,
         code: code,
         ambiguous: write &&

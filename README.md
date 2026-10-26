@@ -72,8 +72,8 @@ Existing Cloud Storage Resources also support a dedicated **Save-only configurat
 `GET` / `PUT /resources/{resourceId}/configuration`. It validates and stores a v1
 JSON document without changing metadata CRUD contracts or provisioning GCP resources.
 See the [configuration API contract](docs/backend/resource-configuration-api.md) for
-fields, canonical defaults, limits and migration prerequisites. A configuration dialog
-is future work; the editor already restores supported saved configurations.
+fields, canonical defaults, limits and migration prerequisites. The 3D editor now
+provides a Cloud Storage JSON configuration dialog and restores saved configurations.
 
 The backend also provides [atomic configured Resource persistence](docs/backend/resource-persistence-api.md):
 client UUIDs, conditional writes, per-resource revisions, unique Design/tile occupancy,
@@ -88,14 +88,15 @@ to restore multiple Cloud Storage placements, including saved configurations.
 - Existing resource type strings remain supported for backward compatibility.
 - EF Core database migrations are applied deliberately; the API does **not** automatically apply them at startup.
 
-**Integration boundary:** Selecting a tile and placing or replacing a service still
-updates local BLoC state only. **Save** explicitly persists multiple Cloud Storage
-representations to the active Design, using Blacksmith's Resource API and PostgreSQL.
-**Open** restores supported placements and configurations after a complete application
-restart. Palette placements have no configuration form yet, so Save creates metadata-only
-resources without inventing GCP settings. These operations do not provision GCP resources.
-The other three GCP representations remain local. Replacing a persisted resource with
-a different kind or deleting it through Save is not supported.
+**Integration boundary:** With an active Design, select an empty tile and choose
+Cloud Storage from either palette to open its JSON configuration dialog.
+**Save configuration** atomically persists metadata and configuration through the
+Resource API/PostgreSQL; its cube appears only after canonical read-back succeeds.
+Selecting a Cloud Storage tile and choosing Cloud Storage again edits that same
+Resource ID/revision. **Open** restores multiple placements and their configurations
+after a complete application restart. These operations do not provision GCP resources.
+The other three GCP representations keep their local placement behavior. Replacing
+a persisted kind or deleting it through Save remains unsupported.
 
 ---
 
@@ -109,19 +110,22 @@ quick-placement strip. Both resource entry points use the same tile-first action
 The board renders in its own canvas between the panels; it does not extend under
 the menu. The sidebar keeps its desktop width and full resource labels when the
 window is resized. The workspace and New Design dialog share one dark UI theme.
-Local placement stays in `IsomapGridBloc` memory and requires no backend.
-Explicit Save/Open requires the API and PostgreSQL; GCP credentials are not needed.
+Other resource kinds stay in `IsomapGridBloc` memory and require no backend.
+Cloud Storage configuration requires an active Design, the API and PostgreSQL;
+GCP credentials are not needed. Cancel and rejected saves preserve the original
+grid and JSON draft. New templates use clearly labelled example identifiers;
+legacy unconfigured resources open with missing required identifiers left blank.
 
 The **New Design** action creates a persistent Design through the existing
 `POST /designs` API and displays its backend ID/name for the current session.
 This action requires the API and PostgreSQL. Set `BLACKSMITH_BACKEND_URL` before
 launching Godot to override `http://localhost:5100`; no GCP credentials are needed.
 Unsaved placements require explicit consent before they are cleared on successful
-creation. Cancellation and failures preserve them. Save processes Cloud Storage cubes
-individually and retains each confirmed result if a later resource fails. Repeated
-unchanged Save creates no additional row. A lost write response exposes **Check Save**,
-which reconciles through reads without posting again. This guard is in memory;
-cross-process recovery of an unacknowledged metadata-only create is not guaranteed.
+creation. Cancellation and failures preserve them. The header Save skips confirmed
+configured resources and retains transitional metadata Save for older unconfigured
+local snapshots. A lost configured-write response exposes **Check Save**, which
+reconciles the original Resource UUID without another write. Closing the form keeps
+this session guard; no durable journal is provided for a crash during an unknown write.
 Use **Copy ID**, completely quit, relaunch, then **Open** and paste that ID to restore
 the saved cubes. Unsaved local changes require confirmation before Open replaces them.
 See [the Dart workflow](frontend/src/README.md) for the isolated persistence test.
@@ -268,7 +272,7 @@ It does **not** verify deploying a whole architecture design or automatically sy
 
 ## 🧭 Roadmap and current limitations
 
-- Add a configuration editor for the supported Cloud Storage configuration contract.
+- Add a separately approved, explicit **Save & Deploy** workflow with tracked cloud outcomes.
 - Extend persistence beyond Cloud Storage and support deliberate resource removal/replacement.
 - Keep any future deployment action explicit and separate from local architecture editing.
 - Add explicit provisioning state, error handling, and recovery before combining cloud operations with database persistence.

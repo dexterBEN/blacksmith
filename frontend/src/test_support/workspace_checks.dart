@@ -66,13 +66,30 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     final selected = grid.state.selected;
     final before = tileEvents();
     final button = _button(scene, group, kind);
-    _check(!button.isDisabled(), 'A selected tile enables both entry points.');
-    await _click(scene, button.getGlobalRect().getCenter());
+    if (kind == ResourceKind.cloudStorage) {
+      // This offline geometry regression uses an explicitly local legacy cube.
+      // The real configured Save journey is covered by --persistence.
+      if (!button.isDisabled()) {
+        await _click(scene, button.getGlobalRect().getCenter());
+        _check(design.state.configurationDraft != null,
+            'Cloud Storage opens configuration instead of placing a cube.');
+        design.cancelResourceConfiguration();
+        await _settle(scene);
+      } else {
+        _check(grid.state.tiles[selected] != ResourceKind.cloudStorage,
+            'Cloud Storage does not silently replace a different local kind.');
+      }
+      grid.add(const PlaceResource(ResourceKind.cloudStorage));
+      await _settle(scene);
+    } else {
+      _check(!button.isDisabled(), 'A selected local tile enables placement.');
+      await _click(scene, button.getGlobalRect().getCenter());
+    }
     _check(
         grid.state.selected == selected &&
             grid.state.tiles[selected] == kind &&
             tileEvents() == before,
-        'Both entry points dispatch the same placement action.');
+        'Other local kinds and the explicit legacy fixture preserve selection.');
     final cube = _cube(scene, selected!);
     _check(
         cube.getSceneFilePath() == resourceVisuals3D[kind]!.scenePath &&

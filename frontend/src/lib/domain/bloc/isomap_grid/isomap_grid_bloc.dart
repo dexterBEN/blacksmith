@@ -42,6 +42,20 @@ class IsomapGridBloc extends Bloc<IsomapGridEvent, IsomapGridState> {
         event.position: current.withConfiguration(event.configuration)
       }));
     });
+    on<ApplyConfiguredResource>((event, emit) {
+      var accepted = false;
+      try {
+        if (state.contains(event.position) &&
+            state.resources[event.position] == event.original) {
+          emit(state.copyWith(resources: {
+            ...state.resources,
+            event.position: event.intent.confirm(event.record, event.intent)
+          }));
+          accepted = true;
+        }
+      } on ArgumentError {/* Do not overwrite an incompatible snapshot. */}
+      event.applied.complete(accepted);
+    });
     on<TileClicked>(_onTileClicked);
     on<PlaceResource>(_onPlaceResource);
     on<ResetGridForNewDesign>((event, emit) =>
