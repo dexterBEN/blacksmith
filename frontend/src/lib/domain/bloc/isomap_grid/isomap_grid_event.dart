@@ -1,4 +1,8 @@
 import 'package:equatable/equatable.dart';
+import 'dart:async';
+import '../../models/placed_resource.dart';
+import '../../models/persisted_resource.dart';
+import '../../models/resource_configuration.dart';
 
 import '../../models/grid_position.dart';
 import '../../models/resource_kind.dart';
@@ -37,8 +41,29 @@ class ResetGridForNewDesign extends IsomapGridEvent {
 /// Apply a validated backend snapshot; selection is intentionally cleared.
 class RestoreDesignResources extends IsomapGridEvent {
   RestoreDesignResources(Map<GridPos, ResourceKind> tiles)
-      : tiles = Map.unmodifiable(tiles);
-  final Map<GridPos, ResourceKind> tiles;
+      : resources = Map.unmodifiable(
+            tiles.map((p, kind) => MapEntry(p, PlacedResource.local(kind))));
+  RestoreDesignResources.resources(Map<GridPos, PlacedResource> resources)
+      : resources = Map.unmodifiable(resources);
+  final Map<GridPos, PlacedResource> resources;
+  final applied = Completer<bool>();
   @override
-  List<Object?> get props => [tiles];
+  List<Object?> get props => [resources];
+}
+
+class ConfirmResourceSaved extends IsomapGridEvent {
+  ConfirmResourceSaved(this.position, this.sent, this.record);
+  final GridPos position;
+  final PlacedResource sent;
+  final PersistedResource record;
+  final applied = Completer<bool>();
+}
+
+/// Future configuration UI/test intents; rendering only projects the kind.
+class ChangeResourceConfiguration extends IsomapGridEvent {
+  const ChangeResourceConfiguration(this.position, this.configuration);
+  final GridPos position;
+  final ResourceConfiguration configuration;
+  @override
+  List<Object?> get props => [position, configuration];
 }

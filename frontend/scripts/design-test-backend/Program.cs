@@ -21,20 +21,34 @@ if (args.Length > 1 && args[1] == "verify-resource")
     await connection.OpenAsync();
     await using var query = new NpgsqlCommand("""
         SELECT r."Id", r.design_id, r.x, r.y, r."Type", r.resource_type_id,
-               t."Code", d."Name", (SELECT COUNT(*) FROM resources WHERE design_id = @id)
+               t."Code", d."Name", (SELECT COUNT(*) FROM resources WHERE design_id = @id),
+               r.revision, c.schema_version, c.configuration->>'bucketName'
         FROM resources r JOIN resource_types t ON r.resource_type_id = t."Id"
-        JOIN designs d ON d."Id" = r.design_id WHERE r.design_id = @id
+        JOIN designs d ON d."Id" = r.design_id
+        LEFT JOIN resource_configurations c ON c.resource_id = r."Id"
+        WHERE r.design_id = @id ORDER BY r.y,r.x,r."Id"
         """, connection);
     query.Parameters.AddWithValue("id", Guid.Parse(args[2]));
     await using var row = await query.ExecuteReaderAsync();
-    if (!await row.ReadAsync() || row.GetGuid(1) != Guid.Parse(args[2]) ||
-        row.GetInt32(2) != 3 || row.GetInt32(3) != 2 ||
-        row.GetString(4) != "gcp.storage.bucket" || row.GetString(6) != "storage" ||
-        !row.GetString(7).StartsWith("Blacksmith Issue44 smoke ", StringComparison.Ordinal) || row.GetInt64(8) != 1)
-        throw new InvalidOperationException("SQL resource read-back did not match the dedicated frontend fixture.");
+    var ids = new HashSet<Guid>();
+    var index = 0;
+    while (await row.ReadAsync())
+    {
+        var first = index == 0;
+        if (index > 1 || !ids.Add(row.GetGuid(0)) || row.GetGuid(1) != Guid.Parse(args[2]) ||
+            row.GetInt32(2) != (first ? 3 : 1) || row.GetInt32(3) != (first ? 2 : 4) ||
+            row.GetString(4) != "gcp.storage.bucket" || row.GetString(6) != "storage" ||
+            !row.GetString(7).StartsWith("Blacksmith Issue53 smoke ", StringComparison.Ordinal) || row.GetInt64(8) != 2 ||
+            row.GetInt64(9) != (first ? 2 : 1) ||
+            (first ? row.IsDBNull(10) || row.GetInt32(10) != 1 || row.GetString(11) != "blacksmith-native-fixture"
+                   : !row.IsDBNull(10)))
+            throw new InvalidOperationException("SQL resource read-back did not match the dedicated two-resource frontend fixture.");
+        index++;
+    }
+    if (index != 2) throw new InvalidOperationException("Expected exactly two dedicated resources.");
     Console.WriteLine(JsonSerializer.Serialize(new { verified = true, database = db,
-        resource_id = row.GetGuid(0), design_id = row.GetGuid(1), x = row.GetInt32(2), y = row.GetInt32(3),
-        type = row.GetString(4), resource_type_id = row.GetGuid(5), catalog_code = row.GetString(6), count = row.GetInt64(8) }));
+        resource_ids = ids, design_id = args[2], count = index, configurations = 1,
+        coordinates = new[] { new { x = 3, y = 2 }, new { x = 1, y = 4 } } }));
     return;
 }
 if (args.Length > 1 && args[1] == "verify")

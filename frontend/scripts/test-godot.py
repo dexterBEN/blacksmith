@@ -161,7 +161,7 @@ def main():
             opened = json.loads((output / 'reopened.json').read_text())
             if saved['save_pid'] == opened['open_pid'] or not opened['restored']:
                 raise RuntimeError('A real complete application restart was not proved.')
-            print('BLACKSMITH_PERSISTENCE_RESTART_PASSED real_api=true resources=1 cloud_calls=0', flush=True)
+            print('BLACKSMITH_PERSISTENCE_RESTART_PASSED real_api=true resources=2 cloud_calls=0', flush=True)
         finally:
             (project / 'src/main.dart').write_bytes(original_main)
             (project / 'src/production_main.dart').unlink()

@@ -72,12 +72,13 @@ Existing Cloud Storage Resources also support a dedicated **Save-only configurat
 `GET` / `PUT /resources/{resourceId}/configuration`. It validates and stores a v1
 JSON document without changing metadata CRUD contracts or provisioning GCP resources.
 See the [configuration API contract](docs/backend/resource-configuration-api.md) for
-fields, canonical defaults, limits and migration prerequisites. Godot integration is future work.
+fields, canonical defaults, limits and migration prerequisites. A configuration dialog
+is future work; the editor already restores supported saved configurations.
 
 The backend also provides [atomic configured Resource persistence](docs/backend/resource-persistence-api.md):
 client UUIDs, conditional writes, per-resource revisions, unique Design/tile occupancy,
-and opt-in complete configuration read-back. These backend capabilities do not change
-the frontend's current single-placement Save/Open workflow.
+and opt-in complete configuration read-back. The frontend uses these aggregate reads
+to restore multiple Cloud Storage placements, including saved configurations.
 
 - A **Design** contains zero or more **Resources**.
 - Every persisted **Resource** belongs to exactly one **Design**.
@@ -88,11 +89,13 @@ the frontend's current single-placement Save/Open workflow.
 - EF Core database migrations are applied deliberately; the API does **not** automatically apply them at startup.
 
 **Integration boundary:** Selecting a tile and placing or replacing a service still
-updates local BLoC state only. **Save** explicitly persists one Cloud Storage
-representation to the active Design, using Blacksmith's Resource API and PostgreSQL.
-**Open** reads an existing Design by ID and restores its supported placement after
-a complete application restart. These operations do not provision GCP resources.
-The other three GCP representations and multi-resource arrangements remain local.
+updates local BLoC state only. **Save** explicitly persists multiple Cloud Storage
+representations to the active Design, using Blacksmith's Resource API and PostgreSQL.
+**Open** restores supported placements and configurations after a complete application
+restart. Palette placements have no configuration form yet, so Save creates metadata-only
+resources without inventing GCP settings. These operations do not provision GCP resources.
+The other three GCP representations remain local. Replacing a persisted resource with
+a different kind or deleting it through Save is not supported.
 
 ---
 
@@ -114,12 +117,13 @@ The **New Design** action creates a persistent Design through the existing
 This action requires the API and PostgreSQL. Set `BLACKSMITH_BACKEND_URL` before
 launching Godot to override `http://localhost:5100`; no GCP credentials are needed.
 Unsaved placements require explicit consent before they are cleared on successful
-creation. Cancellation and failures preserve them. Save supports exactly one Cloud
-Storage cube; repeated unchanged Save creates no additional row. A lost write response
-exposes **Check Save**, which reconciles through reads without blindly posting again.
-Cross-process/concurrent-write idempotency is not provided by the existing API.
+creation. Cancellation and failures preserve them. Save processes Cloud Storage cubes
+individually and retains each confirmed result if a later resource fails. Repeated
+unchanged Save creates no additional row. A lost write response exposes **Check Save**,
+which reconciles through reads without posting again. This guard is in memory;
+cross-process recovery of an unacknowledged metadata-only create is not guaranteed.
 Use **Copy ID**, completely quit, relaunch, then **Open** and paste that ID to restore
-the saved cube. Unsaved local changes require confirmation before Open replaces them.
+the saved cubes. Unsaved local changes require confirmation before Open replaces them.
 See [the Dart workflow](frontend/src/README.md) for the isolated persistence test.
 
 Prepare the Dart sources and generated bindings once, with the existing compatible
@@ -264,8 +268,8 @@ It does **not** verify deploying a whole architecture design or automatically sy
 
 ## 🧭 Roadmap and current limitations
 
-- Extend the initial **Design** creation integration to support resource persistence and reopening Designs.
-- Persist grid placements and load the resources belonging to a selected design.
+- Add a configuration editor for the supported Cloud Storage configuration contract.
+- Extend persistence beyond Cloud Storage and support deliberate resource removal/replacement.
 - Keep any future deployment action explicit and separate from local architecture editing.
 - Add explicit provisioning state, error handling, and recovery before combining cloud operations with database persistence.
 - Introduce **ResourceConnection** later; its GitHub issue exists, but implementation is deferred.
