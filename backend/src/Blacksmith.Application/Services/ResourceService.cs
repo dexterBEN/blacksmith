@@ -6,7 +6,7 @@ using Blacksmith.Application.Validation;
 
 namespace Blacksmith.Application.Services;
 
-public sealed class ResourceService(
+public sealed partial class ResourceService(
     IResourceRepository repository, IDesignRepository designs, IResourceTypeRepository resourceTypes) : IResourceService
 {
     public async Task<ResourceResponse> CreateAsync(CreateResourceRequest request, CancellationToken ct)
@@ -74,13 +74,14 @@ public sealed class ResourceService(
         resource.Type = request.Type.Trim();
         resource.X = request.X;
         resource.Y = request.Y;
+        resource.Revision = ResourceRevision.Next(resource.Revision);
         await repository.SaveChangesAsync(ct);
         return ToResponse(resource);
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
     {
-        var resource = await repository.GetByIdAsync(id, ct);
+        var resource = await repository.GetForUpdateAsync(id, ct);
         if (resource is null) return false;
 
         repository.Remove(resource);

@@ -9,6 +9,7 @@ namespace CloudServices.Api.Controllers;
 
 [ApiController]
 [Route("resources/{resourceId:guid}/configuration")]
+[ResourceConflictFilter]
 public sealed class ResourceConfigurationsController(IResourceConfigurationService configurations) : ControllerBase
 {
     [HttpGet]

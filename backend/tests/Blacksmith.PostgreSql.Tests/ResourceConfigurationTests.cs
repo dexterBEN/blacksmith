@@ -39,7 +39,7 @@ public sealed class ResourceConfigurationTests : PostgreSqlTestDatabase
     public async Task Two_resources_in_one_design_round_trip_nested_json_and_track_document_replacement()
     {
         var first = Resource();
-        var second = Resource(); // Even historical duplicate tile positions remain allowed in this issue.
+        var second = Resource(); // Distinct occupants; duplicate migration failure is covered by ResourceIntegrityMigrationTests.
         var firstId = first.Id;
         var secondId = second.Id;
         await using (var db = CreateContext())
@@ -184,11 +184,16 @@ public sealed class ResourceConfigurationTests : PostgreSqlTestDatabase
         var second = Resource();
         second.DesignId = design.Id;
         second.Type = "custom.legacy.type";
-        second.X = first.X;
+        second.X = first.X + 1;
         second.Y = first.Y;
         db.Designs.Add(design);
-        db.Resources.AddRange(first, second);
         await db.SaveChangesAsync();
+        // The old schema has no revision column: seed its exact historical columns.
+        foreach (var row in new[] { first, second })
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO resources("Id",design_id,resource_type_id,"Name","Type",x,y,created_at_utc)
+                VALUES ({row.Id},{row.DesignId},{row.ResourceTypeId},{row.Name},{row.Type},{row.X},{row.Y},{row.CreatedAtUtc})
+                """);
         db.ChangeTracker.Clear();
         var before = await OriginalRows();
         await migrator.MigrateAsync();
@@ -230,7 +235,7 @@ public sealed class ResourceConfigurationTests : PostgreSqlTestDatabase
         { name = "Renamed metadata", type = resource.Type, x = 4, y = 5 });
         Assert.Equal(HttpStatusCode.OK, update.StatusCode);
         var created = await client.PostAsJsonAsync("/resources", new
-        { name = "Still unconfigured", type = "custom.legacy", x = 4, y = 5, designId = LegacyDesign.Id });
+        { name = "Still unconfigured", type = "custom.legacy", x = 5, y = 5, designId = LegacyDesign.Id });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         await using (var db = CreateContext())
         {
@@ -250,10 +255,11 @@ public sealed class ResourceConfigurationTests : PostgreSqlTestDatabase
         Assert.Equal(0, factory.Cloud.Calls);
     }
 
-    private static ResourceEntity Resource() => new()
+    private int _nextTileColumn = 3;
+    private ResourceEntity Resource() => new()
     {
         Id = Guid.NewGuid(), DesignId = LegacyDesign.Id, Name = "Fixture resource", Type = "gcp.storage.bucket",
-        X = 3, Y = 2, CreatedAtUtc = new DateTime(2026, 10, 25, 0, 0, 0, DateTimeKind.Utc)
+        X = _nextTileColumn++, Y = 2, CreatedAtUtc = new DateTime(2026, 10, 25, 0, 0, 0, DateTimeKind.Utc)
     };
 
     private static ResourceConfiguration Configuration(Guid resourceId, string json, int version = 1) => new()
@@ -265,7 +271,7 @@ public sealed class ResourceConfigurationTests : PostgreSqlTestDatabase
     private Task<string> OriginalRows() => Scalar<string>("""
         SELECT jsonb_build_object(
             'designs',(SELECT jsonb_agg(to_jsonb(d) ORDER BY "Id") FROM designs d),
-            'resources',(SELECT jsonb_agg(to_jsonb(r) ORDER BY "Id") FROM resources r),
+            'resources',(SELECT jsonb_agg(to_jsonb(r)-'revision' ORDER BY "Id") FROM resources r),
             'resource_types',(SELECT jsonb_agg(to_jsonb(t) ORDER BY "Id") FROM resource_types t))::text
         """);
 }

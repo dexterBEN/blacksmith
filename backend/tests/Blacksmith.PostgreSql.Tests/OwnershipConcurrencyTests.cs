@@ -76,7 +76,7 @@ public sealed class OwnershipConcurrencyTests : PostgreSqlTestDatabase
         using var factory = new PostgreSqlApiFactory(ConnectionString);
         using var client = CreateClient(factory);
         var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(index => client.PostAsJsonAsync(
-            "/resources", new { name = $"Legacy {index}", type = "generic" })));
+            "/resources", new { name = $"Legacy {index}", type = "generic", x = index })));
         Assert.All(responses, response => Assert.Equal(HttpStatusCode.Created, response.StatusCode));
         await using var verification = CreateContext();
         Assert.Equal(LegacyDesign.Id, (await verification.Designs.SingleAsync()).Id);

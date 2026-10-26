@@ -82,7 +82,7 @@ public sealed class ApiContractTests : IDisposable
         var older = new ResourceEntity { Id = Guid.NewGuid(), DesignId = LegacyDesign.Id, Name = "Old", Type = "generic",
             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
         var newer = new ResourceEntity { Id = Guid.NewGuid(), DesignId = LegacyDesign.Id, Name = "New", Type = "generic",
-            CreatedAtUtc = older.CreatedAtUtc.AddDays(1) };
+            X = 1, CreatedAtUtc = older.CreatedAtUtc.AddDays(1) };
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<BlacksmithDbContext>();

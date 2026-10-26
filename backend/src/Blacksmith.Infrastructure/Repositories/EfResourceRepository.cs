@@ -33,6 +33,13 @@ public sealed class EfResourceRepository(BlacksmithDbContext db) : IResourceRepo
     public Task<ResourceConfiguration?> GetConfigurationAsync(Guid resourceId, CancellationToken ct) =>
         db.ResourceConfigurations.FirstOrDefaultAsync(configuration => configuration.ResourceId == resourceId, ct);
 
+    public Task<ResourceEntity?> GetAggregateAsync(Guid id, CancellationToken ct) =>
+        db.Resources.AsNoTracking().Include(x => x.Configuration).Include(x => x.ResourceType).SingleOrDefaultAsync(x => x.Id == id, ct);
+
+    public async Task<IReadOnlyList<ResourceEntity>> ListAggregatesAsync(Guid designId, CancellationToken ct) =>
+        await db.Resources.AsNoTracking().Include(x => x.Configuration).Include(x => x.ResourceType)
+            .Where(x => x.DesignId == designId).OrderBy(x => x.Y).ThenBy(x => x.X).ThenBy(x => x.Id).ToListAsync(ct);
+
     public Task<bool> HasConfigurationAsync(Guid resourceId, CancellationToken ct) =>
         db.ResourceConfigurations.AnyAsync(configuration => configuration.ResourceId == resourceId, ct);
 
@@ -48,6 +55,20 @@ public sealed class EfResourceRepository(BlacksmithDbContext db) : IResourceRepo
         {
             await db.SaveChangesAsync(ct);
             if (_transaction is not null) await _transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ResourceConflictException("revision_conflict", "The Resource changed. Read it before retrying.", 412);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+            { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: BlacksmithDbContext.ResourceTileIndex })
+        {
+            throw new ResourceConflictException("tile_occupied", "Another Resource occupies this Design tile.");
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+            { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "PK_resources" })
+        {
+            throw new ResourceConflictException("resource_exists", "The Resource ID already exists. Read it before reconciling this intent.", 412);
         }
         catch (DbUpdateException exception) when (exception.InnerException is PostgresException
         { SqlState: PostgresErrorCodes.ForeignKeyViolation, ConstraintName: BlacksmithDbContext.ResourceDesignForeignKey })

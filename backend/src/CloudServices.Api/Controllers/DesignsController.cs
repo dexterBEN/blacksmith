@@ -49,9 +49,10 @@ public sealed class DesignsController(IDesignService designs, IResourceService r
     }
 
     [HttpGet("{id:guid}/resources")]
-    public async Task<IActionResult> ListResources(Guid id, CancellationToken ct)
+    public async Task<IActionResult> ListResources(Guid id, CancellationToken ct, [FromQuery] string? include = null)
     {
-        try { return Ok(await resources.ListByDesignIdAsync(id, ct)); }
+        if (include is not null && include != "configuration") return BadRequest(new { code = "invalid_include", error = "Supported include: configuration." });
+        try { return include is null ? Ok(await resources.ListByDesignIdAsync(id, ct)) : Ok(await resources.ListAggregatesAsync(id, ct)); }
         catch (DesignNotFoundException exception) { return NotFound(new { error = exception.Message }); }
     }
 }

@@ -3,6 +3,7 @@ namespace Blacksmith.Domain.Entities;
 public sealed class ResourceEntity
 {
     public Guid Id { get; set; }
+    public long Revision { get; set; } = 1;
     public Guid DesignId { get; set; }
     public DesignEntity? Design { get; set; }
     public Guid? ResourceTypeId { get; set; }

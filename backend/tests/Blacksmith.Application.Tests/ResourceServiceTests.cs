@@ -297,6 +297,8 @@ public sealed class ResourceServiceTests
         }
 
         public void Add(ResourceEntity resource) => Resources.Add(resource);
+        public Task<ResourceEntity?> GetAggregateAsync(Guid id, CancellationToken ct) => GetByIdAsync(id, ct);
+        public Task<IReadOnlyList<ResourceEntity>> ListAggregatesAsync(Guid designId, CancellationToken ct) => ListByDesignIdAsync(designId, ct);
         public Task<ResourceEntity?> GetForUpdateAsync(Guid id, CancellationToken ct) => GetByIdAsync(id, ct);
         public Task<ResourceConfiguration?> GetConfigurationAsync(Guid id, CancellationToken ct)
         {
