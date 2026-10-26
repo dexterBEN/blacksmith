@@ -59,9 +59,35 @@ Full examples, recovery semantics, status codes and operator guidance: [resource
 
 ## Validation
 
-Working-tree verification: **210 passing tests** (96 application, 76 HTTP integration, 38 real PostgreSQL), zero failures/skips in the latest run. Release build: zero warnings/errors. Final committed-state verification is pending and will be recorded before publication.
+Tested implementation commit: **`96d75852c4296b2e0a4736dfb864a476edf59813`**. Its backend was exported through `git archive HEAD backend/src backend/tests backend/BlacksmithBackend.sln` into a fresh temporary directory, then restored, built and tested inside the Dev Container. No working-tree files or pre-existing bin/obj outputs were used. The final report-only commit retains the tested backend tree **`b4388c1ef2a5f6cce7fc49541e932d1313f1cc30`**.
 
-Tests run inside the existing backend Dev Container (SDK 8.0.426) against cached packages and disposable random PostgreSQL databases, not blacksmith_db. The container had been stopped and was restarted; the PostgreSQL/pgAdmin containers were already running. The ordinary API connection is overridden to an unused address and the credential path is nonexistent. Cloud services are replaced by fail-closed/recording test doubles; new HTTP/PostgreSQL scenarios assert zero cloud calls. No actual provider request is made.
+| Check | Final result |
+|---|---|
+| Cached-package restore | Passed; no dependency changes |
+| Full solution Release build | Passed, **0 warnings / 0 errors**, 9.36 seconds |
+| Application | **96 passed**, 0 failed, 0 skipped |
+| HTTP integration (SQLite) | **76 passed**, 0 failed, 0 skipped |
+| Real PostgreSQL | **38 passed**, 0 failed, 0 skipped |
+| Total | **210 passed**, 0 failed, 0 skipped; 39 new cases over the 171-case baseline |
+| Development database | Before/after metadata fingerprints and migration inventory identical |
+| Test cleanup | No random fixture databases remain |
+
+Executed inside the exported backend directory:
+
+```bash
+dotnet restore BlacksmithBackend.sln --source /root/.nuget/packages -p:NuGetAudit=false --nologo
+dotnet build BlacksmithBackend.sln -c Release --no-restore --nologo
+EXPORT=/tmp/blacksmith-issue51-final-_d0cr1ht/backend
+for suite in Blacksmith.Application.Tests Blacksmith.IntegrationTests Blacksmith.PostgreSql.Tests; do
+  dotnet test "tests/$suite/$suite.csproj" -c Release --no-build --no-restore \
+    --logger 'trx;LogFileName=results.trx' \
+    --results-directory "$EXPORT/results/$suite" --nologo --verbosity minimal
+done
+```
+
+The loop documents the same per-project commands executed by the validation runner. Package restore uses the existing local cache with online NuGet vulnerability auditing disabled. Logs, all three TRX files and parsed counters are retained outside Git at `/tmp/blacksmith-issue51-final-_d0cr1ht`; these are temporary local artifacts. Results and source hashes above are the durable PR record. No Dart/Godot tests were run for this backend-only change.
+
+Tests run inside the existing backend Dev Container (SDK 8.0.426) with PostgreSQL 16.15 against disposable random `blacksmith_issue7_<guid>` databases, not blacksmith_db. Their private administrative connection targets postgres and is inherited through the environment without credential values in command arguments/reports. Only databases created by each fixture are migrated/dropped. The container had been stopped and was restarted; the PostgreSQL/pgAdmin containers were already running. The ordinary API connection is overridden to an unused address and the credential path is nonexistent. Cloud services are replaced by fail-closed/recording test doubles; new HTTP/PostgreSQL scenarios assert zero cloud calls. No actual provider request is made.
 
 Coverage includes two independent configured Resources; stable-ID read-back after discarding a successful response; canonical/no-op/edit responses; stale/double updates; concurrent same-ID and same-tile creation; an observed competing PostgreSQL row-lock wait; rollback after child insert/update failure; concurrent parent deletion; legacy POST/PUT occupancy and owner changes; revision advancement through legacy routes; missing/invalid/secret-bearing payloads; populated migration/backfill, duplicate preflight failure and raw database uniqueness; legacy unconfigured/unsupported reads and deletion semantics. Existing ownership/catalog/configuration regressions remain enabled.
 
@@ -69,7 +95,7 @@ Initial test runs found 16 failures, then one remaining fixture failure. They ex
 
 ## Development database and remaining work
 
-Read-only preflight: blacksmith_db still has the four earlier migrations, no resource_configurations table and no duplicate tiles. Metadata fingerprints were recorded privately for post-test comparison. **No development migration is authorized or performed by this issue.** Before running this backend manually against that database, separately back it up/test restoration, inspect duplicates, apply PR #47's existing migration then this issue's migration, and verify counts/FKs/index/read-back. See the operator procedure in the contract document. The API does not migrate on startup.
+Read-only before/after checks: blacksmith_db still has the four earlier migrations, no resource_configurations table and no duplicate tiles. Fingerprints of all Design, Resource and catalog metadata and the migration inventory were identical after testing. **No development migration was performed by this issue.** Before running this backend manually against that database, separately authorize and perform backup/test restoration, inspect duplicates, apply PR #47's existing migration then this issue's migration, and verify counts/FKs/index/read-back. See the operator procedure in the contract document. The API does not migrate on startup.
 
 Known limits and next steps:
 
