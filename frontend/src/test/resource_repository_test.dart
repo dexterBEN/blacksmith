@@ -9,13 +9,17 @@ import 'package:blacksmith_front/domain/models/grid_position.dart';
 const designId = '12345678-1234-1234-1234-123456789abc';
 const resourceId = '22345678-1234-1234-1234-123456789abc';
 const storageId = '10000000-0000-0000-0000-000000000002';
-Map<String, Object> record() => {
+Map<String, Object?> record() => {
       'id': resourceId,
       'designId': designId,
       'x': 3,
       'y': 2,
       'type': 'gcp.storage.bucket',
-      'name': 'Cloud Storage'
+      'name': 'Cloud Storage',
+      'resourceTypeId': storageId,
+      'revision': 1,
+      'configurationState': 'absent',
+      'configuration': null,
     };
 http.Response catalog() => http.Response(
     jsonEncode([
@@ -60,6 +64,7 @@ void main() {
         client: MockClient((r) async {
           expect(r.method, 'GET');
           expect(r.url.path, '/designs/$designId/resources');
+          expect(r.url.queryParameters, {'include': 'configuration'});
           return http.Response(jsonEncode([record()]), 200);
         }));
     addTearDown(repo.close);

@@ -130,8 +130,8 @@ class DesignEditor3D {
                     ? 'Unsaved local placements will be replaced only after a successful load.'
                     : 'Current placements are unsaved. Confirm clearing them only after the API creates the new Design.')
                 : (opening
-                    ? 'Loads an empty Design or one saved Cloud Storage cube. No GCP operations.'
-                    : 'The new Design starts empty. Save one Cloud Storage placement explicitly.')));
+                    ? 'Loads all supported Cloud Storage placements and existing configurations. No GCP operations.'
+                    : 'The new Design starts empty. Save Cloud Storage placements explicitly; no bucket settings are invented.')));
     if (state.dialogOpen && !_wasOpen) _name.grabFocus();
     if (!state.dialogOpen && _wasOpen) _new.grabFocus();
     _wasOpen = state.dialogOpen;

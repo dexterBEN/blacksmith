@@ -81,8 +81,8 @@ automatically retried: a timeout or server failure can leave an already-created
 Design, so check `GET /designs` before manually submitting again.
 
 The active ID/name live in a shared `DesignCubit`, separate from `IsomapGridBloc`.
-They survive scene reloads but not application restarts. Resource placements are
-never saved, loaded, or provisioned by this workflow.
+They survive scene reloads but not application restarts. New Design only creates
+the Design; explicit Save/Open handles supported resource persistence as described below.
 
 From the repository root, with the same native prerequisites as the other tests:
 
@@ -113,16 +113,37 @@ The current locked generator may warn that its analyzer predates Dart 3.12.
 Generation is verified with the installed versions; do not upgrade dependencies
 just to suppress that warning. See the root issue report for executed checks.
 
-## Explicit one-resource persistence
+## Explicit multi-resource persistence
 
 The 3D header adds Save, Open-by-ID and Copy ID. DesignCubit coordinates a snapshot
 of the existing grid with ResourceRepository and DesignRepository. Save supports
-one Cloud Storage representation (`gcp.storage.bucket`, generic catalog code
-`storage`), with `x = column` and `y = row`. Only a matching Design/resource
-read-back marks the snapshot saved. Ambiguous writes expose read-only Check Save;
-no automatic POST retry is performed. Cross-process idempotency is outside the
-existing backend contract and this slice. Other kinds and multi-resource edits
-remain local. No GCP provisioning occurs.
+multiple Cloud Storage representations (`gcp.storage.bucket`, generic catalog code
+`storage`), with `x = column` and `y = row`. Each immutable grid entry keeps its
+local intent key, server ID, configuration, revision and ETag; `tiles` is only a
+derived kind projection for the existing renderers.
+
+Palette placement has no configuration form yet. Its explicit Save uses the legacy
+metadata-only POST; it never fabricates a project, bucket name or location. The
+repository also supports conditional configured PUT for explicit configuration
+intents and reads full aggregates via `include=configuration`. Open restores both
+configured and unconfigured Cloud Storage resources, validating the entire result
+before changing the grid. Unsupported records are reported without a partial restore.
+
+Only a matching Design/resource read-back marks a resource saved. If A succeeds
+and B fails, A stays confirmed and retry targets B. Ambiguous writes expose read-only
+Check Save; no automatic write retry is performed. Repeated unchanged Save/Open
+does not create rows or rebuild unchanged cube nodes. Configuration-only changes
+dirty the state without replacing the resource's identity.
+
+The uncertainty guard is in memory, not a durable journal. For a lost legacy POST
+response, it accepts only one new matching record absent from the preflight snapshot.
+This confirms the observed state, not which client created it; concurrent identical
+creates cannot be causally distinguished. Cross-process recovery of an unacknowledged
+legacy create is not guaranteed. Conditional configured creates instead retain their
+original client UUID. Other resource kinds remain local; persisted kind replacement
+and deletion synchronization are blocked rather than silently treated as saved.
+No GCP provisioning occurs. The backend's existing configuration/occupancy migrations
+must be applied deliberately to the target database before using this workflow.
 
 The existing test backend launcher creates a dedicated database from the existing
 migrations and sets an unusable GCP credential path for its API process. With that
@@ -133,13 +154,27 @@ python3 frontend/scripts/test-godot.py --persistence http://CONTAINER_IP:5144 --
 ```
 
 Run from the repository root (unlike the Dart commands above). This native test
-creates one dedicated Design, injects a genuine API 404 before saving, saves one
-Resource, fully exits Godot, then starts another process and opens the Design.
-It captures before-save and after-relaunch views. Network tracing permits only
-the dedicated API address. The normal production bootstrap is invoked in both
-phases; only test clients add cloud tripwires and the one read-fault injection.
+creates one dedicated Design, injects a genuine API 404 before saving, saves two
+Resources, drops the second committed POST's response, and reconciles by reads.
+It attaches one explicit test-only configuration, fully exits Godot, then starts
+another process and opens the same Design. It verifies stable IDs/revisions,
+configuration restore, repeated Open, scene reload and 960 × 640 framing.
+Captures come from the native viewport. Network tracing permits only the dedicated
+API address; test clients add cloud tripwires and fault injection around the
+unchanged production bootstrap.
+
+For configured conditional-create/update, conflict and lost-response integration
+checks against the same isolated API, run from `frontend/src`:
+
+```bash
+BLACKSMITH_INTEGRATION_BASE=http://CONTAINER_IP:5144 /usr/lib/dart/bin/dart run test_support/resource_api_integration.dart
+```
+
+Its explicit fixture project/bucket values are saved only to the temporary database;
+they are never passed to a cloud endpoint.
 
 Use `start-design-test-backend.py CONTAINER --verify-resource RUN_PATH DESIGN_ID`
-for independent SQL verification. Delete the dedicated Resource before its Design
-through the API, then use the launcher's `--stop RUN_PATH` to drop only the owned
-test database. See `issue_44_report.md` for actual results and evidence.
+for independent SQL verification of the two-resource native scenario. Use the
+launcher's `--stop RUN_PATH` to stop only that test API and drop only its owned
+test database. It does not remove a Docker container or volume. See
+`issue_53_report.md` at the repository root for actual results and evidence.

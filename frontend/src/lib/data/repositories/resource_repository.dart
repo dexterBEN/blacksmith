@@ -3,16 +3,21 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../domain/models/grid_position.dart';
 import '../../domain/models/persisted_resource.dart';
+import '../../domain/models/placed_resource.dart';
+import '../../domain/models/resource_configuration.dart';
 
 class ResourceFailure implements Exception {
-  const ResourceFailure(this.message, {this.ambiguous = false});
+  const ResourceFailure(this.message,
+      {this.ambiguous = false, this.code, this.status});
   final String message;
   final bool ambiguous;
+  final String? code;
+  final int? status;
   @override
   String toString() => message;
 }
 
-/// Existing metadata APIs only; one deliberate POST, no automatic write retry.
+/// Owns wire contracts. No Godot dependencies, provisioning or automatic retry.
 class ResourceRepository {
   ResourceRepository(
       {required String baseUrl,
@@ -46,7 +51,13 @@ class ResourceRepository {
 
   void _id(String id) {
     if (!PersistedResource.validId(id)) {
-      throw const ResourceFailure('Invalid Design identifier.');
+      throw const ResourceFailure('Invalid Resource or Design identifier.');
+    }
+  }
+
+  void _position(GridPos p, int rows, int cols) {
+    if (p.row < 0 || p.row >= rows || p.col < 0 || p.col >= cols) {
+      throw const ResourceFailure('The placement is outside the current grid.');
     }
   }
 
@@ -58,9 +69,10 @@ class ResourceRepository {
     } on Exception {
       throw ResourceFailure(
           write
-              ? 'Save outcome unknown. Use Check Save; no duplicate write will be sent.'
+              ? 'Save outcome unknown. Check Save reads the backend before another write.'
               : 'Unable to read backend data. Check the connection and try again.',
-          ambiguous: write);
+          ambiguous: write,
+          code: 'transport');
     }
   }
 
@@ -68,17 +80,177 @@ class ResourceRepository {
     try {
       return jsonDecode(response.body);
     } on FormatException {
-      throw ResourceFailure('The backend returned invalid resource data.',
-          ambiguous: write);
+      throw _invalid(write);
     }
+  }
+
+  ResourceFailure _invalid(bool write) => ResourceFailure(
+      'Unsupported or invalid backend data. The local grid is preserved.',
+      ambiguous: write,
+      code: 'invalid_response');
+
+  Never _error(http.Response response, {bool write = false}) {
+    final status = response.statusCode;
+    const codes = {
+      'tile_occupied',
+      'resource_exists',
+      'revision_conflict',
+      'resource_not_found',
+      'design_not_found',
+      'catalog_not_found',
+      'invalid_payload',
+      'precondition_required',
+      'resource_design_mismatch'
+    };
+    String? code;
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map &&
+          body['code'] is String &&
+          codes.contains(body['code'])) {
+        code = body['code'] as String;
+      }
+    } on FormatException {/* Only fixed messages cross the boundary. */}
+    final message = switch (status) {
+      400 =>
+        'The backend rejected the Resource data. Local changes are preserved.',
+      409 =>
+        'Resource or tile conflict. Open the Design to review backend changes.',
+      412 =>
+        'Resource identity or revision conflict. Read the original Resource before retrying.',
+      428 =>
+        'The backend requires a write precondition. No replacement write was sent.',
+      404 => 'The Design, Resource or catalog entry is missing.',
+      _ => 'The backend operation failed.'
+    };
+    throw ResourceFailure('$message (HTTP $status)',
+        status: status,
+        code: code,
+        ambiguous: write &&
+            !{400, 401, 403, 404, 409, 412, 413, 415, 428}.contains(status));
+  }
+
+  String _tag(String id, int revision) =>
+      '"resource-${id.replaceAll('-', '').toLowerCase()}-r$revision"';
+
+  PersistedResource _record(dynamic value, String designId, int rows, int cols,
+      {bool write = false}) {
+    if (value is! Map<String, dynamic>) throw _invalid(write);
+    final id = value['id'],
+        owner = value['designId'],
+        catalog = value['resourceTypeId'];
+    final x = value['x'], y = value['y'], revision = value['revision'];
+    if (id is! String ||
+        !PersistedResource.validId(id) ||
+        owner is! String ||
+        owner.toLowerCase() != designId.toLowerCase() ||
+        !value.containsKey('resourceTypeId') ||
+        catalog != null &&
+            (catalog is! String || !PersistedResource.validId(catalog)) ||
+        value['name'] is! String ||
+        (value['name'] as String).trim().isEmpty ||
+        value['type'] != PersistedResource.storageType ||
+        x is! int ||
+        y is! int ||
+        x < 0 ||
+        x >= cols ||
+        y < 0 ||
+        y >= rows ||
+        revision is! int ||
+        revision < 1 ||
+        !value.containsKey('configuration')) {
+      throw _invalid(write);
+    }
+    final state = value['configurationState'];
+    ResourceConfiguration? configuration;
+    if (state == 'validated') {
+      final envelope = value['configuration'];
+      if (envelope is! Map<String, dynamic> ||
+          envelope['resourceId'] is! String ||
+          (envelope['resourceId'] as String).toLowerCase() !=
+              id.toLowerCase() ||
+          envelope['schemaVersion'] != 1 ||
+          envelope['schemaVersion'] is! int ||
+          envelope['configuration'] is! Map<String, dynamic>) {
+        throw _invalid(write);
+      }
+      final fields = envelope['configuration'] as Map<String, dynamic>;
+      const allowed = {
+        'projectId',
+        'bucketName',
+        'location',
+        'storageClass',
+        'uniformBucketLevelAccess',
+        'publicAccessPrevention'
+      };
+      if (fields.keys.toSet().difference(allowed).isNotEmpty ||
+          fields.length != allowed.length ||
+          ['projectId', 'bucketName', 'location'].any((key) =>
+              fields[key] is! String ||
+              (fields[key] as String).trim().isEmpty) ||
+          fields['storageClass'] != 'STANDARD' ||
+          fields['uniformBucketLevelAccess'] != true ||
+          fields['publicAccessPrevention'] != 'enforced') {
+        throw _invalid(write);
+      }
+      configuration = ResourceConfiguration(schemaVersion: 1, values: fields);
+    } else if (state != 'absent' || value['configuration'] != null) {
+      throw ResourceFailure(
+          'This Design contains an unsupported configuration or resource. No partial load was applied.',
+          ambiguous: write,
+          code: 'unsupported_configuration');
+    }
+    return PersistedResource(
+        id: id.toLowerCase(),
+        designId: owner.toLowerCase(),
+        position: GridPos(y, x),
+        name: value['name'] as String,
+        type: value['type'] as String,
+        catalogId: (catalog as String?)?.toLowerCase(),
+        revision: revision,
+        etag: _tag(id, revision),
+        configuration: configuration,
+        configurationState: state as String);
+  }
+
+  Future<List<PersistedResource>> listForDesign(String designId,
+      {int rows = 6, int cols = 6}) async {
+    _id(designId);
+    final response = await _send(() => _client.get(
+        Uri.parse('$_base/designs/$designId/resources?include=configuration')));
+    if (response.statusCode != 200) _error(response);
+    final data = _json(response);
+    if (data is! List) throw _invalid(false);
+    final records =
+        data.map((row) => _record(row, designId, rows, cols)).toList();
+    if (records.map((r) => r.id).toSet().length != records.length ||
+        records.map((r) => r.position).toSet().length != records.length) {
+      throw const ResourceFailure(
+          'Duplicate Resource identities or occupied tiles. The local grid is preserved.',
+          code: 'duplicate_resources');
+    }
+    return List.unmodifiable(records);
+  }
+
+  Future<PersistedResource> getById(String designId, String id,
+      {int rows = 6, int cols = 6}) async {
+    _id(designId);
+    _id(id);
+    final response = await _send(() =>
+        _client.get(Uri.parse('$_base/resources/$id?include=configuration')));
+    if (response.statusCode != 200) _error(response);
+    final record = _record(_json(response), designId, rows, cols);
+    if (record.id != id.toLowerCase() ||
+        response.headers['etag'] != record.etag) {
+      throw _invalid(false);
+    }
+    return record;
   }
 
   Future<String> _storageCatalogId() async {
     final response =
         await _send(() => _client.get(Uri.parse('$_base/resource-types')));
-    if (response.statusCode != 200) {
-      throw const ResourceFailure('Unable to read the resource type catalog.');
-    }
+    if (response.statusCode != 200) _error(response);
     final data = _json(response);
     if (data is List) {
       final matches = data
@@ -95,64 +267,12 @@ class ResourceRepository {
         'The backend storage catalog entry is missing or invalid.');
   }
 
-  PersistedResource _record(dynamic json, String designId, int rows, int cols,
-      {bool scoped = true, bool write = false}) {
-    if (json is Map<String, dynamic> &&
-        json['id'] is String &&
-        PersistedResource.validId(json['id'] as String) &&
-        (!scoped ||
-            json['designId'] is String &&
-                (json['designId'] as String).toLowerCase() ==
-                    designId.toLowerCase()) &&
-        json['x'] is int &&
-        json['y'] is int &&
-        (json['x'] as int) >= 0 &&
-        (json['x'] as int) < cols &&
-        (json['y'] as int) >= 0 &&
-        (json['y'] as int) < rows &&
-        json['type'] == PersistedResource.storageType &&
-        json['name'] is String &&
-        (json['name'] as String).trim().isNotEmpty) {
-      return PersistedResource(
-          id: (json['id'] as String).toLowerCase(),
-          designId: designId.toLowerCase(),
-          position: GridPos(json['y'] as int, json['x'] as int),
-          name: json['name'] as String,
-          type: json['type'] as String);
-    }
-    throw ResourceFailure(
-        'Unsupported, invalid or incorrectly owned resource. '
-        'The local grid has not been replaced.',
-        ambiguous: write);
-  }
-
-  Future<List<PersistedResource>> listForDesign(String designId,
-      {int rows = 6, int cols = 6}) async {
-    _id(designId);
-    final response = await _send(
-        () => _client.get(Uri.parse('$_base/designs/$designId/resources')));
-    if (response.statusCode != 200) {
-      throw ResourceFailure(
-          'Unable to read Design resources (HTTP ${response.statusCode}).');
-    }
-    final data = _json(response);
-    if (data is! List || data.length > 1) {
-      throw const ResourceFailure('This workflow supports only an empty Design '
-          'or one Cloud Storage resource. Existing data is unchanged.');
-    }
-    return data.map((json) => _record(json, designId, rows, cols)).toList();
-  }
-
+  /// Transitional metadata-only POST. Its server ID must be read back before confirmation.
   Future<PersistedResource> createCloudStorage(
       String designId, GridPos position,
       {int rows = 6, int cols = 6}) async {
     _id(designId);
-    if (position.row < 0 ||
-        position.row >= rows ||
-        position.col < 0 ||
-        position.col >= cols) {
-      throw const ResourceFailure('The placement is outside the grid.');
-    }
+    _position(position, rows, cols);
     final catalog = await _storageCatalogId();
     final response = await _send(
         () => _client.post(Uri.parse('$_base/resources'),
@@ -166,26 +286,82 @@ class ResourceRepository {
               'y': position.row
             })),
         write: true);
-    if (response.statusCode != 201) {
-      throw ResourceFailure(
-          'Resource save failed (HTTP ${response.statusCode}). '
-          'Local placements are preserved.',
-          ambiguous: !{400, 401, 403, 404}.contains(response.statusCode));
+    if (response.statusCode != 201) _error(response, write: true);
+    final value = _json(response, write: true);
+    if (value is! Map<String, dynamic> ||
+        value['id'] is! String ||
+        !PersistedResource.validId(value['id'] as String) ||
+        value['x'] != position.col ||
+        value['y'] != position.row ||
+        value['type'] != PersistedResource.storageType ||
+        value['name'] != PersistedResource.displayName) {
+      throw _invalid(true);
+    }
+    return PersistedResource(
+        id: (value['id'] as String).toLowerCase(),
+        designId: designId.toLowerCase(),
+        position: position,
+        catalogId: catalog.toLowerCase());
+  }
+
+  /// Configured intents/test fixtures; no configuration is invented for palettes.
+  Future<PersistedResource> writeConfigured(
+      String designId, GridPos position, PlacedResource intent,
+      {int rows = 6, int cols = 6}) async {
+    _id(designId);
+    _position(position, rows, cols);
+    final id = (intent.id ?? intent.localKey).toLowerCase();
+    _id(id);
+    final config = intent.configuration;
+    if (config == null) {
+      throw const ResourceFailure(
+          'Complete explicit configuration is required.');
+    }
+    if (intent.id != null && intent.etag == null) {
+      throw const ResourceFailure('Read the Resource revision before editing.',
+          code: 'precondition_required');
+    }
+    final catalog = intent.catalogId ?? await _storageCatalogId();
+    final response = await _send(
+        () => _client.put(Uri.parse('$_base/designs/$designId/resources/$id'),
+            headers: {
+              'Content-Type': 'application/json',
+              if (intent.id == null)
+                'If-None-Match': '*'
+              else
+                'If-Match': intent.etag!
+            },
+            body: jsonEncode({
+              'name': intent.name,
+              'type': intent.type,
+              'resourceTypeId': catalog,
+              'x': position.col,
+              'y': position.row,
+              'configuration': {
+                'schemaVersion': config.schemaVersion,
+                'configuration': config.values
+              }
+            })),
+        write: true);
+    if (response.statusCode != (intent.id == null ? 201 : 200)) {
+      _error(response, write: true);
     }
     final record = _record(_json(response, write: true), designId, rows, cols,
-        scoped: false, write: true);
-    if (record.position != position ||
-        record.name != PersistedResource.displayName) {
-      throw const ResourceFailure(
-          'The save response did not match the placement.',
-          ambiguous: true);
+        write: true);
+    if (record.id != id ||
+        record.position != position ||
+        record.name != intent.name ||
+        record.catalogId != catalog.toLowerCase() ||
+        record.configuration != config) {
+      throw _invalid(true);
     }
     return record;
   }
 
   void close() {
-    if (_closed) return;
-    _closed = true;
-    _client.close();
+    if (!_closed) {
+      _closed = true;
+      _client.close();
+    }
   }
 }

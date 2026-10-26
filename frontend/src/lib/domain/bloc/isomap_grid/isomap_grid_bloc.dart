@@ -1,4 +1,5 @@
 import 'package:bloc/bloc.dart';
+import '../../models/resource_kind.dart';
 import 'isomap_grid_event.dart';
 import 'isomap_grid_state.dart';
 
@@ -8,9 +9,38 @@ class IsomapGridBloc extends Bloc<IsomapGridEvent, IsomapGridState> {
     int cols = IsomapGridState.defaultCols,
   }) : super(IsomapGridState.initial(rows: rows, cols: cols)) {
     on<RestoreDesignResources>((event, emit) {
-      if (event.tiles.keys.every(state.contains)) {
-        emit(state.copyWith(tiles: event.tiles, clearSelection: true));
+      var accepted = false;
+      try {
+        if (event.resources.keys.every(state.contains)) {
+          emit(
+              state.copyWith(resources: event.resources, clearSelection: true));
+          accepted = true;
+        }
+      } on ArgumentError {
+        // Reject the entire invalid snapshot; never partially hydrate.
       }
+      event.applied.complete(accepted);
+    });
+    on<ConfirmResourceSaved>((event, emit) {
+      final current = state.resources[event.position];
+      final accepted = current != null &&
+          current.localKey == event.sent.localKey &&
+          current.kind == event.sent.kind;
+      if (accepted) {
+        emit(state.copyWith(resources: {
+          ...state.resources,
+          event.position: current.confirm(event.record, event.sent)
+        }));
+      }
+      event.applied.complete(accepted);
+    });
+    on<ChangeResourceConfiguration>((event, emit) {
+      final current = state.resources[event.position];
+      if (current == null || current.kind != ResourceKind.cloudStorage) return;
+      emit(state.copyWith(resources: {
+        ...state.resources,
+        event.position: current.withConfiguration(event.configuration)
+      }));
     });
     on<TileClicked>(_onTileClicked);
     on<PlaceResource>(_onPlaceResource);
@@ -40,6 +70,8 @@ class IsomapGridBloc extends Bloc<IsomapGridEvent, IsomapGridState> {
   ) {
     final selected = state.selected;
     if (selected == null) return;
+    final previous = state.resources[selected];
+    if (previous?.kind == event.kind || previous?.id != null) return;
     emit(state.copyWith(
       tiles: {...state.tiles, selected: event.kind},
     ));

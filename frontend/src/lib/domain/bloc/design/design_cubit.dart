@@ -8,6 +8,7 @@ import '../../models/design.dart';
 import '../../models/grid_position.dart';
 import '../../models/persisted_resource.dart';
 import '../../models/resource_kind.dart';
+import '../../models/placed_resource.dart';
 import '../isomap_grid/isomap_grid_bloc.dart';
 import '../isomap_grid/isomap_grid_event.dart';
 import '../isomap_grid/isomap_grid_state.dart';
@@ -105,10 +106,10 @@ class DesignCubit extends Cubit<DesignState> {
   DesignCubit(this._repository, this._grid, {ResourceRepository? resources})
       : _resources = resources,
         super(const DesignState()) {
-    _observed = _grid.state.tiles;
+    _observed = _grid.state.resources;
     _subscription = _grid.stream.listen((grid) {
-      if (!_equal.equals(_observed, grid.tiles)) {
-        _observed = grid.tiles;
+      if (!_equal.equals(_observed, grid.resources)) {
+        _observed = grid.resources;
         if (!isClosed && !state.pending) _feedback();
       }
     });
@@ -117,48 +118,60 @@ class DesignCubit extends Cubit<DesignState> {
   final ResourceRepository? _resources;
   final IsomapGridBloc _grid;
   late final StreamSubscription<IsomapGridState> _subscription;
-  late Map<GridPos, ResourceKind> _observed;
-  Map<GridPos, ResourceKind>? _confirmed;
-  PersistedResource? _record;
+  late Map<GridPos, PlacedResource> _observed;
+  Map<GridPos, PlacedResource>? _confirmed;
   String? _saveProblem;
-  final _attempts = <String, ({GridPos position, String? id})>{};
-  static const _equal = MapEquality<GridPos, ResourceKind>();
-
+  final _attempts = <String, Map<String, _PendingResourceSave>>{};
+  static const _equal = MapEquality<GridPos, PlacedResource>();
   bool get supportsPersistence => _resources != null;
   bool get _dirty => _confirmed == null
-      ? _grid.state.tiles.isNotEmpty
-      : !_equal.equals(_confirmed, _grid.state.tiles);
-  bool get _supported =>
-      _grid.state.tiles.length == 1 &&
-      _grid.state.tiles.values.single == ResourceKind.cloudStorage;
+      ? _grid.state.resources.isNotEmpty
+      : !_equal.equals(_confirmed, _grid.state.resources);
+  bool get _supported => _grid.state.resources.values.every((r) =>
+      r.kind == ResourceKind.cloudStorage &&
+      (r.configuration == null || r.configuration!.schemaVersion == 1));
+  bool get _unsupportedRemoval =>
+      _confirmed?.entries.any(
+          (entry) => _grid.state.resources[entry.key]?.id != entry.value.id) ??
+      false;
+  Map<String, _PendingResourceSave> _pending(String designId) =>
+      _attempts.putIfAbsent(designId.toLowerCase(), () => {});
+
   void _feedback() {
     if (isClosed) return;
     final uncertain = state.active != null &&
-        _attempts.containsKey(state.active!.id.toLowerCase());
-    final saved = state.active != null && _confirmed != null && !_dirty;
-    final enabled = _resources != null &&
-        state.active != null &&
-        (uncertain || _supported && !saved && _record == null);
+        (_attempts[state.active!.id.toLowerCase()]?.isNotEmpty ?? false);
+    final saved =
+        state.active != null && _confirmed != null && !_dirty && !uncertain;
+    final count = _grid.state.resources.length;
+    final unconfigured = _grid.state.resources.values
+        .where((r) => r.configuration == null)
+        .length;
     final message = _saveProblem != null
         ? '${_saveProblem!}${uncertain ? " Outcome unknown; Check Save is read only." : ""}'
-        : (state.active == null
+        : state.active == null
             ? 'Create or open a Design to save.'
             : uncertain
-                ? 'Save outcome unknown. Check Save reads the backend without another POST.'
+                ? 'Save outcome unknown. Check Save reads the backend without another write.'
                 : saved
-                    ? (_record == null
+                    ? (count == 0
                         ? 'Empty Design · No resource saved'
-                        : 'Saved · Verified by backend read-back')
-                    : _grid.state.tiles.isEmpty
-                        ? 'No placement to save.'
+                        : 'Saved placements: $count · Unconfigured: $unconfigured · No deployment')
+                    : _unsupportedRemoval
+                        ? 'Unsaved · Removing or replacing persisted resources is not supported. Open to restore them.'
                         : !_supported
-                            ? 'Unsaved · Only one Cloud Storage cube can be saved in this workflow.'
-                            : _record != null
-                                ? 'Unsaved · Replacement and deletion synchronization are not supported.'
-                                : 'Unsaved · Save the Cloud Storage placement explicitly.');
+                            ? 'Unsaved · Only Cloud Storage persistence is supported; other kinds remain local.'
+                            : count == 0
+                                ? 'No placement to save.'
+                                : 'Unsaved · Save Cloud Storage placements explicitly. Configuration is not invented.';
     emit(state.copyWith(
-        canSave: enabled && !state.pending && !state.dialogOpen,
-        saved: saved && !uncertain,
+        canSave: _resources != null &&
+            state.active != null &&
+            (uncertain ||
+                _supported && !_unsupportedRemoval && _dirty && count > 0) &&
+            !state.pending &&
+            !state.dialogOpen,
+        saved: saved,
         saveUncertain: uncertain,
         persistenceMessage: message));
   }
@@ -171,7 +184,7 @@ class DesignCubit extends Cubit<DesignState> {
         error: null,
         mode: DesignDialogMode.create,
         status: DesignStatus.editing,
-        requiresDiscard: _grid.state.tiles.isNotEmpty,
+        requiresDiscard: _grid.state.resources.isNotEmpty,
         discardApproved: false));
     _feedback();
   }
@@ -223,7 +236,7 @@ class DesignCubit extends Cubit<DesignState> {
     if (isClosed || !state.dialogOpen || state.pending) return;
     if (state.mode == DesignDialogMode.open) return _load();
     final invalid = Design.validateName(state.name);
-    final placements = _grid.state.tiles.isNotEmpty;
+    final placements = _grid.state.resources.isNotEmpty;
     if (invalid != null || placements && !state.discardApproved) {
       emit(state.copyWith(
           error: invalid ?? 'Confirm clearing the unsaved local placements.',
@@ -235,55 +248,113 @@ class DesignCubit extends Cubit<DesignState> {
     try {
       final design = await _repository.create(name);
       if (isClosed) return;
-      _confirmed = const {};
-      _record = null;
-      _saveProblem = null;
       await _hydrate(const {});
       if (isClosed) return;
+      _confirmed = const {};
+      _saveProblem = null;
       emit(DesignState(active: design));
       _feedback();
-    } on DesignFailure catch (failure) {
-      if (!isClosed) {
-        emit(state.copyWith(
-            status: DesignStatus.failure, error: failure.message));
-      }
-    } on Exception {
+    } on Exception catch (failure) {
       if (!isClosed) {
         emit(state.copyWith(
             status: DesignStatus.failure,
-            error:
-                'Design creation could not be confirmed. Check the API before submitting again.'));
+            error: failure is DesignFailure
+                ? failure.message
+                : 'Design creation could not be confirmed. Check the API before submitting again.'));
       }
     }
   }
 
-  Future<void> _hydrate(Map<GridPos, ResourceKind> tiles) async {
-    if (_equal.equals(_grid.state.tiles, tiles) &&
-        _grid.state.selected == null) {
-      return;
+  Future<void> _hydrate(Map<GridPos, PlacedResource> resources) async {
+    if (_grid.isClosed) {
+      throw const ResourceFailure('The editor state is closed.');
     }
-    final applied = _grid.stream
-        .firstWhere((s) => _equal.equals(s.tiles, tiles) && s.selected == null);
-    _grid.add(RestoreDesignResources(tiles));
-    await applied;
+    final event = RestoreDesignResources.resources(resources);
+    _grid.add(event);
+    if (!await event.applied.future) {
+      throw const ResourceFailure(
+          'The complete Design snapshot could not be restored.');
+    }
   }
 
-  bool _matches(PersistedResource record, GridPos position, {String? id}) =>
-      record.position == position &&
-      record.type == PersistedResource.storageType &&
-      (id == null || record.id == id);
   Future<List<PersistedResource>> _read(String id) => _resources!
       .listForDesign(id, rows: _grid.state.rows, cols: _grid.state.cols);
-  void _validateAttempt(String id, List<PersistedResource> records) {
-    final attempt = _attempts[id.toLowerCase()];
-    if (attempt != null &&
-        (records.length != 1 ||
-            !_matches(records.single, attempt.position, id: attempt.id))) {
+
+  bool _matches(PersistedResource row, _PendingResourceSave attempt) =>
+      row.position == attempt.position &&
+      row.type == attempt.sent.type &&
+      row.name == attempt.sent.name &&
+      row.configuration == attempt.sent.configuration &&
+      row.configurationState ==
+          (attempt.sent.configuration == null ? 'absent' : 'validated') &&
+      (attempt.sent.catalogId == null ||
+          row.catalogId == attempt.sent.catalogId) &&
+      (attempt.ack == null ||
+          row.id == attempt.ack!.id &&
+              row.revision == attempt.ack!.revision &&
+              (attempt.ack!.catalogId == null ||
+                  row.catalogId == attempt.ack!.catalogId));
+
+  PersistedResource _resolve(
+      _PendingResourceSave attempt, List<PersistedResource> rows) {
+    final id = (attempt.ack?.id ??
+            attempt.sent.id ??
+            (attempt.sent.configuration != null ? attempt.sent.localKey : null))
+        ?.toLowerCase();
+    final candidates = rows
+        .where((row) => id != null
+            ? row.id == id
+            : !attempt.beforeIds.contains(row.id) &&
+                row.position == attempt.position &&
+                row.revision == 1)
+        .toList();
+    if (candidates.length != 1 || !_matches(candidates.single, attempt)) {
       throw const ResourceFailure(
-          'Save outcome remains unknown. No new write will be sent. '
-          'Wait and use Check Save again.',
+          'Save outcome remains unknown or conflicts with backend state. No new write will be sent. Use Check Save again.',
           ambiguous: true);
     }
+    return candidates.single;
+  }
+
+  void _verifyBaseline(List<PersistedResource> rows,
+      {Set<String> replacing = const {}}) {
+    final baseline = _confirmed ?? const <GridPos, PlacedResource>{};
+    for (final entry in baseline.entries) {
+      final resource = entry.value;
+      if (replacing.contains(resource.id)) continue;
+      final found = rows.where((r) => r.id == resource.id).toList();
+      if (found.length != 1 ||
+          PlacedResource.fromPersisted(found.single,
+                  localKey: resource.localKey) !=
+              resource ||
+          found.single.position != entry.key) {
+        throw const ResourceFailure(
+            'The backend Design changed. Open it before saving; local changes are preserved.',
+            code: 'snapshot_changed');
+      }
+    }
+    final allowed = {
+      ...baseline.values.map((r) => r.id).whereType<String>(),
+      ...replacing
+    };
+    if (rows.any((r) => !allowed.contains(r.id))) {
+      throw const ResourceFailure(
+          'The backend contains unrelated resources. Open the Design before saving; none were overwritten.',
+          code: 'unrelated_resources');
+    }
+  }
+
+  Future<void> _accept(
+      _PendingResourceSave attempt, PersistedResource record) async {
+    _confirmed = Map.unmodifiable({
+      ...?_confirmed,
+      attempt.position:
+          PlacedResource.fromPersisted(record, localKey: attempt.sent.localKey)
+    });
+    if (_grid.isClosed || isClosed) return;
+    final event = ConfirmResourceSaved(attempt.position, attempt.sent, record);
+    _grid.add(event);
+    await event.applied.future;
   }
 
   Future<void> _load() async {
@@ -303,9 +374,12 @@ class DesignCubit extends Cubit<DesignState> {
     try {
       final design = await _repository.getById(id);
       if (isClosed) return;
-      final records = await _read(id);
+      final rows = await _read(id);
       if (isClosed) return;
-      _validateAttempt(id, records);
+      for (final attempt
+          in (_attempts[id]?.values ?? <_PendingResourceSave>[])) {
+        _resolve(attempt, rows);
+      }
       if (_dirty && !state.discardApproved) {
         emit(state.copyWith(
             status: DesignStatus.failure,
@@ -314,14 +388,13 @@ class DesignCubit extends Cubit<DesignState> {
                 'Local placements changed while loading. Confirm replacement and open again.'));
         return;
       }
-      final tiles = {
-        for (final r in records) r.position: ResourceKind.cloudStorage
+      final resources = {
+        for (final row in rows) row.position: PlacedResource.fromPersisted(row)
       };
-      await _hydrate(tiles);
+      await _hydrate(resources);
       if (isClosed) return;
+      _confirmed = Map.unmodifiable(resources);
       _attempts.remove(id);
-      _confirmed = Map.unmodifiable(tiles);
-      _record = records.isEmpty ? null : records.single;
       _saveProblem = null;
       emit(DesignState(active: design));
       _feedback();
@@ -347,60 +420,71 @@ class DesignCubit extends Cubit<DesignState> {
       return;
     }
     final design = state.active!;
-    final snapshot = Map<GridPos, ResourceKind>.unmodifiable(_grid.state.tiles);
-    final oldAttempt = _attempts[design.id.toLowerCase()];
-    if (oldAttempt == null &&
-        (!_supported ||
-            _record != null ||
-            _equal.equals(_confirmed, snapshot))) {
-      _feedback();
-      return;
-    }
-    final position = oldAttempt?.position ?? snapshot.keys.single;
+    final snapshot =
+        Map<GridPos, PlacedResource>.unmodifiable(_grid.state.resources);
+    final attempts = _pending(design.id);
+    final checking = attempts.isNotEmpty;
     _saveProblem = null;
     emit(state.copyWith(
         status: DesignStatus.saving,
         canSave: false,
         saved: false,
         persistenceMessage:
-            oldAttempt == null ? 'Saving…' : 'Checking Save… (read only)'));
+            checking ? 'Checking Save… (read only)' : 'Saving placements…'));
     try {
-      // All preflight reads finish before the single possible non-idempotent POST.
       await _repository.getById(design.id);
       if (isClosed) return;
-      var records = await _read(design.id);
+      var rows = await _read(design.id);
       if (isClosed) return;
-      if (oldAttempt != null) {
-        _validateAttempt(design.id, records);
-      } else if (records.isEmpty) {
-        _attempts[design.id.toLowerCase()] = (position: position, id: null);
-        try {
-          final created = await _resources.createCloudStorage(
-              design.id, position,
-              rows: _grid.state.rows, cols: _grid.state.cols);
+      if (checking) {
+        final resolved = {
+          for (final entry in attempts.entries)
+            entry.key: _resolve(entry.value, rows)
+        };
+        _verifyBaseline(rows,
+            replacing: resolved.values.map((r) => r.id).toSet());
+        for (final key in resolved.keys) {
+          await _accept(attempts[key]!, resolved[key]!);
           if (isClosed) return;
-          _attempts[design.id.toLowerCase()] =
-              (position: position, id: created.id);
+          attempts.remove(key);
+        }
+        return; // Check Save never starts another write, even after recovery.
+      }
+      _verifyBaseline(rows);
+      for (final entry in snapshot.entries) {
+        final position = entry.key, intent = entry.value;
+        if (_confirmed?[position] == intent) continue;
+        if (intent.id != null && intent.configuration == null) {
+          throw const ResourceFailure(
+              'Editing, replacing or deleting persisted metadata-only resources is not supported. Open to restore them.');
+        }
+        final attempt = _PendingResourceSave(
+            position, intent, rows.map((r) => r.id).toSet());
+        attempts[intent.localKey] = attempt;
+        try {
+          attempt.ack = intent.configuration == null
+              ? await _resources.createCloudStorage(design.id, position,
+                  rows: _grid.state.rows, cols: _grid.state.cols)
+              : await _resources.writeConfigured(design.id, position, intent,
+                  rows: _grid.state.rows, cols: _grid.state.cols);
+          if (isClosed) return;
+          await _repository.getById(design.id);
+          if (isClosed) return;
+          rows = await _read(design.id);
+          if (isClosed) return;
+          final record = _resolve(attempt, rows);
+          _verifyBaseline(rows, replacing: {record.id});
+          await _accept(attempt, record);
+          if (isClosed) return;
+          attempts.remove(intent.localKey);
         } on ResourceFailure catch (failure) {
-          if (!failure.ambiguous) _attempts.remove(design.id.toLowerCase());
+          // Once a write returned successfully, a later read failure is still uncertain.
+          if (!failure.ambiguous && attempt.ack == null) {
+            attempts.remove(intent.localKey);
+          }
           rethrow;
         }
-        // A 201 alone never sets confirmed/saved state.
-        await _repository.getById(design.id);
-        if (isClosed) return;
-        records = await _read(design.id);
-        if (isClosed) return;
-        _validateAttempt(design.id, records);
       }
-      if (records.length != 1 || !_matches(records.single, position)) {
-        throw const ResourceFailure(
-            'The backend snapshot does not match this placement. '
-            'Existing resources were not overwritten.');
-      }
-      if (isClosed) return;
-      _record = records.single;
-      _confirmed = Map.unmodifiable({position: ResourceKind.cloudStorage});
-      _attempts.remove(design.id.toLowerCase());
     } on Exception catch (failure) {
       if (!isClosed) {
         _saveProblem = failure is DesignFailure
@@ -422,4 +506,13 @@ class DesignCubit extends Cubit<DesignState> {
     await _subscription.cancel();
     return super.close();
   }
+}
+
+class _PendingResourceSave {
+  _PendingResourceSave(this.position, this.sent, Set<String> beforeIds)
+      : beforeIds = Set.unmodifiable(beforeIds);
+  final GridPos position;
+  final PlacedResource sent;
+  final Set<String> beforeIds;
+  PersistedResource? ack;
 }
