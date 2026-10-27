@@ -59,3 +59,15 @@ text = "Cancel"
 
 [node name="Save" type="Button" parent="Shade/Dialog"]
 text = "Save configuration"
+
+[node name="Review" type="Label" parent="Shade/Dialog"]
+autowrap_mode = 3
+mouse_filter = 2
+theme_override_font_sizes/font_size = 14
+
+[node name="Consent" type="CheckButton" parent="Shade/Dialog"]
+text = "I approve this target and possible Google Cloud charges."
+theme_override_font_sizes/font_size = 14
+
+[node name="Deploy" type="Button" parent="Shade/Dialog"]
+text = "Save & Deploy"

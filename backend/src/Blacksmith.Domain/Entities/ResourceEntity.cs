@@ -9,6 +9,7 @@ public sealed class ResourceEntity
     public Guid? ResourceTypeId { get; set; }
     public ResourceTypeEntity? ResourceType { get; set; }
     public ResourceConfiguration? Configuration { get; set; }
+    public ICollection<StorageDeployment> Deployments { get; set; } = [];
     public string Name { get; set; } = string.Empty;
     public int X { get; set; }
     public int Y { get; set; }

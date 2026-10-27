@@ -22,6 +22,7 @@ void setupServiceLocator({
   http.Client? httpClient,
   http.Client? designHttpClient,
   http.Client? resourceHttpClient,
+  String? deploymentToken,
 }) {
   if (!sl.isRegistered<CloudServicesApi>()) {
     sl.registerLazySingleton<CloudServicesApi>(
@@ -52,7 +53,10 @@ void setupServiceLocator({
   }
   if (!sl.isRegistered<ResourceRepository>()) {
     sl.registerLazySingleton<ResourceRepository>(
-      () => ResourceRepository(baseUrl: baseUrl, client: resourceHttpClient),
+      () => ResourceRepository(
+          baseUrl: baseUrl,
+          client: resourceHttpClient,
+          deploymentToken: deploymentToken),
       dispose: (repository) => repository.close(),
     );
   }

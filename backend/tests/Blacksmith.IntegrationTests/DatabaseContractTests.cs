@@ -34,12 +34,13 @@ public sealed class DatabaseContractTests
         using var db = CreatePostgreSqlModel();
 
         var migrations = db.Database.GetMigrations().ToArray();
-        Assert.Equal(6, migrations.Length);
+        Assert.Equal(7, migrations.Length);
         Assert.Equal(new[] { "20251229003351_InitialCreate", "20251229011642_AddResourcesTable" }, migrations.Take(2));
         Assert.EndsWith("_AddDesignOwnership", migrations[2]);
         Assert.EndsWith("_AddResourceTypeCatalog", migrations[3]);
         Assert.EndsWith("_AddResourceConfigurations", migrations[4]);
         Assert.EndsWith("_EnforceResourceIdentityAndOccupancy", migrations[5]);
+        Assert.EndsWith("_AddStorageDeployments", migrations[6]);
         Assert.False(db.Database.HasPendingModelChanges());
     }
 
@@ -47,7 +48,7 @@ public sealed class DatabaseContractTests
     public void PostgreSql_mapping_keeps_existing_table_columns_and_constraints()
     {
         using var db = CreatePostgreSqlModel();
-        Assert.Equal(4, db.Model.GetEntityTypes().Count());
+        Assert.Equal(6, db.Model.GetEntityTypes().Count());
         var entity = db.Model.FindEntityType(typeof(ResourceEntity))!;
         Assert.Equal(typeof(ResourceEntity), entity.ClrType);
         Assert.Equal("resources", entity.GetTableName());

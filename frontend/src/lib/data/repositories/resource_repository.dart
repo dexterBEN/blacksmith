@@ -1,3 +1,4 @@
+import '../../domain/models/storage_deployment.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -23,10 +24,12 @@ class ResourceRepository {
   ResourceRepository(
       {required String baseUrl,
       http.Client? client,
-      Duration requestTimeout = const Duration(seconds: 15)})
+      Duration requestTimeout = const Duration(seconds: 30),
+      String? deploymentToken})
       : _base = _validateUrl(baseUrl),
         _client = client ?? http.Client(),
-        _timeout = requestTimeout {
+        _timeout = requestTimeout,
+        _deploymentToken = deploymentToken {
     if (_timeout <= Duration.zero) {
       throw ArgumentError('Invalid request timeout.');
     }
@@ -35,6 +38,164 @@ class ResourceRepository {
   final http.Client _client;
   final Duration _timeout;
   bool _closed = false;
+  final String? _deploymentToken;
+  bool get deploymentEnabled => (_deploymentToken?.length ?? 0) >= 32;
+  String deploymentReview(String text) {
+    final config = parseConfiguration(text);
+    return 'Project: ${config.values['projectId']} · Bucket: ${config.values['bucketName']}\n'
+        'Location: ${config.values['location']} · STANDARD · uniform access · public access blocked';
+  }
+
+  StorageDeployment _deployment(
+      dynamic value, String designId, String resourceId,
+      {bool write = false}) {
+    if (value is! Map<String, dynamic> ||
+        value['id'] is! String ||
+        !PersistedResource.validId(value['id'] as String) ||
+        value['resourceId'] != resourceId ||
+        value['designId'] != designId ||
+        value['resourceRevision'] is! int ||
+        (value['resourceRevision'] as int) < 1 ||
+        !{'pending', 'succeeded', 'failed', 'unknown'}
+            .contains(value['status']) ||
+        value['code'] is! String ||
+        !RegExp(r'^[a-z_]{1,60}$').hasMatch(value['code'] as String) ||
+        value['ownershipVerified'] is! bool ||
+        value['status'] == 'succeeded' && value['ownershipVerified'] != true ||
+        ['projectId', 'bucketName', 'location'].any((key) =>
+            value[key] is! String ||
+            !RegExp(r'^[a-z0-9-]{1,63}$').hasMatch(value[key] as String))) {
+      throw _invalid(write);
+    }
+    return StorageDeployment(
+        id: value['id'] as String,
+        resourceId: resourceId,
+        designId: designId,
+        resourceRevision: value['resourceRevision'] as int,
+        projectId: value['projectId'] as String,
+        bucketName: value['bucketName'] as String,
+        location: value['location'] as String,
+        status: value['status'] as String,
+        code: value['code'] as String,
+        ownershipVerified: value['ownershipVerified'] as bool);
+  }
+
+  Map<String, String> _deploymentHeaders({bool consent = false, String? etag}) {
+    if (!deploymentEnabled) {
+      throw const ResourceFailure(
+          'Deployment is disabled. Configure local deployment authorization first.');
+    }
+    return {
+      'X-Blacksmith-Deployment-Token': _deploymentToken!,
+      if (consent) 'X-Blacksmith-Deploy-Consent': 'true',
+      if (etag != null) 'If-Match': etag
+    };
+  }
+
+  String _operationRoute(String design, String resource, String operation) {
+    _id(design);
+    _id(resource);
+    _id(operation);
+    return '$_base/designs/$design/resources/$resource/deployments/$operation';
+  }
+
+  /// One deliberate command; never automatically retried by this repository.
+  Future<PersistedResource> saveAndDeploy(String designId, GridPos position,
+      PlacedResource intent, String operationId,
+      {required bool consent, int rows = 6, int cols = 6}) async {
+    if (!consent) {
+      throw const ResourceFailure(
+          'Review and approve the exact target and possible charges first.');
+    }
+    _position(position, rows, cols);
+    final id = intent.id ?? intent.localKey;
+    final route = _operationRoute(designId, id, operationId);
+    final config = intent.configuration;
+    if (config == null || intent.id != null && intent.etag == null) {
+      throw const ResourceFailure(
+          'A complete configuration and original revision are required.');
+    }
+    final catalog = intent.catalogId ?? await _storageCatalogId();
+    final response = await _send(
+        () => _client.put(Uri.parse(route),
+            headers: {
+              ..._deploymentHeaders(consent: true),
+              'Content-Type': 'application/json',
+              if (intent.id == null)
+                'If-None-Match': '*'
+              else
+                'If-Match': intent.etag!
+            },
+            body: jsonEncode({
+              'name': intent.name,
+              'type': intent.type,
+              'resourceTypeId': catalog,
+              'x': position.col,
+              'y': position.row,
+              'configuration': {
+                'schemaVersion': config.schemaVersion,
+                'configuration': config.values
+              }
+            })),
+        write: true);
+    if (!{200, 202}.contains(response.statusCode)) {
+      _error(response, write: true);
+    }
+    final body = _json(response, write: true);
+    if (body is! Map<String, dynamic>) throw _invalid(true);
+    final record = _record(body['resource'], designId, rows, cols, write: true);
+    final outcome = _deployment(body['deployment'], designId, id, write: true);
+    if (record.id != id ||
+        record.position != position ||
+        record.configuration != config ||
+        record.name != intent.name ||
+        record.catalogId != catalog ||
+        record.deployment?.id != outcome.id ||
+        outcome.resourceRevision != record.revision ||
+        outcome.projectId != config.values['projectId'] ||
+        outcome.bucketName != config.values['bucketName'] ||
+        outcome.location != config.values['location']) {
+      throw _invalid(true);
+    }
+    return record;
+  }
+
+  Future<StorageDeployment> checkDeployment(
+      String designId, String resourceId, String operationId,
+      {bool reconcile = false}) async {
+    final route = _operationRoute(designId, resourceId, operationId);
+    final response = await _send(() => reconcile
+        ? _client.post(Uri.parse('$route/reconcile'),
+            headers: _deploymentHeaders())
+        : _client.get(Uri.parse(route)));
+    if (!{200, 202}.contains(response.statusCode)) _error(response);
+    final result = _deployment(_json(response), designId, resourceId);
+    if (result.id != operationId) throw _invalid(false);
+    return result;
+  }
+
+  Future<StorageDeployment> retryDeployment(String designId,
+      PlacedResource resource, String operationId, String requestId,
+      {required bool consent}) async {
+    if (!consent || resource.etag == null) {
+      throw const ResourceFailure(
+          'Review and approve the saved target before retrying.');
+    }
+    _id(requestId);
+    final route = _operationRoute(designId, resource.id!, operationId);
+    final response = await _send(
+        () => _client.post(Uri.parse('$route/retry/$requestId'),
+            headers: _deploymentHeaders(consent: true, etag: resource.etag)),
+        write: true);
+    if (!{200, 202}.contains(response.statusCode)) {
+      _error(response, write: true);
+    }
+    final result = _deployment(
+        _json(response, write: true), designId, resource.id!,
+        write: true);
+    if (result.id != operationId) throw _invalid(true);
+    return result;
+  }
 
   String configurationText(ResourceConfiguration? value,
           {bool legacy = false}) =>
@@ -112,7 +273,11 @@ class ResourceRepository {
       'catalog_not_found',
       'invalid_payload',
       'precondition_required',
-      'resource_design_mismatch'
+      'resource_design_mismatch',
+      'deployment_target_locked',
+      'project_not_approved',
+      'deployment_disabled',
+      'operation_id_reused'
     };
     String? code;
     try {
@@ -126,6 +291,8 @@ class ResourceRepository {
     final message = switch (status) {
       400 =>
         'The backend rejected the Resource data. Local changes are preserved.',
+      401 => 'Local deployment authorization is missing or invalid.',
+      403 => 'Deployment is disabled or the target project is not approved.',
       409 =>
         'Resource or tile conflict. Open the Design to review backend changes.',
       412 =>
@@ -247,7 +414,12 @@ class ResourceRepository {
         revision: revision,
         etag: _tag(id, revision),
         configuration: configuration,
-        configurationState: state as String);
+        configurationState: state as String,
+        deployment: value['deployment'] == null
+            ? null
+            : _deployment(
+                value['deployment'], owner.toLowerCase(), id.toLowerCase(),
+                write: write));
   }
 
   Future<List<PersistedResource>> listForDesign(String designId,

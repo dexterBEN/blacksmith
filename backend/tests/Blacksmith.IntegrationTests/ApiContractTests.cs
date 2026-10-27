@@ -145,17 +145,17 @@ public sealed class ApiContractTests : IDisposable
     }
 
     [Fact]
-    public async Task Cloud_routes_keep_existing_payloads_and_query_parameters()
+    public async Task Legacy_creation_is_retired_without_resolving_credentials()
     {
         var ping = await _client.GetFromJsonAsync<JsonElement>("/cloud_services/ping");
         Assert.Equal("CloudServices backend is alive 🚀", ping.GetProperty("message").GetString());
         Assert.Empty(_factory.Cloud.Calls);
         var response = await _client.PostAsync(
             "/cloud_services/create-bucket?projectId=test-project&bucketName=test-bucket", null);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("Bucket test-bucket create in project test-project",
-            (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("message").GetString());
-        Assert.Equal(("test-project", "test-bucket"), Assert.Single(_factory.Cloud.Calls));
+        Assert.Equal(HttpStatusCode.Gone, response.StatusCode);
+        Assert.Equal("legacy_provisioning_disabled",
+            (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        Assert.Empty(_factory.Cloud.Calls);
     }
 
     [Fact]

@@ -17,6 +17,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="../Support/DeploymentApiFactory.cs" Link="DeploymentApiFactory.cs" />
     <ProjectReference Include="../../src/CloudServices.Api/CloudServices.Api.csproj" />
   </ItemGroup>
 </Project>

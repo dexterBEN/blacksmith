@@ -10,6 +10,7 @@ void main() {
   if (Engine.singleton.isEditorHint()) return;
   setupServiceLocator(
       baseUrl:
-          Platform.environment['BLACKSMITH_BACKEND_URL'] ?? defaultBackendUrl);
+          Platform.environment['BLACKSMITH_BACKEND_URL'] ?? defaultBackendUrl,
+      deploymentToken: Platform.environment['BLACKSMITH_DEPLOYMENT_TOKEN']);
   GD.print(Variant('[main] DI ready & scripts attached'));
 }

@@ -55,6 +55,10 @@ public sealed partial class ResourceService(
         var resource = await repository.GetForUpdateAsync(id, ct);
         if (resource is null) return null;
 
+        var history = await repository.GetAggregateAsync(id, ct);
+        if (history?.Deployments.Count > 0 && request.DesignId is Guid nextDesign && nextDesign != resource.DesignId)
+            throw new ResourceConflictException("deployment_identity_locked", "A Resource with deployment records cannot move to another Design.");
+
         var resourceTypeId = await ResolveResourceTypeAsync(request.Type.Trim(), request.ResourceTypeId, resource, ct);
         if (await repository.HasConfigurationAsync(id, ct))
         {
@@ -83,6 +87,9 @@ public sealed partial class ResourceService(
     {
         var resource = await repository.GetForUpdateAsync(id, ct);
         if (resource is null) return false;
+
+        if ((await repository.GetAggregateAsync(id, ct))?.Deployments.Count > 0)
+            throw new ResourceConflictException("deployment_history_exists", "Deployment records must be retained. Resource deletion with a deployment history is outside this increment.");
 
         repository.Remove(resource);
         await repository.SaveChangesAsync(ct);

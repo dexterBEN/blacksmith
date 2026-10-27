@@ -18,6 +18,14 @@ class ResourceConfigurationEditor3D {
     _save = _dialog.getNodeT<Button>('Save')!;
     _cancel = _dialog.getNodeT<Button>('Cancel')!;
     _close = _dialog.getNodeT<Button>('Close')!;
+    _deploy = _dialog.getNodeT<Button>('Deploy')!;
+    _consent = _dialog.getNodeT<CheckButton>('Consent')!;
+    _deploy.pressed.connect(owner, () {
+      if (_cubit != null) async.unawaited(_cubit.deployResourceConfiguration());
+    });
+    _consent.toggled.connect(owner, (bool pressed) {
+      if (!_updating) _cubit?.approveDeployment(pressed);
+    });
     _feedback = _dialog.getNodeT<Label>('FeedbackScroll/Feedback')!;
     _json.textChanged.connect(owner, () {
       if (!_updating) _cubit?.changeResourceConfigurationText(_json.getText());
@@ -32,7 +40,8 @@ class ResourceConfigurationEditor3D {
   late final ColorRect _shade;
   late final Panel _dialog;
   late final TextEdit _json;
-  late final Button _save, _cancel, _close;
+  late final Button _save, _cancel, _close, _deploy;
+  late final CheckButton _consent;
   late final Label _feedback;
   bool _updating = false, _wasOpen = false;
 
@@ -45,7 +54,24 @@ class ResourceConfigurationEditor3D {
     }
     _updating = true;
     if (_json.getText() != draft.text) _json.setText(draft.text);
+    _consent.setPressedNoSignal(draft.consent);
     _updating = false;
+    final outcome = draft.resource.deployment;
+    final checking = _cubit?.checksDeployment ?? false;
+    _deploy
+      ..setText(checking
+          ? 'Check deployment'
+          : (_cubit?.retriesDeployment ?? false)
+              ? 'Retry deployment'
+              : 'Save & Deploy')
+      ..setDisabled(state.pending ||
+          (!checking &&
+              (!draft.consent || !(_cubit?.deploymentEnabled ?? false))));
+    _consent.setDisabled(state.pending ||
+        draft.uncertain ||
+        !(_cubit?.deploymentEnabled ?? false) ||
+        !(_cubit?.validDeploymentTarget ?? false));
+    _dialog.getNodeT<Label>('Review')!.setText(_cubit?.deploymentReview ?? '');
     _json.setEditable(!state.pending && !draft.uncertain);
     _save
       ..setDisabled(state.pending)
@@ -62,16 +88,18 @@ class ResourceConfigurationEditor3D {
     final legacy =
         draft.original != null && draft.original!.configuration == null;
     _dialog.getNodeT<Label>('Notice')!.setText(legacy
-        ? 'Unconfigured resource. Enter projectId, bucketName and location. Save only; no deployment. Never paste credentials.'
+        ? 'Unconfigured resource. Enter projectId, bucketName and location. Save configuration does not deploy. Never paste credentials.'
         : draft.original == null
-            ? 'Example identifiers: replace projectId and bucketName. Save only; no deployment. Never paste credentials.'
-            : 'Edit this saved configuration. Save only; no deployment. Never paste credentials.');
+            ? 'Example identifiers: replace projectId and bucketName. Save configuration does not deploy. Never paste credentials.'
+            : 'Edit this saved configuration. Save configuration does not deploy. Never paste credentials.');
     _feedback.setText(state.pending
         ? (draft.uncertain
             ? 'Checking the original Resource ID (read only)…'
-            : 'Saving configuration… The grid changes only after confirmation.')
-        : '${draft.error ?? "Ready. The backend validates and normalizes the v1 document."}'
-            '${draft.uncertain ? "\nOutcome unknown. Check Save only reads the original Resource. Closing keeps the recovery guard." : ""}');
+            : draft.deploymentCommand
+                ? 'Saving and checking deployment…'
+                : 'Saving configuration… The grid changes only after confirmation.')
+        : '${draft.error ?? (outcome?.describe(draft.resource.revision) ?? "Ready. Save configuration does not deploy.")}'
+            '${draft.uncertain ? "\nOutcome unknown. Check deployment verifies the original intent; it never creates a bucket. Closing keeps the recovery guard." : ""}');
     if (!_wasOpen) _json.grabFocus();
     _wasOpen = true;
   }
@@ -104,10 +132,13 @@ class ResourceConfigurationEditor3D {
     place('Close', width - 52, 12, 36, 32);
     place('Target', 16, 52, width - 32, 44);
     place('Notice', 16, 104, width - 32, 48);
-    place('Json', 16, 160, width - 32, height - 304);
+    place('Json', 16, 160, width - 32, height - 416);
+    place('Review', 16, height - 244, width - 32, 56);
+    place('Consent', 16, height - 180, width - 32, 40);
     place('FeedbackScroll', 16, height - 132, width - 32, 68);
     _feedback.setCustomMinimumSize(Vector2(x: width - 64, y: 0));
-    place('Cancel', width - 350, height - 52, 130, 36);
-    place('Save', width - 208, height - 52, 192, 36);
+    place('Cancel', width - 492, height - 52, 100, 36);
+    place('Save', width - 380, height - 52, 176, 36);
+    place('Deploy', width - 192, height - 52, 176, 36);
   }
 }

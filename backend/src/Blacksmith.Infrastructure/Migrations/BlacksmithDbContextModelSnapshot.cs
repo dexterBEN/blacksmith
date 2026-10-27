@@ -97,16 +97,16 @@ namespace Blacksmith.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<Guid?>("ResourceTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_type_id");
+
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint")
-                        .HasColumnName("revision")
-                        .HasDefaultValue(1L);
-
-                    b.Property<Guid?>("ResourceTypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("resource_type_id");
+                        .HasDefaultValue(1L)
+                        .HasColumnName("revision");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -126,12 +126,12 @@ namespace Blacksmith.Infrastructure.Migrations
                     b.HasIndex("DesignId")
                         .HasDatabaseName("IX_resources_design_id");
 
+                    b.HasIndex("ResourceTypeId")
+                        .HasDatabaseName("IX_resources_resource_type_id");
+
                     b.HasIndex("DesignId", "X", "Y")
                         .IsUnique()
                         .HasDatabaseName("UX_resources_design_id_x_y");
-
-                    b.HasIndex("ResourceTypeId")
-                        .HasDatabaseName("IX_resources_resource_type_id");
 
                     b.ToTable("resources", (string)null);
                 });
@@ -209,6 +209,128 @@ namespace Blacksmith.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Blacksmith.Domain.Entities.StorageDeployment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BucketName")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Configuration")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("ConfigurationHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CurrentAttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DesignId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("design_id");
+
+                    b.Property<DateTime?>("LeaseUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("OwnershipMarker")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("OwnershipVerified")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("RemoteBucketId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RemoteMetageneration")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RemoteProjectNumber")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_id");
+
+                    b.Property<long>("ResourceRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("resource_revision");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResourceId", "ResourceRevision")
+                        .IsUnique();
+
+                    b.ToTable("storage_deployments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_storage_deployments_revision", "resource_revision > 0");
+
+                            t.HasCheckConstraint("CK_storage_deployments_status", "status IN ('pending','succeeded','failed','unknown')");
+                        });
+                });
+
+            modelBuilder.Entity("Blacksmith.Domain.Entities.StorageDeploymentAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeploymentId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeploymentId");
+
+                    b.ToTable("storage_deployment_attempts", (string)null);
+                });
+
             modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceConfiguration", b =>
                 {
                     b.HasOne("Blacksmith.Domain.Entities.ResourceEntity", "Resource")
@@ -240,6 +362,29 @@ namespace Blacksmith.Infrastructure.Migrations
                     b.Navigation("ResourceType");
                 });
 
+            modelBuilder.Entity("Blacksmith.Domain.Entities.StorageDeployment", b =>
+                {
+                    b.HasOne("Blacksmith.Domain.Entities.ResourceEntity", "Resource")
+                        .WithMany("Deployments")
+                        .HasForeignKey("ResourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_storage_deployments_resources_resource_id");
+
+                    b.Navigation("Resource");
+                });
+
+            modelBuilder.Entity("Blacksmith.Domain.Entities.StorageDeploymentAttempt", b =>
+                {
+                    b.HasOne("Blacksmith.Domain.Entities.StorageDeployment", "Deployment")
+                        .WithMany("Attempts")
+                        .HasForeignKey("DeploymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Deployment");
+                });
+
             modelBuilder.Entity("Blacksmith.Domain.Entities.DesignEntity", b =>
                 {
                     b.Navigation("Resources");
@@ -248,11 +393,18 @@ namespace Blacksmith.Infrastructure.Migrations
             modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceEntity", b =>
                 {
                     b.Navigation("Configuration");
+
+                    b.Navigation("Deployments");
                 });
 
             modelBuilder.Entity("Blacksmith.Domain.Entities.ResourceTypeEntity", b =>
                 {
                     b.Navigation("Resources");
+                });
+
+            modelBuilder.Entity("Blacksmith.Domain.Entities.StorageDeployment", b =>
+                {
+                    b.Navigation("Attempts");
                 });
 #pragma warning restore 612, 618
         }

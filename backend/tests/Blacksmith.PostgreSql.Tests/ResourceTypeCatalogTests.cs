@@ -32,7 +32,7 @@ public sealed class ResourceTypeCatalogTests : PostgreSqlTestDatabase
         Assert.False(db.Database.HasPendingModelChanges());
         await db.Database.MigrateAsync();
         Assert.Equal(6, await db.ResourceTypes.CountAsync());
-        Assert.Equal(6, (await db.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(7, (await db.Database.GetAppliedMigrationsAsync()).Count());
     }
 
     [PostgreSqlFact]

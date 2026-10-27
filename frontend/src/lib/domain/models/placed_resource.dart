@@ -1,3 +1,4 @@
+import 'storage_deployment.dart';
 import 'dart:math';
 import 'package:equatable/equatable.dart';
 import 'persisted_resource.dart';
@@ -17,7 +18,8 @@ class PlacedResource extends Equatable {
       this.revision,
       this.etag,
       this.configuration,
-      this.configurationState = 'absent'});
+      this.configurationState = 'absent',
+      this.deployment});
   factory PlacedResource.local(ResourceKind kind) =>
       PlacedResource(localKey: newResourceId(), kind: kind);
   factory PlacedResource.fromPersisted(PersistedResource record,
@@ -33,13 +35,15 @@ class PlacedResource extends Equatable {
           revision: record.revision,
           etag: record.etag,
           configuration: record.configuration,
-          configurationState: record.configurationState);
+          configurationState: record.configurationState,
+          deployment: record.deployment);
   final String localKey;
   final ResourceKind kind;
   final String? id, designId, catalogId, etag;
   final String name, type, configurationState;
   final int? revision;
   final ResourceConfiguration? configuration;
+  final StorageDeployment? deployment;
 
   PlacedResource withConfiguration(ResourceConfiguration value) =>
       configuration == value
@@ -55,7 +59,18 @@ class PlacedResource extends Equatable {
               revision: revision,
               etag: etag,
               configuration: value,
-              configurationState: 'draft');
+              configurationState: 'draft',
+              deployment: deployment);
+
+  bool sameSavedContent(PlacedResource other) =>
+      localKey == other.localKey &&
+      id == other.id &&
+      designId == other.designId &&
+      catalogId == other.catalogId &&
+      revision == other.revision &&
+      etag == other.etag &&
+      configurationState == other.configurationState &&
+      sameContent(other);
 
   bool sameContent(PlacedResource other) =>
       kind == other.kind &&
@@ -78,7 +93,8 @@ class PlacedResource extends Equatable {
         revision: record.revision,
         etag: record.etag,
         configuration: configuration,
-        configurationState: configurationState);
+        configurationState: configurationState,
+        deployment: record.deployment);
   }
 
   @override
@@ -93,7 +109,8 @@ class PlacedResource extends Equatable {
         revision,
         etag,
         configuration,
-        configurationState
+        configurationState,
+        deployment
       ];
 }
 
