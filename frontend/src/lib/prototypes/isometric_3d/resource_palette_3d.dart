@@ -51,13 +51,21 @@ class ResourcePalette3D {
               : persisted && !canChoose && enabled
                   ? 'Replacing a persisted resource is not supported. Choose another tile.'
                   : storage
-                      ? 'Configure Cloud Storage (Save only)'
+                      ? 'Configure Cloud Storage'
                       : resourceVisuals3D[choice.kind]!.label);
     }
     final text = hasSelection
         ? 'Tile (${selected.row}, ${selected.col}) · ${persisted ? (state.resources[selected]?.configuration == null ? "Unconfigured" : "Saved configuration") : "Local placement"}'
         : 'Select a tile first';
+    final selectedResource = state.resources[selected];
+    final detail =
+        selectedResource?.deployment?.describe(selectedResource.revision);
+    _instruction.setTooltipText(detail ??
+        'Configuration saved locally or in the backend; no deployment requested.');
+    _guidance.setTooltipText(detail ?? 'No deployment requested.');
     _instruction.setText(text);
-    _guidance.setText(text);
+    _guidance.setText(detail == null
+        ? text
+        : '$text · ${selectedResource!.deployment!.status}');
   }
 }

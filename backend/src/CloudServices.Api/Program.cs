@@ -3,6 +3,7 @@ using Providers.GoogleCloud;
 using Blacksmith.Application.Interfaces;
 using Blacksmith.Application.Services;
 using Blacksmith.Infrastructure;
+using CloudServices.Api;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,7 +24,11 @@ builder.Services.AddCors(options =>
 });
 
 // provider GCP injection ICloudStorageService
-builder.Services.AddScoped<ICloudStorageService, GoogleCloudStorageService>();
+builder.Services.AddScoped<ICloudStorageService>(_ => new GoogleCloudStorageService());
+builder.Services.AddScoped<ICloudBucketProvisioner>(_ => new GoogleCloudStorageService());
+builder.Services.AddSingleton<DeploymentPolicy>();
+builder.Services.AddSingleton<IDeploymentTargetPolicy>(services => services.GetRequiredService<DeploymentPolicy>());
+builder.Services.AddScoped<IStorageDeploymentService, StorageDeploymentService>();
 
 var cs = builder.Configuration.GetConnectionString("BlacksmithDb");
 builder.Services.AddBlacksmithInfrastructure(cs);

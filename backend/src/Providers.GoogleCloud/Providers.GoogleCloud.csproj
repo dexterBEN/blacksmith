@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CloudServices.Core\CloudServices.Core.csproj" />
+    <ProjectReference Include="..\Blacksmith.Application\Blacksmith.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -63,7 +63,7 @@ The backend uses a **layered architecture with ports-and-adapters principles**. 
 | `GET /resources/{id}`, `PUT /resources/{id}`, `DELETE /resources/{id}` | Read, update, or delete a stored resource |
 | `GET /resource-types`, `GET /resource-types/{id}` | Read the generic resource type catalog |
 | `GET /cloud_services/ping` | Check the cloud controller endpoint |
-| `POST /cloud_services/create-bucket` | Create a real Google Cloud Storage bucket |
+| `POST /cloud_services/create-bucket` | Retired (410); use authorized Save & Deploy |
 | `GET /db/ping` | Database health endpoint |
 
 ### Domain and persistence
@@ -74,6 +74,11 @@ JSON document without changing metadata CRUD contracts or provisioning GCP resou
 See the [configuration API contract](docs/backend/resource-configuration-api.md) for
 fields, canonical defaults, limits and migration prerequisites. The 3D editor now
 provides a Cloud Storage JSON configuration dialog and restores saved configurations.
+
+Explicit local **Save & Deploy** is available for one Cloud Storage resource after target review,
+consent and backend authorization. Ordinary Save and Open never provision Google resources.
+See the [deployment API and recovery contract](docs/backend/storage-deployment.md) for
+default-off configuration, migration prerequisites, ownership checks and retry limitations.
 
 The backend also provides [atomic configured Resource persistence](docs/backend/resource-persistence-api.md):
 client UUIDs, conditional writes, per-resource revisions, unique Design/tile occupancy,

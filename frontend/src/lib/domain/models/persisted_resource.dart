@@ -1,3 +1,4 @@
+import 'storage_deployment.dart';
 import 'package:equatable/equatable.dart';
 import 'grid_position.dart';
 import 'resource_configuration.dart';
@@ -14,7 +15,8 @@ class PersistedResource extends Equatable {
       this.revision = 1,
       this.etag,
       this.configuration,
-      this.configurationState = 'absent'});
+      this.configurationState = 'absent',
+      this.deployment});
   static const storageType = 'gcp.storage.bucket';
   static const catalogCode = 'storage';
   static const displayName = 'Cloud Storage';
@@ -27,6 +29,7 @@ class PersistedResource extends Equatable {
   final int revision;
   final String? etag;
   final ResourceConfiguration? configuration;
+  final StorageDeployment? deployment;
   final String configurationState;
   int get x => position.col;
   int get y => position.row;
@@ -45,6 +48,7 @@ class PersistedResource extends Equatable {
         revision,
         etag,
         configuration,
-        configurationState
+        configurationState,
+        deployment
       ];
 }

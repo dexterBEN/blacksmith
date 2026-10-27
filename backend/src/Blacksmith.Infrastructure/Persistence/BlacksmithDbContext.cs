@@ -14,9 +14,45 @@ public sealed class BlacksmithDbContext : DbContext
     public DbSet<DesignEntity> Designs => Set<DesignEntity>();
     public DbSet<ResourceTypeEntity> ResourceTypes => Set<ResourceTypeEntity>();
     public DbSet<ResourceConfiguration> ResourceConfigurations => Set<ResourceConfiguration>();
+    public DbSet<StorageDeployment> StorageDeployments => Set<StorageDeployment>();
+    public DbSet<StorageDeploymentAttempt> StorageDeploymentAttempts => Set<StorageDeploymentAttempt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<StorageDeployment>(entity =>
+        {
+            entity.ToTable("storage_deployments", table => {
+                table.HasCheckConstraint("CK_storage_deployments_revision", "resource_revision > 0");
+                table.HasCheckConstraint("CK_storage_deployments_status", "status IN ('pending','succeeded','failed','unknown')");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(x => x.ResourceId).HasColumnName("resource_id");
+            entity.Property(x => x.DesignId).HasColumnName("design_id");
+            entity.Property(x => x.ResourceRevision).HasColumnName("resource_revision");
+            entity.HasIndex(x => new { x.ResourceId, x.ResourceRevision }).IsUnique();
+            entity.Property(x => x.RequestHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ConfigurationHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Configuration).HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.OwnershipMarker).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.ProjectId).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.BucketName).HasMaxLength(63).IsRequired();
+            entity.Property(x => x.Location).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
+            entity.Property(x => x.Code).HasMaxLength(60).IsRequired();
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasOne(x => x.Resource).WithMany(x => x.Deployments).HasForeignKey(x => x.ResourceId)
+                .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_storage_deployments_resources_resource_id");
+        });
+        modelBuilder.Entity<StorageDeploymentAttempt>(entity =>
+        {
+            entity.ToTable("storage_deployment_attempts");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasOne(x => x.Deployment).WithMany(x => x.Attempts).HasForeignKey(x => x.DeploymentId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<ResourceConfiguration>(entity =>
         {
             entity.ToTable("resource_configurations", table =>

@@ -169,7 +169,7 @@ class DesignCubit extends Cubit<DesignState> {
                 : saved
                     ? (count == 0
                         ? 'Empty Design · No resource saved'
-                        : 'Saved placements: $count · Unconfigured: $unconfigured · No deployment')
+                        : 'Saved placements: $count · Unconfigured: $unconfigured · ${_deploymentSummary()}')
                     : _unsupportedRemoval
                         ? 'Unsaved · Removing or replacing persisted resources is not supported. Open to restore them.'
                         : !_supported
@@ -187,6 +187,72 @@ class DesignCubit extends Cubit<DesignState> {
         saved: saved,
         saveUncertain: uncertain,
         persistenceMessage: message));
+  }
+
+  String _deploymentSummary() {
+    final outcomes =
+        _grid.state.resources.values.where((r) => r.deployment != null);
+    if (outcomes.isEmpty) return 'No deployment';
+    return outcomes.map((r) => r.deployment!.describe(r.revision)).join(' | ');
+  }
+
+  bool get deploymentEnabled => _resources?.deploymentEnabled ?? false;
+  String get deploymentReview {
+    final draft = state.configurationDraft;
+    if (draft == null) return '';
+    try {
+      return _resources!.deploymentReview(draft.text);
+    } on ResourceFailure {
+      return 'Enter a valid configuration to review the target.';
+    }
+  }
+
+  bool get validDeploymentTarget {
+    try {
+      _resources!.parseConfiguration(state.configurationDraft!.text);
+      return true;
+    } on Exception {
+      return false;
+    }
+  }
+
+  bool get configurationMatchesSaved {
+    final draft = state.configurationDraft;
+    if (draft == null) return false;
+    try {
+      return _resources!.parseConfiguration(draft.text) ==
+          draft.resource.configuration;
+    } on ResourceFailure {
+      return false;
+    }
+  }
+
+  bool get checksDeployment {
+    final draft = state.configurationDraft;
+    if (draft == null) return false;
+    final previous = draft.resource.deployment;
+    return draft.deploymentCommand && draft.uncertain ||
+        configurationMatchesSaved &&
+            previous != null &&
+            (previous.status == 'unknown' ||
+                previous.status == 'succeeded' ||
+                previous.status == 'pending' && previous.code != 'queued');
+  }
+
+  bool get retriesDeployment =>
+      configurationMatchesSaved &&
+      state.configurationDraft?.resource.deployment != null &&
+      !checksDeployment;
+
+  void approveDeployment(bool approved) {
+    final draft = state.configurationDraft;
+    if (draft == null ||
+        state.pending ||
+        draft.uncertain ||
+        !validDeploymentTarget) {
+      return;
+    }
+    emit(state.copyWith(configurationDraft: draft.copyWith(consent: approved)));
   }
 
   void open() {
@@ -342,9 +408,9 @@ class DesignCubit extends Cubit<DesignState> {
       if (replacing.contains(resource.id)) continue;
       final found = rows.where((r) => r.id == resource.id).toList();
       if (found.length != 1 ||
-          PlacedResource.fromPersisted(found.single,
-                  localKey: resource.localKey) !=
-              resource ||
+          !PlacedResource.fromPersisted(found.single,
+                  localKey: resource.localKey)
+              .sameSavedContent(resource) ||
           found.single.position != entry.key) {
         throw const ResourceFailure(
             'The backend Design changed. Open it before saving; local changes are preserved.',
@@ -566,6 +632,7 @@ class DesignCubit extends Cubit<DesignState> {
             position: position,
             original: original,
             resource: resource,
+            operationId: resource.deployment?.id,
             text: _resources.configurationText(resource.configuration,
                 legacy: original != null && original.configuration == null)),
         canSave: false,
@@ -582,7 +649,8 @@ class DesignCubit extends Cubit<DesignState> {
       error = failure.message;
     }
     emit(state.copyWith(
-        configurationDraft: draft.copyWith(text: text, error: error)));
+        configurationDraft:
+            draft.copyWith(text: text, error: error, consent: false)));
   }
 
   void cancelResourceConfiguration() {
@@ -593,9 +661,144 @@ class DesignCubit extends Cubit<DesignState> {
     _feedback();
   }
 
+  /// Explicitly authorized cloud command. A pending/unknown result is checked,
+  /// never converted into another creation by a timer, Open or header Save.
+  Future<void> deployResourceConfiguration({bool metadataOnly = false}) async {
+    var draft = state.configurationDraft;
+    if (isClosed || state.pending || draft == null || _resources == null) {
+      return;
+    }
+    final attempts = _pending(draft.designId);
+    final previous = draft.resource.deployment;
+    final checking = checksDeployment || metadataOnly;
+    if (!checking && (!deploymentEnabled || !draft.consent)) return;
+    PlacedResource intent;
+    try {
+      intent = draft.resource
+          .withConfiguration(_resources.parseConfiguration(draft.text));
+    } on ResourceFailure catch (e) {
+      emit(
+          state.copyWith(configurationDraft: draft.copyWith(error: e.message)));
+      return;
+    }
+    final existing = attempts[intent.localKey];
+    final operationId = previous != null && !configurationMatchesSaved
+        ? newResourceId()
+        : draft.operationId ?? newResourceId();
+    draft = draft.copyWith(
+        operationId: operationId, deploymentCommand: true, consent: false);
+    emit(state.copyWith(
+        status: DesignStatus.saving,
+        canSave: false,
+        configurationDraft: draft));
+    var attempt = existing;
+    try {
+      if (state.active?.id != draft.designId ||
+          _grid.state.resources[draft.position] != draft.original) {
+        throw ResourceFailure(
+            'The captured tile changed. Open the original Design.',
+            ambiguous: existing != null);
+      }
+      await _repository.getById(draft.designId);
+      var rows = await _read(draft.designId);
+      if (isClosed) return;
+      if (checking) {
+        // First recover the durable intent by ID. A 404 is not permission to create.
+        final saved = await _resources.getById(
+            draft.designId, intent.id ?? intent.localKey);
+        if (saved.position != draft.position ||
+            saved.configuration != intent.configuration) {
+          throw const ResourceFailure(
+              'The saved target changed. Open the Design before checking deployment.',
+              ambiguous: true);
+        }
+        final operation = saved.deployment;
+        if (operation == null) {
+          throw const ResourceFailure(
+              'No deployment record confirmed. No new cloud command was sent.',
+              ambiguous: true);
+        }
+        await _resources.checkDeployment(draft.designId, saved.id, operation.id,
+            reconcile: !metadataOnly && deploymentEnabled);
+        attempt ??= _PendingResourceSave(
+            draft.position, intent, rows.map((r) => r.id).toSet(),
+            configurationDialog: true, original: draft.original);
+      } else if (previous != null &&
+          intent.configuration == draft.resource.configuration &&
+          previous.resourceRevision == draft.resource.revision) {
+        _verifyBaseline(rows);
+        attempt = _PendingResourceSave(
+            draft.position, intent, rows.map((r) => r.id).toSet(),
+            configurationDialog: true, original: draft.original);
+        attempts[intent.localKey] = attempt;
+        await _resources.retryDeployment(
+            draft.designId, draft.resource, previous.id, newResourceId(),
+            consent: true);
+      } else {
+        _verifyBaseline(rows);
+        attempt = _PendingResourceSave(
+            draft.position, intent, rows.map((r) => r.id).toSet(),
+            configurationDialog: true, original: draft.original);
+        attempts[intent.localKey] = attempt;
+        attempt.ack = await _resources.saveAndDeploy(
+            draft.designId, draft.position, intent, operationId,
+            consent: true, rows: _grid.state.rows, cols: _grid.state.cols);
+      }
+      if (isClosed) return;
+      final record = await _resources.getById(
+          draft.designId, intent.id ?? intent.localKey);
+      rows = await _read(draft.designId);
+      if (isClosed) return;
+      final confirmed = _resolve(attempt, rows);
+      if (!PlacedResource.fromPersisted(record)
+          .sameSavedContent(PlacedResource.fromPersisted(confirmed))) {
+        throw const ResourceFailure(
+            'Resource changed during confirmation. Check again.',
+            ambiguous: true);
+      }
+      _verifyBaseline(rows, replacing: {confirmed.id});
+      await _accept(attempt, confirmed);
+      attempts.remove(intent.localKey);
+      final canonical =
+          PlacedResource.fromPersisted(confirmed, localKey: intent.localKey);
+      _saveProblem = null;
+      emit(state.copyWith(
+          status: DesignStatus.editing,
+          configurationDraft: ResourceConfigurationDraft(
+              designId: draft.designId,
+              position: draft.position,
+              resource: canonical,
+              original: canonical,
+              text: _resources.configurationText(canonical.configuration),
+              operationId: canonical.deployment?.id,
+              error:
+                  'Configuration saved. ${canonical.deployment?.describe(canonical.revision) ?? "Deployment not confirmed"}')));
+    } on Exception catch (failure) {
+      if (isClosed) return;
+      if (failure is ResourceFailure &&
+          !failure.ambiguous &&
+          existing == null) {
+        attempts.remove(intent.localKey);
+      }
+      emit(state.copyWith(
+          status: DesignStatus.editing,
+          configurationDraft: draft.copyWith(
+              uncertain: attempts.containsKey(intent.localKey),
+              error: failure is ResourceFailure
+                  ? failure.message
+                  : 'Deployment could not be confirmed. Saved configuration is retained.')));
+    } finally {
+      if (!isClosed) _feedback();
+    }
+  }
+
   Future<void> saveResourceConfiguration() async {
     final draft = state.configurationDraft;
     if (isClosed || state.pending || draft == null || _resources == null) {
+      return;
+    }
+    if (draft.deploymentCommand && draft.uncertain) {
+      await deployResourceConfiguration(metadataOnly: true);
       return;
     }
     final attempts = _pending(draft.designId);
@@ -650,7 +853,8 @@ class DesignCubit extends Cubit<DesignState> {
       rows = await _read(draft.designId);
       if (isClosed) return;
       final confirmed = _resolve(attempt, rows);
-      if (record != confirmed) {
+      if (!PlacedResource.fromPersisted(record)
+          .sameSavedContent(PlacedResource.fromPersisted(confirmed))) {
         throw const ResourceFailure(
             'The Resource changed during confirmation. Check Save again.',
             ambiguous: true);

@@ -101,10 +101,14 @@ public sealed partial class ResourceService
         return canonical is JsonElement configuration ? ValidatedAggregate(resource, configuration)
             : new(resource.Id, resource.DesignId, resource.ResourceTypeId, resource.Name, resource.X, resource.Y,
                 resource.Type, DateTime.SpecifyKind(resource.CreatedAtUtc, DateTimeKind.Utc), resource.Revision,
-                resource.Configuration is null ? "absent" : "unsupported", null);
+                resource.Configuration is null ? "absent" : "unsupported", null, LatestDeployment(resource));
     }
 
     private static ResourceAggregateResponse ValidatedAggregate(ResourceEntity resource, JsonElement configuration) =>
         new(resource.Id, resource.DesignId, resource.ResourceTypeId, resource.Name, resource.X, resource.Y,
-            resource.Type, DateTime.SpecifyKind(resource.CreatedAtUtc, DateTimeKind.Utc), resource.Revision, "validated", new(resource.Id, 1, configuration));
+            resource.Type, DateTime.SpecifyKind(resource.CreatedAtUtc, DateTimeKind.Utc), resource.Revision, "validated", new(resource.Id, 1, configuration), LatestDeployment(resource));
+
+    private static StorageDeploymentResponse? LatestDeployment(ResourceEntity resource) =>
+        resource.Deployments.OrderByDescending(x => x.CreatedAtUtc).ThenByDescending(x => x.Id).FirstOrDefault() is { } operation
+            ? StorageDeploymentResponse.From(operation) : null;
 }

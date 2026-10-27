@@ -25,6 +25,7 @@ def docker(*arguments, **kwargs):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('container')
+    parser.add_argument('--deployment', action='store_true', help='Test-only host with an injected GCP fake; never provisions Google Cloud.')
     parser.add_argument('--port', type=int, default=5139)
     action = parser.add_mutually_exclusive_group()
     action.add_argument('--stop', metavar='RUN_PATH')
@@ -55,11 +56,15 @@ def main():
         target = snapshot / path.relative_to(backend)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, target)
-    shutil.copytree(Path(__file__).with_name('design-test-backend'), snapshot / 'test-host',
+    fixture = 'deployment-test-backend' if args.deployment else 'design-test-backend'
+    if args.deployment:
+        shutil.copyfile(backend / 'BlacksmithBackend.sln', snapshot / 'BlacksmithBackend.sln')
+        shutil.copytree(backend / 'tests/Support', snapshot / 'tests/Support')
+    shutil.copytree(Path(__file__).with_name(fixture), snapshot / 'test-host',
                     ignore=shutil.ignore_patterns('bin', 'obj'))
     # ProjectReference is resolved relative to the temporary test-host directory.
     project = snapshot / 'test-host/DesignTestBackend.csproj'
-    project.write_text(project.read_text().replace('../../../backend/src/', '../src/'))
+    project.write_text(project.read_text().replace('../../../backend/src/', '../src/').replace('../../../backend/tests/', '../tests/'))
     run = f'/tmp/{snapshot.name}'
     print(f'RUN_PATH={run}', flush=True)
     docker('cp', str(snapshot), f'{args.container}:/tmp/')

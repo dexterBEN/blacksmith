@@ -22,7 +22,8 @@ public sealed class EfResourceRepository(BlacksmithDbContext db) : IResourceRepo
 
     public async Task<ResourceEntity?> GetForUpdateAsync(Guid id, CancellationToken ct)
     {
-        _transaction ??= await db.Database.BeginTransactionAsync(ct);
+        if (_transaction is null && db.Database.CurrentTransaction is null)
+            _transaction = await db.Database.BeginTransactionAsync(ct);
         // Serialize configuration and metadata-type writes on the existing parent.
         // The SQLite HTTP fixture uses its ordinary transaction instead.
         return db.Database.IsNpgsql()
@@ -34,10 +35,10 @@ public sealed class EfResourceRepository(BlacksmithDbContext db) : IResourceRepo
         db.ResourceConfigurations.FirstOrDefaultAsync(configuration => configuration.ResourceId == resourceId, ct);
 
     public Task<ResourceEntity?> GetAggregateAsync(Guid id, CancellationToken ct) =>
-        db.Resources.AsNoTracking().Include(x => x.Configuration).Include(x => x.ResourceType).SingleOrDefaultAsync(x => x.Id == id, ct);
+        db.Resources.AsNoTracking().Include(x => x.Configuration).Include(x => x.ResourceType).Include(x => x.Deployments).SingleOrDefaultAsync(x => x.Id == id, ct);
 
     public async Task<IReadOnlyList<ResourceEntity>> ListAggregatesAsync(Guid designId, CancellationToken ct) =>
-        await db.Resources.AsNoTracking().Include(x => x.Configuration).Include(x => x.ResourceType)
+        await db.Resources.AsNoTracking().Include(x => x.Configuration).Include(x => x.ResourceType).Include(x => x.Deployments)
             .Where(x => x.DesignId == designId).OrderBy(x => x.Y).ThenBy(x => x.X).ThenBy(x => x.Id).ToListAsync(ct);
 
     public Task<bool> HasConfigurationAsync(Guid resourceId, CancellationToken ct) =>

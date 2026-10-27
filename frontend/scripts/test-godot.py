@@ -38,19 +38,26 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--persistence', metavar='BASE_URL',
                         help='Real dedicated local API/PostgreSQL save, full quit, open journey; never GCP.')
+    parser.add_argument('--deployment', metavar='BASE_URL', help='Native Save & Deploy journey, only against the marked fake-provider fixture.')
     parser.add_argument('--persistence-phase', choices=['save', 'open'],
                         help='Run one restart phase per invocation, sharing --output; useful on slow VMs.')
     args = parser.parse_args()
-    if sum(bool(mode) for mode in [args.design, args.application, args.persistence]) > 1:
+    if sum(bool(mode) for mode in [args.design, args.application, args.persistence, args.deployment]) > 1:
         parser.error('--design and --application are separate checks.')
     if args.design_live and not args.design:
         parser.error('--design-live requires --design and a dedicated test database.')
-    if args.persistence_phase and not args.persistence:
+    if args.persistence_phase and not (args.persistence or args.deployment):
         parser.error('--persistence-phase requires --persistence.')
     if args.persistence_phase and not args.output:
         parser.error('--persistence-phase requires a shared --output directory.')
     if args.design_live and args.trace_network:
         parser.error('--trace-network forbids IP connections; use it with the offline --design check.')
+    journey = args.deployment or args.persistence
+    if args.deployment:
+        from urllib.request import urlopen
+        with urlopen(args.deployment.rstrip('/') + '/__test/deployment-provider', timeout=5) as response:
+            if json.load(response).get('fakeProvider') is not True:
+                parser.error('The deployment fixture must explicitly identify its injected fake provider.')
     source = args.source.resolve()
     native = (args.native_dir or source).resolve()
     project = Path(tempfile.mkdtemp(prefix='blacksmith-godot-smoke-'))
@@ -85,7 +92,7 @@ def main():
     shutil.copytree(source / 'assets/models/resource_cubes',
                     project / 'assets/models/resource_cubes',
                     ignore=shutil.ignore_patterns('*.import', '*.uid'))
-    if not args.application and not args.design and not args.persistence:
+    if not args.application and not args.design and not (args.persistence or args.deployment):
         (project / 'src/main.dart').write_text(
             "import 'test_support/godot_smoke_main.dart' as smoke;\n"
             "void main() => smoke.main();\n")
@@ -94,7 +101,7 @@ def main():
     for name in ['DATA', 'CONFIG', 'CACHE']:
         env[f'XDG_{name}_HOME'] = str(project / f'xdg-{name.lower()}')
     # Clean application launches must not depend on any old fixture environment.
-    if args.application or args.design or args.persistence:
+    if args.application or args.design or args.persistence or args.deployment:
         env = {key: value for key, value in env.items()
                if not key.startswith('BLACKSMITH_')}
     if args.design:
@@ -104,8 +111,8 @@ def main():
             env['BLACKSMITH_DESIGN_LIVE'] = '1'
     if args.application:
         env['BLACKSMITH_WORKSPACE_OUTPUT'] = str(output)
-    if args.persistence:
-        env['BLACKSMITH_BACKEND_URL'] = args.persistence
+    if journey:
+        env['BLACKSMITH_BACKEND_URL'] = journey
         env['BLACKSMITH_PERSISTENCE_OUTPUT'] = str(output)
     if args.trace_network and not shutil.which('strace'):
         raise RuntimeError('--trace-network requires an installed Linux strace.')
@@ -113,7 +120,7 @@ def main():
     def run(name, arguments, marker, local=False, headless=True, trace=False):
         log = output / f'{name}.log'
         run_env = env.copy()
-        if not args.application and not args.design and not args.persistence:
+        if not args.application and not args.design and not (args.persistence or args.deployment):
             run_env['BLACKSMITH_SMOKE_LOCAL'] = '1' if local else '0'
         command = [args.godot, *(['--headless'] if headless else []),
                    '--path', str(project), *arguments]
@@ -128,15 +135,15 @@ def main():
         contents = log.read_text(errors='replace')
         if result.returncode or marker not in contents:
             raise RuntimeError(f'{name} failed; inspect {log}')
-        if (args.application or args.design or args.persistence) and (any(line.startswith(
+        if (args.application or args.design or args.persistence or args.deployment) and (any(line.startswith(
                 ('ERROR:', 'SCRIPT ERROR:', 'SHADER ERROR:'))
                 for line in contents.splitlines()) or
                 'ObjectDB instances leaked at exit' in contents):
             raise RuntimeError(f'{name} native errors; inspect {log}')
         if trace:
             connections = [line for line in network.read_text(errors='replace').splitlines() if 'AF_INET' in line]
-            if args.persistence:
-                target = urlparse(args.persistence)
+            if journey:
+                target = urlparse(journey)
                 allowed = f'inet_addr("{target.hostname}")'
                 port = f'sin_port=htons({target.port or 80})'
                 if any(allowed not in line or port not in line for line in connections):
@@ -146,7 +153,7 @@ def main():
         print(f'{name}: PASS ({marker})', flush=True)
         return contents
 
-    if args.persistence:
+    if journey:
         graphical = ['--display-driver', 'x11', '--rendering-method',
                      'gl_compatibility', '--resolution', '1152x648']
         run('persistence-import', ['--editor', '--import', *graphical],
@@ -155,7 +162,7 @@ def main():
         (project / 'src/production_main.dart').write_bytes(original_main)
         (project / 'src/main.dart').write_text(
             "import 'production_main.dart' as application;\n"
-            "import 'test_support/persistence_journey_checks.dart' as checks;\n"
+            f"import 'test_support/{'deployment' if args.deployment else 'persistence'}_journey_checks.dart' as checks;\n"
             'void main() { checks.beforeStartup(); application.main(); checks.afterStartup(); }\n')
         try:
             phases = [args.persistence_phase] if args.persistence_phase else ['save', 'open']
@@ -169,7 +176,7 @@ def main():
                 opened = json.loads((output / 'reopened.json').read_text())
                 if saved['save_pid'] == opened['open_pid'] or not opened['restored']:
                     raise RuntimeError('A real complete application restart was not proved.')
-                print('BLACKSMITH_PERSISTENCE_RESTART_PASSED real_api=true resources=2 cloud_calls=0', flush=True)
+                print('BLACKSMITH_DEPLOYMENT_RESTART_PASSED real_api=true fake_provider=true resources=2' if args.deployment else 'BLACKSMITH_PERSISTENCE_RESTART_PASSED real_api=true resources=2 cloud_calls=0', flush=True)
         finally:
             (project / 'src/main.dart').write_bytes(original_main)
             (project / 'src/production_main.dart').unlink()
