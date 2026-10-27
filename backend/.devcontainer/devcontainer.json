@@ -15,7 +15,9 @@
         "ConnectionStrings__BlacksmithDb": "Host=blacksmith_db_postgres;Port=5432;Database=blacksmith_db;Username=admin;Password=azerty1234"
     },
     "runArgs": [
-        "--network=backend_default"
+        "--network=backend_default",
+        "--env-file",
+        "${localWorkspaceFolder}/.env"
     ],
     "features": {},
     "customizations": {
