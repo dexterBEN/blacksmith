@@ -151,6 +151,16 @@ void afterStartup() {
         _check((await _stats())['creates'] == 2,
             'Only the explicitly approved retry follows rejection; response loss never retries automatically.');
         await _capture(scene, 'deployment_unknown.png');
+        await _click(scene,
+            _configurationButton(scene, 'Save').getGlobalRect().getCenter());
+        await _until(() =>
+            !cubit.state.pending &&
+            !cubit.state.configurationDraft!.uncertain &&
+            grid.state.resources[_position]?.deployment?.status == 'unknown');
+        _check(
+            (await _stats())['creates'] == 2 &&
+                (await _stats())['inspections'] == 0,
+            'Check Save confirms the database commit without contacting the provider.');
         await _click(scene, deploy.getGlobalRect().getCenter());
         await _until(() =>
             !cubit.state.pending &&

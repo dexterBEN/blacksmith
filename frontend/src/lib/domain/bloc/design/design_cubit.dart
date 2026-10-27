@@ -663,14 +663,14 @@ class DesignCubit extends Cubit<DesignState> {
 
   /// Explicitly authorized cloud command. A pending/unknown result is checked,
   /// never converted into another creation by a timer, Open or header Save.
-  Future<void> deployResourceConfiguration() async {
+  Future<void> deployResourceConfiguration({bool metadataOnly = false}) async {
     var draft = state.configurationDraft;
     if (isClosed || state.pending || draft == null || _resources == null) {
       return;
     }
     final attempts = _pending(draft.designId);
     final previous = draft.resource.deployment;
-    final checking = checksDeployment;
+    final checking = checksDeployment || metadataOnly;
     if (!checking && (!deploymentEnabled || !draft.consent)) return;
     PlacedResource intent;
     try {
@@ -719,7 +719,7 @@ class DesignCubit extends Cubit<DesignState> {
               ambiguous: true);
         }
         await _resources.checkDeployment(draft.designId, saved.id, operation.id,
-            reconcile: deploymentEnabled);
+            reconcile: !metadataOnly && deploymentEnabled);
         attempt ??= _PendingResourceSave(
             draft.position, intent, rows.map((r) => r.id).toSet(),
             configurationDialog: true, original: draft.original);
@@ -798,7 +798,7 @@ class DesignCubit extends Cubit<DesignState> {
       return;
     }
     if (draft.deploymentCommand && draft.uncertain) {
-      await deployResourceConfiguration();
+      await deployResourceConfiguration(metadataOnly: true);
       return;
     }
     final attempts = _pending(draft.designId);

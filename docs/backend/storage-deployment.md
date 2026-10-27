@@ -22,6 +22,8 @@ Supply these values externally to the API process, never in a tracked configurat
 Launch Godot/the normal launcher with `BLACKSMITH_DEPLOYMENT_TOKEN` set to that same private
 token and `BLACKSMITH_BACKEND_URL` pointing to the intended local API. The token is used only
 in deployment request headers, never in JSON configuration, a Design, or a deployment record.
+After an ambiguous response, **Check Save** reads only database metadata; **Check deployment**
+explicitly requests a read-only provider verification.
 Missing frontend authorization disables cloud mutations; metadata reads and Save-only remain available.
 Keep this single-operator development endpoint on a trusted local connection; it is not a hosted
 multi-user security model. Use TLS for transport beyond a trusted local environment.

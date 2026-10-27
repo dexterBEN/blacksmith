@@ -72,6 +72,7 @@ class Deployments extends configuration.ConfiguredResources {
       {bool reconcile = false}) async {
     if (reconcile) inspections++;
     final record = await getById(designId, resourceId);
+    if (!reconcile) return record.deployment!;
     return attach(record, operationId, 'succeeded').deployment!;
   }
 
@@ -220,6 +221,37 @@ void main() {
       expect(resources.deploys, 1);
       expect(grid.state.resources[const GridPos(4, 1)]!.deployment, isNull);
     });
+  });
+  test('Check Save after a lost deployment response is database-only',
+      () async {
+    final designs = fixtures.Designs(), resources = Deployments();
+    final grid = IsomapGridBloc();
+    final cubit = DesignCubit(designs, grid, resources: resources);
+    addTearDown(() async {
+      await cubit.close();
+      await grid.close();
+      designs.close();
+      resources.close();
+    });
+    cubit.open();
+    cubit.changeName('Metadata-only recovery');
+    await cubit.submit();
+    grid.add(const TileClicked(fixtures.pos));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    cubit.openResourceConfiguration();
+    cubit.changeResourceConfigurationText(document);
+    cubit.approveDeployment(true);
+    resources.outcome = 'unknown';
+    resources.loseResponse = true;
+    await cubit.deployResourceConfiguration();
+    expect(cubit.state.configurationDraft!.uncertain, isTrue);
+    await cubit.saveResourceConfiguration();
+    expect(resources.deploys, 1);
+    expect(resources.inspections, 0);
+    expect(grid.state.resources.values.single.deployment!.status, 'unknown');
+    cubit.cancelResourceConfiguration();
+    await cubit.save();
+    expect(resources.inspections, 0);
   });
   test(
       'editing an already deployed target resets consent and keeps Save-only available',
