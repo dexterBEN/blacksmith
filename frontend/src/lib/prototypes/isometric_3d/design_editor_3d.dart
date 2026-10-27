@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:godot_dart/godot_dart.dart';
 import '../../domain/bloc/design/design_cubit.dart';
 import 'workspace_3d.dart';
+import 'resource_configuration_editor_3d.dart';
 
 /// Presentation only: native controls and the scene-owned state subscription.
 /// The shared Cubit, request, active Design and discard policy outlive scenes.
@@ -54,6 +55,7 @@ class DesignEditor3D {
     });
     _discard.toggled
         .connect(owner, (approved) => _cubit?.approveDiscard(approved));
+    _configuration = ResourceConfigurationEditor3D(owner, _cubit);
     _subscription = _cubit?.stream.listen(_render);
     _render(_cubit?.state ?? const DesignState());
     if (_cubit == null) {
@@ -72,14 +74,16 @@ class DesignEditor3D {
   late final Label _active, _feedback;
   late final LineEdit _name;
   late final CheckButton _discard;
+  late final ResourceConfigurationEditor3D _configuration;
   bool _wasOpen = false;
   bool _disposed = false;
   bool get isOpen =>
-      (_cubit?.state.dialogOpen ?? false) || (_cubit?.state.pending ?? false);
+      (_cubit?.state.modalOpen ?? false) || (_cubit?.state.pending ?? false);
+  bool handleInput(InputEvent? event) => _configuration.handleInput(event);
 
   void _render(DesignState state) {
     if (_disposed) return;
-    final blocked = state.dialogOpen || state.pending;
+    final blocked = state.modalOpen || state.pending;
     final opening = state.mode == DesignDialogMode.open;
     _new.setDisabled(_cubit == null || blocked);
     _open.setDisabled(!(_cubit?.supportsPersistence ?? false) || blocked);
@@ -95,6 +99,7 @@ class DesignEditor3D {
         ? state.persistenceMessage
         : 'Design ID: ${state.active!.id}\n${state.persistenceMessage}');
     _shade.setVisible(state.dialogOpen);
+    _configuration.render(state);
     _onModalChanged(blocked);
     _dialog
         .getNodeT<Label>('Title')!
@@ -138,6 +143,7 @@ class DesignEditor3D {
   }
 
   void resize(Vector2 viewport) {
+    _configuration.resize(viewport);
     final width = math.min(520.0, viewport.x - 32);
     const height = 300.0;
     _dialog

@@ -81,7 +81,13 @@ class Isometric3DGrid extends Node3D {
           !(_designEditor?.isOpen ?? false) &&
           bloc != null &&
           !bloc.isClosed) {
-        bloc.add(PlaceResource(kind));
+        if (kind == ResourceKind.cloudStorage) {
+          if (di.sl.isRegistered<DesignCubit>()) {
+            di.sl<DesignCubit>().openResourceConfiguration();
+          }
+        } else {
+          bloc.add(PlaceResource(kind));
+        }
       }
     });
     // The camera is fixed: react to viewport changes instead of polling Godot
@@ -106,7 +112,7 @@ class Isometric3DGrid extends Node3D {
     _designEditor = DesignEditor3D(
         this, di.sl.isRegistered<DesignCubit>() ? di.sl<DesignCubit>() : null,
         (open) {
-      _palette?.render(bloc.state, blocked: open);
+      _renderPalette(bloc.state, blocked: open);
     });
     _resizeWorkspace();
     _stateSubscription = bloc.stream.listen((state) {
@@ -114,8 +120,16 @@ class Isometric3DGrid extends Node3D {
     });
     _renderState(bloc.state);
     setProcessUnhandledInput(true);
+    setProcessInput(true);
     GD.print(Variant('[Isometric3DGrid] 36 shared beveled tiles ready. '
         'bloc=${_ownsBloc ? "local" : "shared"} resources=${_resources.length}'));
+  }
+
+  @override
+  void vInput(InputEvent? event) {
+    if (_active && (_designEditor?.handleInput(event) ?? false)) {
+      getViewport()!.setInputAsHandled();
+    }
   }
 
   @override
@@ -170,7 +184,7 @@ class Isometric3DGrid extends Node3D {
 
   void _renderState(IsomapGridState state) {
     _renderSelection(state.selected);
-    _palette?.render(state, blocked: _designEditor?.isOpen ?? false);
+    _renderPalette(state, blocked: _designEditor?.isOpen ?? false);
     final root = _resourceRoot!;
     for (final position in _resources.keys.toList()) {
       if (state.tiles[position] != _resources[position]!.kind) {
@@ -198,6 +212,15 @@ class Isometric3DGrid extends Node3D {
       root.addChild(node);
       _resources[entry.key] = (kind: entry.value, node: node);
     }
+  }
+
+  void _renderPalette(IsomapGridState state, {required bool blocked}) {
+    final cubit =
+        di.sl.isRegistered<DesignCubit>() ? di.sl<DesignCubit>() : null;
+    _palette?.render(state,
+        blocked: blocked,
+        canConfigure: cubit?.state.active != null &&
+            (cubit?.supportsPersistence ?? false));
   }
 
   @override

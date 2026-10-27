@@ -152,11 +152,11 @@ void afterStartup() {
         await _click(
             scene,
             scene
-                .getNodeT<Button>('${Workspace3D.choices}/CloudStorage')!
+                .getNodeT<Button>('${Workspace3D.choices}/ComputeEngine')!
                 .getGlobalRect()
                 .getCenter());
         _check(
-            grid.state.tiles[const GridPos(0, 0)] == ResourceKind.cloudStorage,
+            grid.state.tiles[const GridPos(0, 0)] == ResourceKind.computeEngine,
             'Placement remains local.');
       }
 

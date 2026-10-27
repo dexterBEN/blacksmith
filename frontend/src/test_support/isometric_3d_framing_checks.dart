@@ -147,13 +147,13 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
       }
     }
     final button =
-        scene.getNodeT<Button>('${Workspace3D.choices}/CloudStorage')!;
+        scene.getNodeT<Button>('${Workspace3D.choices}/ComputeEngine')!;
     final before = tileEvents();
     await _click(scene, button.getGlobalRect().getCenter());
     _check(
         tileEvents() == before &&
             bloc.state.selected == const GridPos(5, 5) &&
-            bloc.state.tiles[const GridPos(5, 5)] == ResourceKind.cloudStorage,
+            bloc.state.tiles[const GridPos(5, 5)] == ResourceKind.computeEngine,
         'Foreground placement consumes palette input without changing selection.');
     _check(
         (camera.getSize() - cameraSize).abs() < 1e-5 &&

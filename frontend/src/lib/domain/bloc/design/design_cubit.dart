@@ -9,6 +9,7 @@ import '../../models/grid_position.dart';
 import '../../models/persisted_resource.dart';
 import '../../models/resource_kind.dart';
 import '../../models/placed_resource.dart';
+import '../../models/resource_configuration_draft.dart';
 import '../isomap_grid/isomap_grid_bloc.dart';
 import '../isomap_grid/isomap_grid_event.dart';
 import '../isomap_grid/isomap_grid_state.dart';
@@ -20,6 +21,7 @@ enum DesignDialogMode { create, open }
 class DesignState extends Equatable {
   const DesignState(
       {this.active,
+      this.configurationDraft,
       this.dialogOpen = false,
       this.name = '',
       this.status = DesignStatus.editing,
@@ -33,6 +35,8 @@ class DesignState extends Equatable {
       this.saveUncertain = false,
       this.persistenceMessage = 'Local placements only'});
   final Design? active;
+  final ResourceConfigurationDraft? configurationDraft;
+  bool get modalOpen => dialogOpen || configurationDraft != null;
   final bool dialogOpen;
   final String name;
   final DesignStatus status;
@@ -56,6 +60,8 @@ class DesignState extends Equatable {
 
   DesignState copyWith(
           {Design? active,
+          ResourceConfigurationDraft? configurationDraft,
+          bool clearConfigurationDraft = false,
           bool? dialogOpen,
           String? name,
           DesignStatus? status,
@@ -70,6 +76,9 @@ class DesignState extends Equatable {
           String? persistenceMessage}) =>
       DesignState(
           active: active ?? this.active,
+          configurationDraft: clearConfigurationDraft
+              ? null
+              : configurationDraft ?? this.configurationDraft,
           dialogOpen: dialogOpen ?? this.dialogOpen,
           name: name ?? this.name,
           status: status ?? this.status,
@@ -85,6 +94,7 @@ class DesignState extends Equatable {
   @override
   List<Object?> get props => [
         active,
+        configurationDraft,
         dialogOpen,
         name,
         status,
@@ -141,8 +151,11 @@ class DesignCubit extends Cubit<DesignState> {
     if (isClosed) return;
     final uncertain = state.active != null &&
         (_attempts[state.active!.id.toLowerCase()]?.isNotEmpty ?? false);
-    final saved =
-        state.active != null && _confirmed != null && !_dirty && !uncertain;
+    final saved = state.active != null &&
+        _confirmed != null &&
+        !_dirty &&
+        !uncertain &&
+        state.configurationDraft == null;
     final count = _grid.state.resources.length;
     final unconfigured = _grid.state.resources.values
         .where((r) => r.configuration == null)
@@ -170,14 +183,14 @@ class DesignCubit extends Cubit<DesignState> {
             (uncertain ||
                 _supported && !_unsupportedRemoval && _dirty && count > 0) &&
             !state.pending &&
-            !state.dialogOpen,
+            !state.modalOpen,
         saved: saved,
         saveUncertain: uncertain,
         persistenceMessage: message));
   }
 
   void open() {
-    if (isClosed || state.pending) return;
+    if (isClosed || state.pending || state.configurationDraft != null) return;
     emit(state.copyWith(
         dialogOpen: true,
         name: '',
@@ -190,7 +203,12 @@ class DesignCubit extends Cubit<DesignState> {
   }
 
   void openExisting() {
-    if (isClosed || state.pending || _resources == null) return;
+    if (isClosed ||
+        state.pending ||
+        state.configurationDraft != null ||
+        _resources == null) {
+      return;
+    }
     emit(state.copyWith(
         dialogOpen: true,
         openId: '',
@@ -346,6 +364,27 @@ class DesignCubit extends Cubit<DesignState> {
 
   Future<void> _accept(
       _PendingResourceSave attempt, PersistedResource record) async {
+    if (attempt.configurationDialog) {
+      if (_grid.isClosed || isClosed || state.active?.id != record.designId) {
+        throw const ResourceFailure(
+            'Saved in the backend, but the active Design changed. Open the original Design to restore it.',
+            ambiguous: true);
+      }
+      final event = ApplyConfiguredResource(
+          attempt.position, attempt.original, attempt.sent, record);
+      _grid.add(event);
+      if (!await event.applied.future) {
+        throw const ResourceFailure(
+            'Saved in the backend, but the captured tile changed. Open the Design to restore it.',
+            ambiguous: true);
+      }
+      _confirmed = Map.unmodifiable({
+        ...?_confirmed,
+        attempt.position: PlacedResource.fromPersisted(record,
+            localKey: attempt.sent.localKey)
+      });
+      return;
+    }
     _confirmed = Map.unmodifiable({
       ...?_confirmed,
       attempt.position:
@@ -414,7 +453,7 @@ class DesignCubit extends Cubit<DesignState> {
   Future<void> save() async {
     if (isClosed ||
         state.pending ||
-        state.dialogOpen ||
+        state.modalOpen ||
         !state.canSave ||
         _resources == null) {
       return;
@@ -501,6 +540,145 @@ class DesignCubit extends Cubit<DesignState> {
     }
   }
 
+  /// Captures one target/identity. Drafts never enter the renderable grid.
+  void openResourceConfiguration() {
+    if (isClosed || state.pending || state.modalOpen || _resources == null) {
+      return;
+    }
+    final design = state.active;
+    final position = _grid.state.selected;
+    if (design == null || position == null || !_grid.state.contains(position)) {
+      return;
+    }
+    if (_pending(design.id).isNotEmpty) {
+      _saveProblem =
+          'Resolve the previous save with Check Save before configuring another resource.';
+      _feedback();
+      return;
+    }
+    final original = _grid.state.resources[position];
+    if (original != null && original.kind != ResourceKind.cloudStorage) return;
+    final resource =
+        original ?? PlacedResource.local(ResourceKind.cloudStorage);
+    emit(state.copyWith(
+        configurationDraft: ResourceConfigurationDraft(
+            designId: design.id,
+            position: position,
+            original: original,
+            resource: resource,
+            text: _resources.configurationText(resource.configuration,
+                legacy: original != null && original.configuration == null)),
+        canSave: false,
+        saved: false));
+  }
+
+  void changeResourceConfigurationText(String text) {
+    final draft = state.configurationDraft;
+    if (isClosed || state.pending || draft == null || draft.uncertain) return;
+    String? error;
+    try {
+      _resources!.parseConfiguration(text);
+    } on ResourceFailure catch (failure) {
+      error = failure.message;
+    }
+    emit(state.copyWith(
+        configurationDraft: draft.copyWith(text: text, error: error)));
+  }
+
+  void cancelResourceConfiguration() {
+    if (isClosed || state.pending || state.configurationDraft == null) return;
+    // An uncertain attempt remains in the shared coordinator. Header Check Save
+    // can still reconcile its original ID/configuration after closing the form.
+    emit(state.copyWith(clearConfigurationDraft: true));
+    _feedback();
+  }
+
+  Future<void> saveResourceConfiguration() async {
+    final draft = state.configurationDraft;
+    if (isClosed || state.pending || draft == null || _resources == null) {
+      return;
+    }
+    final attempts = _pending(draft.designId);
+    var attempt = attempts[draft.resource.localKey];
+    final checking = attempt != null;
+    PlacedResource intent;
+    try {
+      intent = attempt?.sent ??
+          draft.resource
+              .withConfiguration(_resources.parseConfiguration(draft.text));
+    } on ResourceFailure catch (failure) {
+      emit(state.copyWith(
+          configurationDraft: draft.copyWith(error: failure.message)));
+      return;
+    }
+    emit(state.copyWith(
+        status: DesignStatus.saving,
+        canSave: false,
+        configurationDraft: draft.copyWith(uncertain: checking)));
+    try {
+      if (state.active?.id != draft.designId ||
+          _grid.state.resources[draft.position] != draft.original) {
+        throw ResourceFailure(
+            'The captured Design or tile changed. Close the form and open the original Design.',
+            ambiguous: checking);
+      }
+      await _repository.getById(draft.designId);
+      if (isClosed) return;
+      var rows = await _read(draft.designId);
+      if (isClosed) return;
+      if (!checking) {
+        _verifyBaseline(rows);
+        attempt = _PendingResourceSave(
+            draft.position, intent, rows.map((r) => r.id).toSet(),
+            configurationDialog: true, original: draft.original);
+        attempts[intent.localKey] = attempt;
+        try {
+          attempt.ack = await _resources.writeConfigured(
+              draft.designId, draft.position, intent,
+              rows: _grid.state.rows, cols: _grid.state.cols);
+        } on ResourceFailure catch (failure) {
+          if (!failure.ambiguous) attempts.remove(intent.localKey);
+          rethrow;
+        }
+        if (isClosed) return;
+      }
+      // Original UUID and complete intent are retained across transport errors.
+      final record = await _resources.getById(
+          draft.designId, intent.id ?? intent.localKey,
+          rows: _grid.state.rows, cols: _grid.state.cols);
+      if (isClosed) return;
+      rows = await _read(draft.designId);
+      if (isClosed) return;
+      final confirmed = _resolve(attempt, rows);
+      if (record != confirmed) {
+        throw const ResourceFailure(
+            'The Resource changed during confirmation. Check Save again.',
+            ambiguous: true);
+      }
+      _verifyBaseline(rows, replacing: {confirmed.id});
+      await _accept(attempt, confirmed);
+      if (isClosed) return;
+      attempts.remove(intent.localKey);
+      _saveProblem = null;
+      emit(state.copyWith(
+          status: DesignStatus.editing, clearConfigurationDraft: true));
+    } on Exception catch (failure) {
+      if (isClosed) return;
+      final uncertain = attempts.containsKey(intent.localKey);
+      final message = failure is ResourceFailure
+          ? failure.message
+          : failure is DesignFailure
+              ? failure.message
+              : 'Save could not be confirmed. Your configuration is preserved.';
+      emit(state.copyWith(
+          status: DesignStatus.editing,
+          configurationDraft:
+              draft.copyWith(error: message, uncertain: uncertain)));
+    } finally {
+      if (!isClosed) _feedback();
+    }
+  }
+
   @override
   Future<void> close() async {
     await _subscription.cancel();
@@ -509,10 +687,13 @@ class DesignCubit extends Cubit<DesignState> {
 }
 
 class _PendingResourceSave {
-  _PendingResourceSave(this.position, this.sent, Set<String> beforeIds)
+  _PendingResourceSave(this.position, this.sent, Set<String> beforeIds,
+      {this.configurationDialog = false, this.original})
       : beforeIds = Set.unmodifiable(beforeIds);
   final GridPos position;
   final PlacedResource sent;
   final Set<String> beforeIds;
+  final bool configurationDialog;
+  final PlacedResource? original;
   PersistedResource? ack;
 }

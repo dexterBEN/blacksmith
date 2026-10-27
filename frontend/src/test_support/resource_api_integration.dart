@@ -83,6 +83,20 @@ Future<void> main() async {
     final design = await designs.create(
         'Blacksmith Issue53 configured integration ${DateTime.now().microsecondsSinceEpoch}');
     final a = _new('blacksmith-fixture-a'), b = _new('blacksmith-fixture-b');
+    final invalid = PlacedResource.local(ResourceKind.cloudStorage)
+        .withConfiguration(ResourceConfiguration(schemaVersion: 1, values: {
+      'projectId': 'example-project-123',
+      'bucketName': 'rejected-fixture',
+      'location': 'unsupported-region'
+    }));
+    await _failure(
+        resources.writeConfigured(design.id, const GridPos(0, 2), invalid),
+        status: 400,
+        code: 'invalid_payload');
+    await _failure(resources.getById(design.id, invalid.localKey),
+        status: 404, code: 'resource_not_found');
+    _check((await resources.listForDesign(design.id)).isEmpty,
+        'Rejected configured create must leave no metadata/configuration row.');
     const pa = GridPos(2, 3), pb = GridPos(4, 1);
     resourceClient.loseNextPut = true;
     await _failure(resources.writeConfigured(design.id, pa, a),
@@ -97,6 +111,16 @@ Future<void> main() async {
         status: 412, code: 'resource_exists');
     final second = await resources.writeConfigured(design.id, pb, b);
     final beforeSibling = await resources.getById(design.id, second.id);
+    await _failure(
+        resources.writeConfigured(
+            design.id,
+            pa,
+            PlacedResource.fromPersisted(recovered)
+                .withConfiguration(invalid.configuration!)),
+        status: 400,
+        code: 'invalid_payload');
+    _check(await resources.getById(design.id, recovered.id) == recovered,
+        'Rejected update must preserve metadata, configuration and revision.');
     final updatedIntent = PlacedResource.fromPersisted(recovered)
         .withConfiguration(_configuration('blacksmith-fixture-edited'));
     final edited =

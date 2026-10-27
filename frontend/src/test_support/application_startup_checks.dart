@@ -156,7 +156,21 @@ void afterStartup() {
       Future<void> choose(ResourceKind kind) async {
         final selected = bloc.state.selected;
         final events = _observer.tileEvents;
-        await _click(scene, _button(scene, kind).getGlobalRect().getCenter());
+        final button = _button(scene, kind);
+        if (kind == ResourceKind.cloudStorage) {
+          // Geometry-only legacy projection fixture, no configuration write.
+          if (!button.isDisabled()) {
+            await _click(scene, button.getGlobalRect().getCenter());
+            _check(di.sl<DesignCubit>().state.configurationDraft != null,
+                'Cloud Storage opens the shared configuration form.');
+            di.sl<DesignCubit>().cancelResourceConfiguration();
+            await _pause();
+          }
+          bloc.add(const PlaceResource(ResourceKind.cloudStorage));
+          await _pause();
+        } else {
+          await _click(scene, button.getGlobalRect().getCenter());
+        }
         _check(
             bloc.state.selected == selected &&
                 _observer.tileEvents == events &&
