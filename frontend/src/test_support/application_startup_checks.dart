@@ -59,6 +59,7 @@ class _RuntimeObserver extends bloc_core.BlocObserver {
   final created = <IsomapGridBloc>[];
   int closed = 0;
   int tileEvents = 0;
+  int placementEvents = 0;
   @override
   void onCreate(bloc_core.BlocBase<dynamic> bloc) {
     if (bloc is IsomapGridBloc) created.add(bloc);
@@ -74,6 +75,7 @@ class _RuntimeObserver extends bloc_core.BlocObserver {
   @override
   void onEvent(bloc_core.Bloc<dynamic, dynamic> bloc, Object? event) {
     if (event is TileClicked) tileEvents++;
+    if (event is PlaceResource) placementEvents++;
     super.onEvent(bloc, event);
   }
 }
@@ -141,7 +143,8 @@ void afterStartup() {
       _check(bloc.state.selected == null && bloc.state.tiles.isEmpty,
           'Disabled buttons cannot place or select.');
       await checkWorkspace(scene, bloc, di.sl<DesignCubit>(),
-          tileEvents: () => _observer.tileEvents);
+          tileEvents: () => _observer.tileEvents,
+          placementEvents: () => _observer.placementEvents);
       _check(_designRepository.calls == 1,
           'Only explicit fixture Design creation may call its repository.');
 

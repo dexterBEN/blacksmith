@@ -106,7 +106,7 @@ void afterStartup() {
         await _settle(scene);
         await _click(scene, _dialogButton(scene).getGlobalRect().getCenter());
         await _until(() => cubit.state.active != null && !cubit.state.pending);
-        // Save the sibling first through quick placement; it must never deploy.
+        // Save the sibling first through the top-toolbar shortcut; it must never deploy.
         await _select(scene, _secondPosition);
         await _choose(scene, Workspace3D.choices, ResourceKind.cloudStorage);
         _fillJson(scene, _document('blacksmith-native-save-only'));
@@ -223,6 +223,15 @@ void afterStartup() {
             'Both Resource IDs, tiles, complete configurations, revisions and deployment records survive restart.');
         _check(cubit.state.persistenceMessage.contains('succeeded'),
             'The existing workspace summary displays the persisted outcome.');
+        final summary =
+            scene.getNodeT<Label>('${Workspace3D.header}/Rows/ActiveDesign')!;
+        _check(
+            !scene
+                    .getNodeT<Control>(Workspace3D.inspector)!
+                    .isVisibleInTree() &&
+                summary.isVisibleInTree() &&
+                summary.getTooltipText().contains('succeeded'),
+            'Deployment feedback stays retrievable in the header with Inspector closed.');
         _cube(scene);
         _cube(scene, _secondPosition);
         checkEditorFraming(scene);

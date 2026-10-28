@@ -94,6 +94,50 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
+[node name="PlacementSeparator" type="VSeparator" parent="Margin/Layout/Header/Rows/Actions"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PlacementChoices" type="HBoxContainer" parent="Margin/Layout/Header/Rows/Actions"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CloudStorage" type="Button" parent="Margin/Layout/Header/Rows/Actions/PlacementChoices"]
+custom_minimum_size = Vector2(40, 32)
+layout_mode = 2
+disabled = true
+tooltip_text = "Cloud Storage · Local placement"
+icon = ExtResource("2_storage")
+icon_max_width = 20
+expand_icon = true
+
+[node name="ComputeEngine" type="Button" parent="Margin/Layout/Header/Rows/Actions/PlacementChoices"]
+custom_minimum_size = Vector2(40, 32)
+layout_mode = 2
+disabled = true
+tooltip_text = "Compute Engine · Local placement"
+icon = SubResource("ComputeIcon")
+icon_max_width = 20
+expand_icon = true
+
+[node name="CloudVpn" type="Button" parent="Margin/Layout/Header/Rows/Actions/PlacementChoices"]
+custom_minimum_size = Vector2(40, 32)
+layout_mode = 2
+disabled = true
+tooltip_text = "Cloud VPN · Local placement"
+icon = ExtResource("4_vpn")
+icon_max_width = 20
+expand_icon = true
+
+[node name="CloudLoadBalancing" type="Button" parent="Margin/Layout/Header/Rows/Actions/PlacementChoices"]
+custom_minimum_size = Vector2(40, 32)
+layout_mode = 2
+disabled = true
+tooltip_text = "Load Balancing · Local placement"
+icon = ExtResource("5_balancing")
+icon_max_width = 20
+expand_icon = true
+
 [node name="ActiveDesign" type="Label" parent="Margin/Layout/Header/Rows"]
 layout_mode = 2
 text = "No active Design · Local placements only"
@@ -224,27 +268,6 @@ size = 6.0
 near = 0.1
 far = 50.0
 
-[node name="QuickPlacement" type="PanelContainer" parent="Margin/Layout/Body/Center"]
-layout_mode = 2
-
-[node name="Content" type="HBoxContainer" parent="Margin/Layout/Body/Center/QuickPlacement"]
-layout_mode = 2
-mouse_filter = 2
-theme_override_constants/separation = 8
-
-[node name="Instruction" type="Label" parent="Margin/Layout/Body/Center/QuickPlacement/Content"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-text = "Select a tile first"
-text_overrun_behavior = 3
-mouse_filter = 2
-
-[node name="Choices" type="HBoxContainer" parent="Margin/Layout/Body/Center/QuickPlacement/Content"]
-layout_mode = 2
-alignment = 1
-theme_override_constants/separation = 8
-
 [node name="CloudStorage" type="Button" parent="Margin/Layout/Body/Sidebar/Content/Scroll/Choices"]
 custom_minimum_size = Vector2(44, 48)
 layout_mode = 2
@@ -288,42 +311,6 @@ disabled = true
 text = "Load Balancing"
 alignment = 0
 icon_alignment = 0
-tooltip_text = "Load Balancing · Local placement"
-icon = ExtResource("5_balancing")
-icon_max_width = 24
-expand_icon = true
-
-[node name="CloudStorage" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
-custom_minimum_size = Vector2(44, 40)
-layout_mode = 2
-disabled = true
-tooltip_text = "Cloud Storage · Local placement"
-icon = ExtResource("2_storage")
-icon_max_width = 24
-expand_icon = true
-
-[node name="ComputeEngine" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
-custom_minimum_size = Vector2(44, 40)
-layout_mode = 2
-disabled = true
-tooltip_text = "Compute Engine · Local placement"
-icon = SubResource("ComputeIcon")
-icon_max_width = 24
-expand_icon = true
-
-[node name="CloudVpn" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
-custom_minimum_size = Vector2(44, 40)
-layout_mode = 2
-disabled = true
-tooltip_text = "Cloud VPN · Local placement"
-icon = ExtResource("4_vpn")
-icon_max_width = 24
-expand_icon = true
-
-[node name="CloudLoadBalancing" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
-custom_minimum_size = Vector2(44, 40)
-layout_mode = 2
-disabled = true
 tooltip_text = "Load Balancing · Local placement"
 icon = ExtResource("5_balancing")
 icon_max_width = 24
@@ -389,7 +376,7 @@ mouse_filter = 2
 
 [node name="Placement" type="Label" parent="Margin/Layout/Body/Inspector/Content/Scroll/Details"]
 layout_mode = 2
-text = "Browse the library or use quick placement."
+text = "Browse the library or use the top-toolbar shortcuts."
 autowrap_mode = 3
 mouse_filter = 2
 

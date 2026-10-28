@@ -21,8 +21,6 @@ void checkEditorFraming(Node scene) {
       scene.getNodeT<PanelContainer>(Workspace3D.header)!.getGlobalRect();
   final sidebar =
       scene.getNodeT<PanelContainer>(Workspace3D.sidebar)!.getGlobalRect();
-  final quick =
-      scene.getNodeT<PanelContainer>(Workspace3D.quick)!.getGlobalRect();
   final docks = [
     Workspace3D.rail,
     Workspace3D.sidebar,
@@ -40,7 +38,7 @@ void checkEditorFraming(Node scene) {
           (renderSize.x - rect.size.x).abs() <= 1 &&
           (renderSize.y - rect.size.y).abs() <= 1,
       'A real render viewport must follow the canvas container dimensions.');
-  for (final panel in [header, quick, rect, ...docks]) {
+  for (final panel in [header, rect, ...docks]) {
     _check(
         panel.position.x >= 0 &&
             panel.position.y >= 0 &&
@@ -48,7 +46,7 @@ void checkEditorFraming(Node scene) {
             panel.end.y <= viewport.y + .1,
         'Every workspace panel must fit the actual main viewport.');
   }
-  for (final panel in [header, quick, ...docks]) {
+  for (final panel in [header, ...docks]) {
     final intersects = rect.position.x < panel.end.x - .1 &&
         rect.end.x > panel.position.x + .1 &&
         rect.position.y < panel.end.y - .1 &&
@@ -57,8 +55,11 @@ void checkEditorFraming(Node scene) {
         'No visible dock, rail, grip or toolbar overlaps the render canvas.');
   }
   _check(
-      rect.position.y >= header.end.y + 7 && rect.end.y <= quick.position.y - 7,
-      'Header and quick strip reserve vertical canvas space.');
+      rect.position.y >= header.end.y + 7 &&
+          (rect.end.y - (viewport.y - 8)).abs() <= .1 &&
+          !scene.hasNode(
+              NodePath.fromString('${Workspace3D.body}/Center/QuickPlacement')),
+      'The canvas fills the body down to its bottom margin, with no footer allocation.');
   for (final group in [Workspace3D.catalog, Workspace3D.choices]) {
     final container = scene.getNodeT<Control>(group)!;
     _check(container.getChildCount() == 4, 'Exactly four supported choices.');
@@ -66,9 +67,9 @@ void checkEditorFraming(Node scene) {
     for (final entry in resourceVisuals3D.values) {
       final button = container.getNodeT<Button>(entry.buttonName)!;
       final bounds = button.getGlobalRect();
-      final panel = group == Workspace3D.catalog ? sidebar : quick;
+      final panel = group == Workspace3D.catalog ? sidebar : header;
       // The native sidebar retains its vertical scroll container; no horizontal
-      // overflow is permitted. Quick choices must always be completely visible.
+      // overflow is permitted. Toolbar choices must always be completely visible.
       _check(
           bounds.position.x >= panel.position.x &&
               bounds.end.x <= panel.end.x + .1 &&

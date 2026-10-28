@@ -18,7 +18,8 @@ import 'isometric_3d_framing_checks.dart';
 /// Real native containers/controls, actual window sizes, production BLoC/Cubit.
 /// The caller injects fail-closed repositories; this suite never saves/deploys.
 Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
-    {required int Function() tileEvents}) async {
+    {required int Function() tileEvents,
+    required int Function() placementEvents}) async {
   final window = scene.getTree()!.getRoot()!;
   final originalMode = window.getContentScaleMode();
   final originalSize = window.getContentScaleSize();
@@ -128,6 +129,7 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     if (group == Workspace3D.catalog) await library();
     final selected = grid.state.selected;
     final before = tileEvents();
+    final placements = placementEvents();
     final button = _button(scene, group, kind);
     if (kind == ResourceKind.cloudStorage) {
       if (!button.isDisabled()) {
@@ -148,8 +150,9 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     _check(
         grid.state.selected == selected &&
             grid.state.tiles[selected] == kind &&
-            tileEvents() == before,
-        'Placement/replacement preserves selection.');
+            tileEvents() == before &&
+            placementEvents() == placements + 1,
+        'Each placement/replacement emits exactly once and preserves selection.');
     _check(
         _cube(scene, selected!).getSceneFilePath() ==
             resourceVisuals3D[kind]!.scenePath,
@@ -168,8 +171,61 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
         'Replacement frees the obsolete cube.');
     await choose(Workspace3D.choices, kind);
   }
+
+  // Default Godot keyboard activation survives relocation; no custom shortcut
+  // or duplicate pressed binding is introduced by moving the existing buttons.
+  await closeDocks();
+  await select(const GridPos(3, 2));
+  final keyboardChoice =
+      _button(scene, Workspace3D.choices, ResourceKind.computeEngine);
+  keyboardChoice.grabFocus();
+  await _settle(scene);
+  _check(keyboardChoice.hasFocus(), 'Toolbar choices retain keyboard focus.');
+  final keyboardEvents = placementEvents();
+  final selectionEvents = tileEvents();
+  for (final pressed in [true, false]) {
+    scene.getViewport()!.pushInput(
+        InputEventKey()
+          ..setKeycode(Key.enter)
+          ..setPressed(pressed),
+        inLocalCoords: true);
+    await _settle(scene);
+  }
+  _check(
+      placementEvents() == keyboardEvents + 1 &&
+          tileEvents() == selectionEvents &&
+          grid.state.tiles[const GridPos(3, 2)] == ResourceKind.computeEngine,
+      'Enter activates the focused toolbar command exactly once.');
+  keyboardChoice.releaseFocus();
+
+  // Opening Inspector reads the current selection, including changes made
+  // while it was closed, rather than retaining the previously inspected tile.
+  await inspector();
+  _check(
+      scene.getNodeT<Label>('${Workspace3D.details}/Kind')!.getText() ==
+          'Compute Engine',
+      'Inspector opens on the resource selected while closed.');
+  await click('${Workspace3D.inspector}/Content/Heading/Close');
+  await select(const GridPos(3, 3));
+  await inspector();
+  _check(
+      scene.getNodeT<Label>('${Workspace3D.details}/Coordinates')!.getText() ==
+              'Row 3 · Column 3' &&
+          scene.getNodeT<Label>('${Workspace3D.details}/Kind')!.getText() ==
+              'Empty tile' &&
+          scene.getNodeT<Label>('${Workspace3D.details}/Identity')!.getText() ==
+              '' &&
+          scene
+                  .getNodeT<Label>('${Workspace3D.details}/Deployment')!
+                  .getText() ==
+              '',
+      'Reopened Inspector clears stale resource identity and deployment details.');
   grid.add(const ResetGridForNewDesign());
   await _settle(scene);
+  _check(
+      scene.getNodeT<Label>('${Workspace3D.details}/Coordinates')!.getText() ==
+          'No tile selected',
+      'Reset clears the Inspector selection context.');
   final corners = [
     GridPos(0, 0),
     GridPos(0, grid.state.cols - 1),
@@ -337,7 +393,8 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
   checkEditorFraming(scene);
   GD.print(Variant('BLACKSMITH_WORKSPACE_PASSED resources=4 entry_points=2 '
       'panel_states=4 desktop_sizes=4 minimum=960x640 minimum_canvas=480x320 '
-      'native_resize=true grips=true maximize_restore=true selection_preserved=true'));
+      'native_resize=true grips=true maximize_restore=true selection_preserved=true '
+      'footer_absent=true commands_once=true keyboard=true inspector_reopen=true'));
 }
 
 Button _button(Node scene, String group, ResourceKind kind) =>
