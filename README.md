@@ -33,7 +33,8 @@ https://github.com/user-attachments/assets/6a8570f7-8b87-4de8-8a9c-fb4c8ad4aaca
 
 ## 🧱 Global Architecture Overview
 
-![Blacksmith global architecture](images/blacksmith-global-architecture.png)
+<img width="1774" height="887" alt="image" src="https://github.com/user-attachments/assets/cd20bf5d-c839-4efb-bea7-4e1ba2198933" />
+
 
 *Conceptual overview: the illustration includes future components as well as current ones. In the current code, the cloud contract belongs to `CloudServices.Core` and its implementation to `Providers.GoogleCloud`, outside `Blacksmith.Application`. The resource type catalog is read-only; provider/metadata fields and the combined provisioning workflow shown in the image are future concepts. See the [source-based ASCII diagrams](project_architecture.md) for the implemented structure.*
 
