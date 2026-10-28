@@ -21,8 +21,6 @@ void checkEditorFraming(Node scene) {
       scene.getNodeT<PanelContainer>(Workspace3D.header)!.getGlobalRect();
   final sidebar =
       scene.getNodeT<PanelContainer>(Workspace3D.sidebar)!.getGlobalRect();
-  final quick =
-      scene.getNodeT<PanelContainer>(Workspace3D.quick)!.getGlobalRect();
   final docks = [
     Workspace3D.rail,
     Workspace3D.sidebar,
@@ -40,7 +38,7 @@ void checkEditorFraming(Node scene) {
           (renderSize.x - rect.size.x).abs() <= 1 &&
           (renderSize.y - rect.size.y).abs() <= 1,
       'A real render viewport must follow the canvas container dimensions.');
-  for (final panel in [header, quick, rect, ...docks]) {
+  for (final panel in [header, rect, ...docks]) {
     _check(
         panel.position.x >= 0 &&
             panel.position.y >= 0 &&
@@ -48,7 +46,7 @@ void checkEditorFraming(Node scene) {
             panel.end.y <= viewport.y + .1,
         'Every workspace panel must fit the actual main viewport.');
   }
-  for (final panel in [header, quick, ...docks]) {
+  for (final panel in [header, ...docks]) {
     final intersects = rect.position.x < panel.end.x - .1 &&
         rect.end.x > panel.position.x + .1 &&
         rect.position.y < panel.end.y - .1 &&
@@ -57,25 +55,35 @@ void checkEditorFraming(Node scene) {
         'No visible dock, rail, grip or toolbar overlaps the render canvas.');
   }
   _check(
-      rect.position.y >= header.end.y + 7 && rect.end.y <= quick.position.y - 7,
-      'Header and quick strip reserve vertical canvas space.');
-  for (final group in [Workspace3D.catalog, Workspace3D.choices]) {
-    final container = scene.getNodeT<Control>(group)!;
-    _check(container.getChildCount() == 4, 'Exactly four supported choices.');
-    if (!container.isVisibleInTree()) continue;
+      rect.position.y >= header.end.y + 7 &&
+          (rect.end.y - (viewport.y - 8)).abs() <= .1 &&
+          !scene.hasNode(
+              NodePath.fromString('${Workspace3D.body}/Center/QuickPlacement')),
+      'The canvas fills the body down to its bottom margin, with no footer allocation.');
+  _check(
+      !scene.hasNode(NodePath.fromString(
+              '${Workspace3D.header}/Rows/Actions/PlacementChoices')) &&
+          !scene.hasNode(NodePath.fromString(
+              '${Workspace3D.header}/Rows/Actions/PlacementSeparator')),
+      'The header contains Design actions; resource tools belong to the Library.');
+  final container = scene.getNodeT<Control>(Workspace3D.catalog)!;
+  _check(container.getChildCount() == 4,
+      'Exactly four resource controls in the single Library palette.');
+  if (container.isVisibleInTree()) {
+    final scroll = scene
+        .getNodeT<Control>('${Workspace3D.sidebar}/Content/Scroll')!
+        .getGlobalRect();
     for (final entry in resourceVisuals3D.values) {
       final button = container.getNodeT<Button>(entry.buttonName)!;
       final bounds = button.getGlobalRect();
-      final panel = group == Workspace3D.catalog ? sidebar : quick;
       // The native sidebar retains its vertical scroll container; no horizontal
-      // overflow is permitted. Quick choices must always be completely visible.
+      // overflow is permitted at the minimum dock width.
       _check(
-          bounds.position.x >= panel.position.x &&
-              bounds.end.x <= panel.end.x + .1 &&
-              (group == Workspace3D.catalog ||
-                  bounds.position.y >= panel.position.y &&
-                      bounds.end.y <= panel.end.y + .1),
-          'Resource buttons stay inside their panel (or its vertical scroll area).');
+          bounds.position.x >= sidebar.position.x &&
+              bounds.end.x <= sidebar.end.x + .1 &&
+              bounds.position.y >= scroll.position.y - .1 &&
+              bounds.end.y <= scroll.end.y + .1,
+          'All four labelled resource tools are fully visible in the open Library.');
     }
   }
   void point(Vector3 world) {
@@ -148,6 +156,14 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
   ]) {
     window.setContentScaleSize(Vector2i.fromXY(size.$1, size.$2));
     await _pause();
+    if (!scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
+      await _click(
+          scene,
+          scene
+              .getNodeT<Button>(Workspace3D.libraryToggle)!
+              .getGlobalRect()
+              .getCenter());
+    }
     checkEditorFraming(scene);
     final cameraSize = camera.getSize();
     final offset = camera.getVOffset();
@@ -166,7 +182,7 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
       }
     }
     final button =
-        scene.getNodeT<Button>('${Workspace3D.choices}/ComputeEngine')!;
+        scene.getNodeT<Button>('${Workspace3D.catalog}/ComputeEngine')!;
     final before = tileEvents();
     await _click(scene, button.getGlobalRect().getCenter());
     _check(

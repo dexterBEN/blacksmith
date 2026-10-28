@@ -149,10 +149,18 @@ void afterStartup() {
 
       Future<void> place() async {
         await select(const GridPos(0, 0));
+        if (!scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
+          await _click(
+              scene,
+              scene
+                  .getNodeT<Button>(Workspace3D.libraryToggle)!
+                  .getGlobalRect()
+                  .getCenter());
+        }
         await _click(
             scene,
             scene
-                .getNodeT<Button>('${Workspace3D.choices}/ComputeEngine')!
+                .getNodeT<Button>('${Workspace3D.catalog}/ComputeEngine')!
                 .getGlobalRect()
                 .getCenter());
         _check(
@@ -180,7 +188,7 @@ void afterStartup() {
           dialogButton('Create').isDisabled(), 'Discard consent is required.');
       _check(
           scene
-              .getNodeT<Button>('${Workspace3D.choices}/CloudStorage')!
+              .getNodeT<Button>('${Workspace3D.catalog}/CloudStorage')!
               .isDisabled(),
           'Modal blocks keyboard and pointer placement behind the dialog.');
       await _capture(scene, 'new_design_dialog.png');

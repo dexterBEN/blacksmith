@@ -71,8 +71,6 @@ class Workspace3D {
   static const inspectorGrip = '$body/InspectorResize';
   static const catalog = '$sidebar/Content/Scroll/Choices';
   static const canvas = '$root/Margin/Layout/Body/Center/Canvas';
-  static const quick = '$root/Margin/Layout/Body/Center/QuickPlacement';
-  static const choices = '$quick/Content/Choices';
   static const cameraPath = '$canvas/WorldViewport/Camera3D';
 
   static SubViewport viewport(Node scene) =>
@@ -178,7 +176,7 @@ class Workspace3D {
     label(
         'Placement',
         resource == null
-            ? 'Choose a resource from the library or quick placement.'
+            ? 'Open the Resource Library to choose a resource.'
             : resource.id == null
                 ? 'Local placement'
                 : resource.configuration == null

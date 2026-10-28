@@ -59,6 +59,7 @@ class _RuntimeObserver extends bloc_core.BlocObserver {
   final created = <IsomapGridBloc>[];
   int closed = 0;
   int tileEvents = 0;
+  int placementEvents = 0;
   @override
   void onCreate(bloc_core.BlocBase<dynamic> bloc) {
     if (bloc is IsomapGridBloc) created.add(bloc);
@@ -74,6 +75,7 @@ class _RuntimeObserver extends bloc_core.BlocObserver {
   @override
   void onEvent(bloc_core.Bloc<dynamic, dynamic> bloc, Object? event) {
     if (event is TileClicked) tileEvents++;
+    if (event is PlaceResource) placementEvents++;
     super.onEvent(bloc, event);
   }
 }
@@ -133,6 +135,18 @@ void afterStartup() {
         ..call('notify_mouse_entered');
       _check(bloc.state.selected == null && bloc.state.tiles.isEmpty,
           'A new application starts without selection or saved resources.');
+      Future<void> library() async {
+        if (!scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
+          await _click(
+              scene,
+              scene
+                  .getNodeT<Button>(Workspace3D.libraryToggle)!
+                  .getGlobalRect()
+                  .getCenter());
+        }
+      }
+
+      await library();
       for (final kind in ResourceKind.values) {
         final button = _button(scene, kind);
         _check(button.isDisabled(), 'Placement requires a selected tile.');
@@ -140,8 +154,15 @@ void afterStartup() {
       }
       _check(bloc.state.selected == null && bloc.state.tiles.isEmpty,
           'Disabled buttons cannot place or select.');
+      await _click(
+          scene,
+          scene
+              .getNodeT<Button>(Workspace3D.libraryToggle)!
+              .getGlobalRect()
+              .getCenter());
       await checkWorkspace(scene, bloc, di.sl<DesignCubit>(),
-          tileEvents: () => _observer.tileEvents);
+          tileEvents: () => _observer.tileEvents,
+          placementEvents: () => _observer.placementEvents);
       _check(_designRepository.calls == 1,
           'Only explicit fixture Design creation may call its repository.');
 
@@ -160,6 +181,7 @@ void afterStartup() {
       }
 
       Future<void> choose(ResourceKind kind) async {
+        await library();
         final selected = bloc.state.selected;
         final events = _observer.tileEvents;
         final button = _button(scene, kind);
@@ -291,7 +313,7 @@ Node3D _root(Node scene) => scene.getNodeT<Node3D>('ResourceRoot')!;
 Node3D _cube(Node scene, GridPos pos) =>
     _root(scene).getNodeT<Node3D>('Resource_${pos.row}_${pos.col}')!;
 Button _button(Node scene, ResourceKind kind) => scene.getNodeT<Button>(
-    '${Workspace3D.choices}/${resourceVisuals3D[kind]!.buttonName}')!;
+    '${Workspace3D.catalog}/${resourceVisuals3D[kind]!.buttonName}')!;
 void _checkResources(Node scene, IsomapGridBloc bloc) {
   _check(_root(scene).getChildCount() == bloc.state.tiles.length,
       'Exactly one existing scene per logical resource.');

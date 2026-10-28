@@ -8,21 +8,17 @@ import 'workspace_3d.dart';
 /// only. Signal ownership is the scene node, never an additional state owner.
 class ResourcePalette3D {
   ResourcePalette3D(Node owner, void Function(ResourceKind) onChosen) {
-    _instruction =
-        owner.getNodeT<Label>('${Workspace3D.quick}/Content/Instruction')!;
     _guidance =
         owner.getNodeT<Label>('${Workspace3D.sidebar}/Content/Guidance')!;
     for (final entry in resourceVisuals3D.entries) {
-      for (final path in [Workspace3D.catalog, Workspace3D.choices]) {
-        final button =
-            owner.getNodeT<Button>('$path/${entry.value.buttonName}')!;
-        _buttons.add((button: button, kind: entry.key));
-        button.pressed.connect(owner, () => onChosen(entry.key));
-      }
+      final button = owner.getNodeT<Button>(
+          '${Workspace3D.catalog}/${entry.value.buttonName}')!;
+      _buttons.add((button: button, kind: entry.key));
+      button.pressed.connect(owner, () => onChosen(entry.key));
     }
   }
 
-  late final Label _instruction, _guidance;
+  late final Label _guidance;
   final _buttons = <({Button button, ResourceKind kind})>[];
 
   void render(IsomapGridState state,
@@ -50,9 +46,11 @@ class ResourcePalette3D {
               ? 'Choose an empty tile or an existing Cloud Storage resource.'
               : persisted && !canChoose && enabled
                   ? 'Replacing a persisted resource is not supported. Choose another tile.'
-                  : storage
-                      ? 'Configure Cloud Storage'
-                      : resourceVisuals3D[choice.kind]!.label);
+                  : !hasSelection
+                      ? '${resourceVisuals3D[choice.kind]!.label} · Select a tile first'
+                      : storage
+                          ? 'Configure Cloud Storage'
+                          : resourceVisuals3D[choice.kind]!.label);
     }
     final text = hasSelection
         ? 'Tile (${selected.row}, ${selected.col}) · ${persisted ? (state.resources[selected]?.configuration == null ? "Unconfigured" : "Saved configuration") : "Local placement"}'
@@ -60,10 +58,7 @@ class ResourcePalette3D {
     final selectedResource = state.resources[selected];
     final detail =
         selectedResource?.deployment?.describe(selectedResource.revision);
-    _instruction.setTooltipText(detail ??
-        'Configuration saved locally or in the backend; no deployment requested.');
     _guidance.setTooltipText(detail ?? 'No deployment requested.');
-    _instruction.setText(text);
     _guidance.setText(detail == null
         ? text
         : '$text · ${selectedResource!.deployment!.status}');

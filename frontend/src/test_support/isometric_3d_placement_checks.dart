@@ -19,8 +19,20 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
     required int Function() listeners,
     required bool capture}) async {
   var scene = tree.getCurrentScene()!;
+  Future<void> library() async {
+    if (!scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
+      await _click(
+          scene,
+          scene
+              .getNodeT<Button>(Workspace3D.libraryToggle)!
+              .getGlobalRect()
+              .getCenter());
+    }
+  }
+
   restore(IsomapGridState.initial());
   await _pause();
+  await library();
   for (final kind in ResourceKind.values) {
     final button = _button(scene, kind);
     _check(button.isDisabled() && button.getButtonIcon() != null,
@@ -47,6 +59,7 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
   }
 
   Future<void> choose(ResourceKind kind) async {
+    await library();
     final selected = bloc.state.selected;
     final before = tileEvents();
     final button = _button(scene, kind);
@@ -170,7 +183,7 @@ Node3D _root(Node scene) => scene.getNodeT<Node3D>('ResourceRoot')!;
 Node3D _cube(Node scene, GridPos position) =>
     _root(scene).getNodeT<Node3D>('Resource_${position.row}_${position.col}')!;
 Button _button(Node scene, ResourceKind kind) => scene.getNodeT<Button>(
-    '${Workspace3D.choices}/${resourceVisuals3D[kind]!.buttonName}')!;
+    '${Workspace3D.catalog}/${resourceVisuals3D[kind]!.buttonName}')!;
 
 void _checkResources(Node scene, IsomapGridState state) {
   _check(_root(scene).getChildCount() == state.tiles.length,

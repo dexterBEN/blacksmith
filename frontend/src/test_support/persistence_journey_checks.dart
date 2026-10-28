@@ -200,7 +200,7 @@ void afterStartup() {
                 grid.state.resources.isEmpty &&
                 _resourceClient.puts == 0,
             'Escape cancels without placement or write.');
-        await _choose(scene, Workspace3D.choices, ResourceKind.cloudStorage);
+        await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
         await _click(scene,
             _configurationButton(scene, 'Close').getGlobalRect().getCenter());
         _check(
@@ -252,7 +252,7 @@ void afterStartup() {
             'Confirmed create uses the captured UUID.');
         final firstNode = _cube(scene).getInstanceId();
         await _select(scene, _secondPosition);
-        await _choose(scene, Workspace3D.choices, ResourceKind.cloudStorage);
+        await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
         final secondId = cubit.state.configurationDraft!.resource.localKey;
         _fillJson(scene, _document('blacksmith-native-second'));
         _resourceClient.losePutNumber = 3;
@@ -287,7 +287,7 @@ void afterStartup() {
                 grid.state.resources[_position]!.revision == 2 &&
                 _cube(scene).getInstanceId() == firstNode,
             'Editing retains ID/tile/node and advances revision.');
-        await _choose(scene, Workspace3D.choices, ResourceKind.cloudStorage);
+        await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
         await _click(scene,
             _configurationButton(scene, 'Save').getGlobalRect().getCenter());
         await _until(() =>
@@ -389,10 +389,7 @@ void afterStartup() {
         await _capture(scene, 'after_relaunch.png');
         for (final position in [_position, _secondPosition]) {
           await _select(scene, position);
-          await _choose(
-              scene,
-              position == _position ? Workspace3D.catalog : Workspace3D.choices,
-              ResourceKind.cloudStorage);
+          await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
           final parsed = di
               .sl<ResourceRepository>()
               .parseConfiguration(_json(scene).getText());
@@ -416,7 +413,7 @@ void afterStartup() {
                 .every((e) => _cube(scene, e.key).getInstanceId() == e.value),
             'Repeated Open must not duplicate or rebuild unchanged cubes.');
         await _select(scene);
-        await _choose(scene, Workspace3D.choices, ResourceKind.computeEngine);
+        await _choose(scene, Workspace3D.catalog, ResourceKind.computeEngine);
         _check(
             grid.state.tiles[_position] == ResourceKind.cloudStorage &&
                 cubit.state.saved,
