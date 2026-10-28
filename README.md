@@ -107,6 +107,10 @@ a persisted kind or deleting it through Save remains unsupported.
 
 ## Local 3D editor
 
+See [local startup and the five-cycle non-cloud smoke test](docs/local-smoke-test.md)
+for host/container terminal contexts, port 5100 diagnostics, safe dependency refresh,
+deployment-state semantics and isolated regression commands.
+
 On the Ubuntu host, open the Godot editor with the existing backend deployment
 token automatically loaded:
 

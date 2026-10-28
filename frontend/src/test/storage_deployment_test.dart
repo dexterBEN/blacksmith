@@ -46,7 +46,12 @@ class Deployments extends configuration.ConfiguredResources {
             bucketName: record.configuration!.values['bucketName'] as String,
             location: 'europe-west9',
             status: status,
-            code: status == 'succeeded' ? 'verified' : 'provider_timeout',
+            code: switch (status) {
+              'succeeded' => 'verified',
+              'pending' => 'deploying',
+              'failed' => 'provider_rejected',
+              _ => 'provider_timeout',
+            },
             ownershipVerified: status == 'succeeded'));
     records = [...records.where((r) => r.id != record.id), value];
     return value;
@@ -221,6 +226,54 @@ void main() {
       expect(resources.deploys, 1);
       expect(grid.state.resources[const GridPos(4, 1)]!.deployment, isNull);
     });
+    for (final outcome in ['pending', 'succeeded', 'failed', 'unknown']) {
+      test(
+          'five fresh coordinators restore $outcome and saved-only without writes',
+          () async {
+        await open();
+        resources.outcome = outcome;
+        cubit.approveDeployment(true);
+        await cubit.deployResourceConfiguration();
+        cubit.cancelResourceConfiguration();
+        const sibling = GridPos(4, 1);
+        grid.add(const TileClicked(sibling));
+        await settle();
+        cubit.openResourceConfiguration();
+        cubit.changeResourceConfigurationText(document.replaceAll(
+            'blacksmith-deployment-fixture', 'blacksmith-saved-only'));
+        await cubit.saveResourceConfiguration();
+        final original = Map.of(grid.state.resources);
+        final writes = resources.puts, deploys = resources.deploys;
+        final reads = resources.inspections, retries = resources.retries;
+        for (var cycle = 0; cycle < 5; cycle++) {
+          await cubit.close();
+          await grid.close();
+          grid = IsomapGridBloc();
+          cubit = DesignCubit(designs, grid, resources: resources);
+          expect(cubit.state.active, isNull);
+          expect(grid.state.resources, isEmpty);
+          cubit.openExisting();
+          cubit.changeOpenId(fixtures.id);
+          await cubit.submit();
+          expect(grid.state.resources, original);
+          expect(
+              grid.state.resources[fixtures.pos]!.deployment!.status, outcome);
+          expect(grid.state.resources[sibling]!.deployment, isNull);
+          expect(cubit.state.persistenceMessage, contains(outcome));
+          grid.add(const TileClicked(fixtures.pos));
+          await settle();
+          cubit.openResourceConfiguration();
+          expect(cubit.state.configurationDraft!.resource.id,
+              original[fixtures.pos]!.id);
+          expect(cubit.state.configurationDraft!.consent, isFalse);
+          cubit.cancelResourceConfiguration();
+          expect(resources.puts, writes);
+          expect(resources.deploys, deploys);
+          expect(resources.inspections, reads);
+          expect(resources.retries, retries);
+        }
+      });
+    }
   });
   test('Check Save after a lost deployment response is database-only',
       () async {

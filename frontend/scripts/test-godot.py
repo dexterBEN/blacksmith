@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import tempfile
 import json
+import re
 from urllib.parse import urlparse
 import sys
 
@@ -41,17 +42,23 @@ def main():
     parser.add_argument('--deployment', metavar='BASE_URL', help='Native Save & Deploy journey, only against the marked fake-provider fixture.')
     parser.add_argument('--persistence-phase', choices=['save', 'open'],
                         help='Run one restart phase per invocation, sharing --output; useful on slow VMs.')
+    parser.add_argument('--reopen-cycles', type=int, default=1,
+                        help='Repeat the fake deployment Open phase in distinct native processes, preserving per-cycle evidence.')
+    parser.add_argument('--local-editor', action='store_true',
+                        help='For a deployment fixture, import with the real host run_local.sh launcher before the player cycles (requires backend/.env).')
     args = parser.parse_args()
     if sum(bool(mode) for mode in [args.design, args.application, args.persistence, args.deployment]) > 1:
         parser.error('--design and --application are separate checks.')
     if args.design_live and not args.design:
         parser.error('--design-live requires --design and a dedicated test database.')
     if args.persistence_phase and not (args.persistence or args.deployment):
-        parser.error('--persistence-phase requires --persistence.')
+        parser.error('--persistence-phase requires --persistence or --deployment.')
     if args.persistence_phase and not args.output:
         parser.error('--persistence-phase requires a shared --output directory.')
     if args.design_live and args.trace_network:
         parser.error('--trace-network forbids IP connections; use it with the offline --design check.')
+    if args.reopen_cycles < 1 or (args.reopen_cycles != 1 or args.local_editor) and not args.deployment:
+        parser.error('--reopen-cycles and --local-editor require --deployment; cycle count must be positive.')
     journey = args.deployment or args.persistence
     if args.deployment:
         from urllib.request import urlopen
@@ -117,16 +124,21 @@ def main():
     if args.trace_network and not shutil.which('strace'):
         raise RuntimeError('--trace-network requires an installed Linux strace.')
 
-    def run(name, arguments, marker, local=False, headless=True, trace=False):
+    def run(name, arguments, marker, local=False, headless=True, trace=False, launcher=False):
         log = output / f'{name}.log'
         run_env = env.copy()
         if not args.application and not args.design and not (args.persistence or args.deployment):
             run_env['BLACKSMITH_SMOKE_LOCAL'] = '1' if local else '0'
         command = [args.godot, *(['--headless'] if headless else []),
                    '--path', str(project), *arguments]
+        if launcher:
+            command = ['bash', str(source / 'scripts/run_local.sh'),
+                       '--path', str(project), *arguments]
         network = output / f'{name}.network.log'
         if trace:
-            command = ['strace', '-f', '-qq', '-e', 'trace=connect',
+            # Filter unrelated syscalls in-kernel: ordinary ptrace makes cold
+            # Dart compilation unnecessarily slow on the development VM.
+            command = ['strace', '--seccomp-bpf', '-f', '-qq', '-e', 'trace=connect',
                        '-o', str(network), *command]
         with log.open('w') as stream:
             result = subprocess.run(
@@ -135,6 +147,12 @@ def main():
         contents = log.read_text(errors='replace')
         if result.returncode or marker not in contents:
             raise RuntimeError(f'{name} failed; inspect {log}')
+        # Legacy headless imports have known Godot 4.4 progress-dialog errors,
+        # but a readiness marker must never conceal a Dart/native exception.
+        if any(line.startswith(('ERROR: GodotDart:', 'ERROR: Unhandled exception:',
+                                'SCRIPT ERROR:', 'SHADER ERROR:'))
+               for line in contents.splitlines()):
+            raise RuntimeError(f'{name} Dart/native failure; inspect {log}')
         if (args.application or args.design or args.persistence or args.deployment) and (any(line.startswith(
                 ('ERROR:', 'SCRIPT ERROR:', 'SHADER ERROR:'))
                 for line in contents.splitlines()) or
@@ -146,7 +164,17 @@ def main():
                 target = urlparse(journey)
                 allowed = f'inet_addr("{target.hostname}")'
                 port = f'sin_port=htons({target.port or 80})'
-                if any(allowed not in line or port not in line for line in connections):
+                # godot_dart's editor connects to its own advertised VM service.
+                # Only that exact IPv4 loopback endpoint is exempt, only for the
+                # real editor launcher; player requests stay API-only.
+                debugger_ports = re.findall(
+                    r'The Dart VM service is listening on http://127\.0\.0\.1:(\d+)/',
+                    contents) if launcher else []
+                def permitted(line):
+                    return (allowed in line and port in line) or (
+                        'inet_addr("127.0.0.1")' in line and
+                        any(f'sin_port=htons({value})' in line for value in debugger_ports))
+                if any(not permitted(line) for line in connections):
                     raise RuntimeError(f'{name}: connection outside the dedicated API; inspect {network}')
             elif connections:
                 raise RuntimeError(f'{name} attempted an outgoing IP connection; inspect {network}')
@@ -157,7 +185,8 @@ def main():
         graphical = ['--display-driver', 'x11', '--rendering-method',
                      'gl_compatibility', '--resolution', '1152x648']
         run('persistence-import', ['--editor', '--import', *graphical],
-            '[main] Dart scripts attached.', headless=False)
+            '[main] Dart scripts attached.', headless=False,
+            launcher=args.local_editor, trace=args.trace_network and args.local_editor)
         original_main = (project / 'src/main.dart').read_bytes()
         (project / 'src/production_main.dart').write_bytes(original_main)
         (project / 'src/main.dart').write_text(
@@ -168,9 +197,23 @@ def main():
             phases = [args.persistence_phase] if args.persistence_phase else ['save', 'open']
             for phase in phases:
                 env['BLACKSMITH_PERSISTENCE_PHASE'] = phase
-                run(f'persistence-{phase}', [*graphical, '--max-fps', '60'],
-                    f'BLACKSMITH_PERSISTENCE_{phase.upper()}_PASSED',
-                    headless=False, trace=args.trace_network)
+                cycles = args.reopen_cycles if phase == 'open' else 1
+                for cycle in range(1, cycles + 1):
+                    suffix = f'-{cycle}' if phase == 'open' else ''
+                    run(f'persistence-{phase}{suffix}', [*graphical, '--max-fps', '60'],
+                        f'BLACKSMITH_PERSISTENCE_{phase.upper()}_PASSED',
+                        headless=False, trace=args.trace_network)
+                    if phase == 'open':
+                        for name in ['reopened.json', 'open-http.json',
+                                     'deployment_restored.png', 'deployment_reopened_workspace.png']:
+                            path = output / name
+                            if path.exists():
+                                shutil.copyfile(path, output / f'cycle-{cycle}-{name}')
+                if phase == 'open':
+                    opened = [json.loads((output / f'cycle-{cycle}-reopened.json').read_text())
+                              for cycle in range(1, cycles + 1)]
+                    if len({item['open_pid'] for item in opened}) != cycles:
+                        raise RuntimeError('Every reopen cycle must use a distinct native process.')
             if 'open' in phases:
                 saved = json.loads((output / 'journey.json').read_text())
                 opened = json.loads((output / 'reopened.json').read_text())

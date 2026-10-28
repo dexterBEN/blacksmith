@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
 import 'package:http/http.dart' as http;
+import 'package:collection/collection.dart';
 import '../lib/core/di/service_locator.dart' as di;
 import '../lib/data/repositories/design_repository.dart';
 import '../lib/data/repositories/resource_repository.dart';
@@ -193,6 +194,7 @@ void afterStartup() {
           'resource_id': deployed.id,
           'operation_id': deployed.deployment!.id,
           'revision': deployed.revision,
+          'resources': _snapshot(grid),
           'fake_provider': true,
           'stats': stats
         }));
@@ -212,23 +214,46 @@ void afterStartup() {
             'Same identity, configuration and durable outcome restored.');
         _check(grid.state.resources[_secondPosition]!.deployment == null,
             'Saved sibling remains undeployed.');
+        _check(
+            const DeepCollectionEquality()
+                .equals(_snapshot(grid), saved['resources']),
+            'Both Resource IDs, tiles, complete configurations, revisions and deployment records survive restart.');
+        _check(cubit.state.persistenceMessage.contains('succeeded'),
+            'The existing workspace summary displays the persisted outcome.');
         _cube(scene);
         _cube(scene, _secondPosition);
         checkEditorFraming(scene);
+        await _capture(scene, 'deployment_reopened_workspace.png');
+        await _select(scene);
+        await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
+        _check(
+            const DeepCollectionEquality()
+                    .equals(jsonDecode(_json(scene).getText()), {
+                  'schemaVersion': grid
+                      .state.resources[_position]!.configuration!.schemaVersion,
+                  'configuration':
+                      grid.state.resources[_position]!.configuration!.values
+                }) &&
+                !scene
+                    .getNodeT<CheckButton>('$_configurationPath/Consent')!
+                    .isPressed(),
+            'Reopened configuration is editable, canonical and never pre-consented.');
+        await _capture(scene, 'deployment_restored.png');
+        await _click(scene,
+            _configurationButton(scene, 'Cancel').getGlobalRect().getCenter());
+        // A second Open in this same process must also be read-only and idempotent.
+        await _open(scene, cubit, saved['design_id'] as String);
+        _check(
+            const DeepCollectionEquality()
+                .equals(_snapshot(grid), saved['resources']),
+            'Repeated Open retains the complete same snapshot.');
         _check(_client.events.every((e) => e['method'] == 'GET'),
             'Restart/Open performs only metadata reads.');
-        _check(
-            (await _stats())['creates'] == initial['creates'] &&
-                (await _stats())['inspections'] == initial['inspections'],
-            'Open never calls Google, even read-only.');
-        await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
-        await _capture(scene, 'deployment_restored.png');
-        await File('$_output/reopened.json').writeAsString(jsonEncode({
-          ...saved,
-          'open_pid': pid,
-          'restored': true,
-          'stats': await _stats()
-        }));
+        final after = await _stats();
+        _check(const DeepCollectionEquality().equals(after, initial),
+            'Open, configuration review and repeated Open change no SQL counts or provider counters.');
+        await File('$_output/reopened.json').writeAsString(jsonEncode(
+            {...saved, 'open_pid': pid, 'restored': true, 'stats': after}));
       }
       await File('$_output/$_phase-http.json')
           .writeAsString(jsonEncode(_client.events));
@@ -242,6 +267,42 @@ void afterStartup() {
       tree.quit(exitCode: 1);
     }
   });
+}
+
+List<Map<String, Object?>> _snapshot(IsomapGridBloc grid) {
+  final entries = grid.state.resources.entries.toList()
+    ..sort((a, b) => a.key.row == b.key.row
+        ? a.key.col.compareTo(b.key.col)
+        : a.key.row.compareTo(b.key.row));
+  return entries.map((entry) {
+    final resource = entry.value;
+    final deployment = resource.deployment;
+    return <String, Object?>{
+      'id': resource.id,
+      'designId': resource.designId,
+      'row': entry.key.row,
+      'col': entry.key.col,
+      'revision': resource.revision,
+      'etag': resource.etag,
+      'configurationState': resource.configurationState,
+      'configuration': resource.configuration!.values,
+      'schemaVersion': resource.configuration!.schemaVersion,
+      'deployment': deployment == null
+          ? null
+          : {
+              'id': deployment.id,
+              'resourceId': deployment.resourceId,
+              'designId': deployment.designId,
+              'resourceRevision': deployment.resourceRevision,
+              'projectId': deployment.projectId,
+              'bucketName': deployment.bucketName,
+              'location': deployment.location,
+              'status': deployment.status,
+              'code': deployment.code,
+              'ownershipVerified': deployment.ownershipVerified,
+            },
+    };
+  }).toList();
 }
 
 Future<void> _open(Node scene, DesignCubit cubit, String id) async {
