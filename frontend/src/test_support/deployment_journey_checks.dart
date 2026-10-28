@@ -80,6 +80,9 @@ void afterStartup() {
   async.Timer.run(() async {
     final tree = Engine.singleton.getMainLoop()! as SceneTree;
     try {
+      tree.getRoot()!
+        ..setFlag(WindowFlags.flagMousePassthrough, true)
+        ..setFlag(WindowFlags.flagNoFocus, true);
       await _until(() => tree.getCurrentScene() != null);
       final scene = tree.getCurrentScene()!;
       final cubit = di.sl<DesignCubit>();
@@ -225,7 +228,37 @@ void afterStartup() {
         checkEditorFraming(scene);
         await _capture(scene, 'deployment_reopened_workspace.png');
         await _select(scene);
-        await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
+        await _click(
+            scene,
+            scene
+                .getNodeT<Button>(Workspace3D.inspectorToggle)!
+                .getGlobalRect()
+                .getCenter());
+        _check(
+            scene
+                    .getNodeT<Label>('${Workspace3D.details}/Deployment')!
+                    .getText()
+                    .contains('succeeded') &&
+                scene
+                    .getNodeT<Label>('${Workspace3D.details}/Identity')!
+                    .getTooltipText()
+                    .contains(deployed.id!),
+            'Docked Inspector displays restored server evidence without an extra request.');
+        await _click(
+            scene,
+            scene
+                .getNodeT<Button>('${Workspace3D.details}/Configure')!
+                .getGlobalRect()
+                .getCenter());
+        _check(
+            scene
+                    .getNodeT<Button>(
+                        '${Workspace3D.inspector}/Content/Heading/Close')!
+                    .isDisabled() &&
+                scene
+                    .getNodeT<Button>(Workspace3D.inspectorToggle)!
+                    .isDisabled(),
+            'Modal configuration also blocks keyboard actions on the underlying dock.');
         _check(
             const DeepCollectionEquality()
                     .equals(jsonDecode(_json(scene).getText()), {
@@ -350,12 +383,24 @@ Future<void> _select(Node scene, [GridPos position = _position]) async {
           scene, (scene as Node3D).toGlobal(Vector3(x: p.x, y: .12, z: p.z))));
 }
 
-Future<void> _choose(Node scene, String group, ResourceKind kind) => _click(
-    scene,
-    scene
-        .getNodeT<Button>('$group/${resourceVisuals3D[kind]!.buttonName}')!
-        .getGlobalRect()
-        .getCenter());
+Future<void> _choose(Node scene, String group, ResourceKind kind) async {
+  if (group == Workspace3D.catalog &&
+      !scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
+    await _click(
+        scene,
+        scene
+            .getNodeT<Button>(Workspace3D.libraryToggle)!
+            .getGlobalRect()
+            .getCenter());
+  }
+  await _click(
+      scene,
+      scene
+          .getNodeT<Button>('$group/${resourceVisuals3D[kind]!.buttonName}')!
+          .getGlobalRect()
+          .getCenter());
+}
+
 void _check(bool value, String message) {
   if (!value) throw StateError(message);
 }

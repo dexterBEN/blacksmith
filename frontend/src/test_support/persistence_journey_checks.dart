@@ -514,12 +514,24 @@ Future<void> _select(Node scene, [GridPos position = _position]) async {
           scene, (scene as Node3D).toGlobal(Vector3(x: p.x, y: .12, z: p.z))));
 }
 
-Future<void> _choose(Node scene, String group, ResourceKind kind) => _click(
-    scene,
-    scene
-        .getNodeT<Button>('$group/${resourceVisuals3D[kind]!.buttonName}')!
-        .getGlobalRect()
-        .getCenter());
+Future<void> _choose(Node scene, String group, ResourceKind kind) async {
+  if (group == Workspace3D.catalog &&
+      !scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
+    await _click(
+        scene,
+        scene
+            .getNodeT<Button>(Workspace3D.libraryToggle)!
+            .getGlobalRect()
+            .getCenter());
+  }
+  await _click(
+      scene,
+      scene
+          .getNodeT<Button>('$group/${resourceVisuals3D[kind]!.buttonName}')!
+          .getGlobalRect()
+          .getCenter());
+}
+
 void _check(bool value, String message) {
   if (!value) throw StateError(message);
 }

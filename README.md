@@ -134,11 +134,16 @@ the existing Dart bindings and native libraries separately as described below.
 Normal Godot project startup opens `scenes/isometric_3d.tscn`. The existing 3D
 scene supports selecting a tile and placing or replacing Cloud Storage,
 Compute Engine, Cloud VPN and Cloud Load Balancing cubes through a native palette.
-The dark workspace has a Blacksmith header, a full-width GCP catalog and a
-quick-placement strip. Both resource entry points use the same tile-first action.
-The board renders in its own canvas between the panels; it does not extend under
-the menu. The sidebar keeps its desktop width and full resource labels when the
-window is resized. The workspace and New Design dialog share one dark UI theme.
+The dark workspace starts with a compact header, navigation rail and quick-placement
+strip, leaving both optional docks closed. **Library** opens the four-service GCP
+catalog; **Inspect** opens selected tile/resource details and the existing Cloud
+Storage configuration entry point. Both docks reserve layout space beside the
+real `SubViewportContainer`; neither floats over the map. Drag their inner edge
+to resize, or use their close controls without deselecting. At narrow widths,
+the last requested dock takes priority; widening restores both requested docks.
+The catalog retains full service labels and tooltips. The workspace and New Design
+dialog share one dark UI theme. Ordinary selection does not open a dock or change
+the camera framing. Configuration/deployment dialogs retain their existing modal behavior.
 Other resource kinds stay in `IsomapGridBloc` memory and require no backend.
 Cloud Storage configuration requires an active Design, the API and PostgreSQL;
 GCP credentials are not needed. Cancel and rejected saves preserve the original
@@ -195,8 +200,9 @@ optional Linux `strace` tool. See [the Dart workflow](frontend/src/README.md) fo
 source-generation prerequisites.
 
 The 3D window follows actual window dimensions, with a minimum size of
-960 × 640. Native containers reserve the header, sidebar and quick strip; camera
-framing uses the actual central render viewport and
+960 × 640, with at least 480 × 320 reserved for the map. Library width defaults to
+216 pixels (200–304); Inspector defaults to 240 (216–304). Native containers reserve
+the header, rail, visible docks and quick strip; camera framing uses the actual central render viewport and
 includes the maximum cube height even on an empty board, so placement does not
 change the zoom. Full application restart clears in-memory placements
 and active Design selection; use Open to load a previously saved Design. See

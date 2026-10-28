@@ -9,6 +9,7 @@ import '../lib/core/di/service_locator.dart' as di;
 import '../lib/data/repositories/cloud_storage_repository.dart';
 import '../lib/data/services/cloud_services_api.dart';
 import '../lib/data/repositories/design_repository.dart';
+import '../lib/data/repositories/resource_repository.dart';
 import '../lib/domain/bloc/design/design_cubit.dart';
 import '../lib/domain/models/design.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
@@ -78,6 +79,7 @@ class _RuntimeObserver extends bloc_core.BlocObserver {
 }
 
 final _client = _NoNetworkClient();
+final _resourceClient = _NoNetworkClient();
 final _observer = _RuntimeObserver();
 late final _NoProvisioningRepository _repository;
 final _designRepository = _FixtureDesignRepository();
@@ -91,6 +93,10 @@ void beforeStartup() {
   di.sl.registerSingleton<CloudServicesApi>(api, dispose: (api) => api.close());
   di.sl.registerSingleton<CloudStorageRepository>(_repository);
   di.sl.registerSingleton<DesignRepository>(_designRepository,
+      dispose: (repository) => repository.close());
+  di.sl.registerSingleton<ResourceRepository>(
+      ResourceRepository(
+          baseUrl: 'http://forbidden.invalid', client: _resourceClient),
       dispose: (repository) => repository.close());
   bloc_core.Bloc.observer = _observer;
 }
@@ -266,7 +272,9 @@ void afterStartup() {
           _observer.closed == 1 &&
               !di.sl.isRegistered<IsomapGridBloc>() &&
               _repository.calls == 0 &&
-              _client.requests == 0,
+              _client.requests == 0 &&
+              _resourceClient.requests == 0 &&
+              _resourceClient.closes == 1,
           'Runtime shutdown closes shared services once, with zero cloud I/O.');
       GD.print(Variant('BLACKSMITH_DEFAULT_APPLICATION_PASSED bloc_instances=1 '
           'kinds=4 reload=true shutdown=true repository_calls=0 http_requests=0'));

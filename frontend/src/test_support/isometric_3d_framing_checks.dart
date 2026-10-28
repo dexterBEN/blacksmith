@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
 import '../lib/prototypes/isometric_3d/workspace_3d.dart';
+import '../lib/prototypes/isometric_3d/workspace_layout.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../lib/domain/models/grid_position.dart';
 import '../lib/domain/models/resource_kind.dart';
@@ -22,13 +23,24 @@ void checkEditorFraming(Node scene) {
       scene.getNodeT<PanelContainer>(Workspace3D.sidebar)!.getGlobalRect();
   final quick =
       scene.getNodeT<PanelContainer>(Workspace3D.quick)!.getGlobalRect();
+  final docks = [
+    Workspace3D.rail,
+    Workspace3D.sidebar,
+    Workspace3D.inspector,
+    Workspace3D.libraryGrip,
+    Workspace3D.inspectorGrip
+  ]
+      .map((path) => scene.getNodeT<Control>(path)!)
+      .where((control) => control.isVisibleInTree())
+      .map((control) => control.getGlobalRect())
+      .toList();
   _check(
-      rect.size.x > 24 &&
-          rect.size.y > 24 &&
+      rect.size.x >= WorkspaceLayout.minimumCanvasWidth - .1 &&
+          rect.size.y >= WorkspaceLayout.minimumCanvasHeight - .1 &&
           (renderSize.x - rect.size.x).abs() <= 1 &&
           (renderSize.y - rect.size.y).abs() <= 1,
       'A real render viewport must follow the canvas container dimensions.');
-  for (final panel in [header, sidebar, quick, rect]) {
+  for (final panel in [header, quick, rect, ...docks]) {
     _check(
         panel.position.x >= 0 &&
             panel.position.y >= 0 &&
@@ -36,14 +48,21 @@ void checkEditorFraming(Node scene) {
             panel.end.y <= viewport.y + .1,
         'Every workspace panel must fit the actual main viewport.');
   }
+  for (final panel in [header, quick, ...docks]) {
+    final intersects = rect.position.x < panel.end.x - .1 &&
+        rect.end.x > panel.position.x + .1 &&
+        rect.position.y < panel.end.y - .1 &&
+        rect.end.y > panel.position.y + .1;
+    _check(!intersects,
+        'No visible dock, rail, grip or toolbar overlaps the render canvas.');
+  }
   _check(
-      rect.position.x >= sidebar.end.x + 11 &&
-          rect.position.y >= header.end.y + 11 &&
-          rect.end.y <= quick.position.y - 11,
-      'The render canvas is physically between header/sidebar/quick strip.');
+      rect.position.y >= header.end.y + 7 && rect.end.y <= quick.position.y - 7,
+      'Header and quick strip reserve vertical canvas space.');
   for (final group in [Workspace3D.catalog, Workspace3D.choices]) {
     final container = scene.getNodeT<Control>(group)!;
     _check(container.getChildCount() == 4, 'Exactly four supported choices.');
+    if (!container.isVisibleInTree()) continue;
     for (final entry in resourceVisuals3D.values) {
       final button = container.getNodeT<Button>(entry.buttonName)!;
       final bounds = button.getGlobalRect();
