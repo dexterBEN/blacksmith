@@ -34,15 +34,15 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 12
+theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 12
+theme_override_constants/margin_bottom = 8
 mouse_filter = 2
 
 [node name="Layout" type="VBoxContainer" parent="Margin"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
 [node name="Header" type="PanelContainer" parent="Margin/Layout"]
 layout_mode = 2
@@ -50,12 +50,12 @@ layout_mode = 2
 [node name="Rows" type="VBoxContainer" parent="Margin/Layout/Header"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 4
 
 [node name="Actions" type="HBoxContainer" parent="Margin/Layout/Header/Rows"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
 [node name="Brand" type="Label" parent="Margin/Layout/Header/Rows/Actions"]
 layout_mode = 2
@@ -64,26 +64,26 @@ theme_override_font_sizes/font_size = 20
 mouse_filter = 2
 
 [node name="NewDesign" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
-custom_minimum_size = Vector2(112, 34)
+custom_minimum_size = Vector2(104, 32)
 layout_mode = 2
 text = "New Design"
 tooltip_text = "Create a persistent Design. Resource placements remain local."
 
 [node name="OpenDesign" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
-custom_minimum_size = Vector2(80, 34)
+custom_minimum_size = Vector2(76, 32)
 layout_mode = 2
 text = "Open"
 tooltip_text = "Open an existing Design by ID. Resources are read from Blacksmith, never deployed."
 
 [node name="SaveDesign" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
-custom_minimum_size = Vector2(96, 34)
+custom_minimum_size = Vector2(76, 32)
 layout_mode = 2
 text = "Save"
 disabled = true
 tooltip_text = "Save one Cloud Storage description to the active Design. No GCP provisioning."
 
 [node name="CopyDesignId" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
-custom_minimum_size = Vector2(80, 34)
+custom_minimum_size = Vector2(76, 32)
 layout_mode = 2
 text = "Copy ID"
 disabled = true
@@ -97,6 +97,7 @@ mouse_filter = 2
 [node name="ActiveDesign" type="Label" parent="Margin/Layout/Header/Rows"]
 layout_mode = 2
 text = "No active Design · Local placements only"
+theme_override_font_sizes/font_size = 12
 text_overrun_behavior = 3
 mouse_filter = 2
 
@@ -104,22 +105,72 @@ mouse_filter = 2
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
+
+[node name="NavigationRail" type="VBoxContainer" parent="Margin/Layout/Body"]
+custom_minimum_size = Vector2(56, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="LibraryToggle" type="Button" parent="Margin/Layout/Body/NavigationRail"]
+custom_minimum_size = Vector2(56, 44)
+layout_mode = 2
+toggle_mode = true
+icon = ExtResource("2_storage")
+icon_alignment = 1
+icon_max_width = 24
+expand_icon = true
+tooltip_text = "Open Resource Library"
+
+[node name="LibraryLabel" type="Label" parent="Margin/Layout/Body/NavigationRail"]
+layout_mode = 2
+text = "Library"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 11
+mouse_filter = 2
+
+[node name="InspectorToggle" type="Button" parent="Margin/Layout/Body/NavigationRail"]
+custom_minimum_size = Vector2(56, 44)
+layout_mode = 2
+toggle_mode = true
+text = "i"
+theme_override_font_sizes/font_size = 22
+tooltip_text = "Open tile and resource Inspector"
+
+[node name="InspectorLabel" type="Label" parent="Margin/Layout/Body/NavigationRail"]
+layout_mode = 2
+text = "Inspect"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 11
+mouse_filter = 2
 
 [node name="Sidebar" type="PanelContainer" parent="Margin/Layout/Body"]
-custom_minimum_size = Vector2(236, 0)
+visible = false
+custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 
 [node name="Content" type="VBoxContainer" parent="Margin/Layout/Body/Sidebar"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="Margin/Layout/Body/Sidebar/Content"]
+[node name="Heading" type="HBoxContainer" parent="Margin/Layout/Body/Sidebar/Content"]
 layout_mode = 2
-text = "GCP Resources"
-theme_override_font_sizes/font_size = 16
 mouse_filter = 2
+
+[node name="Title" type="Label" parent="Margin/Layout/Body/Sidebar/Content/Heading"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "GCP Resources"
+theme_override_font_sizes/font_size = 14
+mouse_filter = 2
+
+[node name="Close" type="Button" parent="Margin/Layout/Body/Sidebar/Content/Heading"]
+layout_mode = 2
+custom_minimum_size = Vector2(28, 28)
+text = "×"
+tooltip_text = "Close Resource Library"
 
 [node name="Scroll" type="ScrollContainer" parent="Margin/Layout/Body/Sidebar/Content"]
 layout_mode = 2
@@ -137,13 +188,21 @@ text = "Select a tile first"
 autowrap_mode = 3
 mouse_filter = 2
 
+[node name="LibraryResize" type="Control" parent="Margin/Layout/Body"]
+visible = false
+custom_minimum_size = Vector2(6, 0)
+layout_mode = 2
+mouse_default_cursor_shape = 10
+tooltip_text = "Drag to resize Resource Library"
+
 [node name="Center" type="VBoxContainer" parent="Margin/Layout/Body"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
 [node name="Canvas" type="SubViewportContainer" parent="Margin/Layout/Body/Center"]
+custom_minimum_size = Vector2(480, 320)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -168,14 +227,16 @@ far = 50.0
 [node name="QuickPlacement" type="PanelContainer" parent="Margin/Layout/Body/Center"]
 layout_mode = 2
 
-[node name="Content" type="VBoxContainer" parent="Margin/Layout/Body/Center/QuickPlacement"]
+[node name="Content" type="HBoxContainer" parent="Margin/Layout/Body/Center/QuickPlacement"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 8
 
 [node name="Instruction" type="Label" parent="Margin/Layout/Body/Center/QuickPlacement/Content"]
 layout_mode = 2
-text = "Quick placement · Select a tile first"
+size_flags_horizontal = 3
+size_flags_vertical = 4
+text = "Select a tile first"
 text_overrun_behavior = 3
 mouse_filter = 2
 
@@ -185,7 +246,7 @@ alignment = 1
 theme_override_constants/separation = 8
 
 [node name="CloudStorage" type="Button" parent="Margin/Layout/Body/Sidebar/Content/Scroll/Choices"]
-custom_minimum_size = Vector2(44, 60)
+custom_minimum_size = Vector2(44, 48)
 layout_mode = 2
 disabled = true
 text = "Cloud Storage"
@@ -193,11 +254,11 @@ alignment = 0
 icon_alignment = 0
 tooltip_text = "Cloud Storage · Local placement"
 icon = ExtResource("2_storage")
-icon_max_width = 28
+icon_max_width = 24
 expand_icon = true
 
 [node name="ComputeEngine" type="Button" parent="Margin/Layout/Body/Sidebar/Content/Scroll/Choices"]
-custom_minimum_size = Vector2(44, 60)
+custom_minimum_size = Vector2(44, 48)
 layout_mode = 2
 disabled = true
 text = "Compute Engine"
@@ -205,11 +266,11 @@ alignment = 0
 icon_alignment = 0
 tooltip_text = "Compute Engine · Local placement"
 icon = SubResource("ComputeIcon")
-icon_max_width = 28
+icon_max_width = 24
 expand_icon = true
 
 [node name="CloudVpn" type="Button" parent="Margin/Layout/Body/Sidebar/Content/Scroll/Choices"]
-custom_minimum_size = Vector2(44, 60)
+custom_minimum_size = Vector2(44, 48)
 layout_mode = 2
 disabled = true
 text = "Cloud VPN"
@@ -217,11 +278,11 @@ alignment = 0
 icon_alignment = 0
 tooltip_text = "Cloud VPN · Local placement"
 icon = ExtResource("4_vpn")
-icon_max_width = 28
+icon_max_width = 24
 expand_icon = true
 
 [node name="CloudLoadBalancing" type="Button" parent="Margin/Layout/Body/Sidebar/Content/Scroll/Choices"]
-custom_minimum_size = Vector2(44, 60)
+custom_minimum_size = Vector2(44, 48)
 layout_mode = 2
 disabled = true
 text = "Load Balancing"
@@ -229,7 +290,7 @@ alignment = 0
 icon_alignment = 0
 tooltip_text = "Load Balancing · Local placement"
 icon = ExtResource("5_balancing")
-icon_max_width = 28
+icon_max_width = 24
 expand_icon = true
 
 [node name="CloudStorage" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
@@ -238,7 +299,7 @@ layout_mode = 2
 disabled = true
 tooltip_text = "Cloud Storage · Local placement"
 icon = ExtResource("2_storage")
-icon_max_width = 28
+icon_max_width = 24
 expand_icon = true
 
 [node name="ComputeEngine" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
@@ -247,7 +308,7 @@ layout_mode = 2
 disabled = true
 tooltip_text = "Compute Engine · Local placement"
 icon = SubResource("ComputeIcon")
-icon_max_width = 28
+icon_max_width = 24
 expand_icon = true
 
 [node name="CloudVpn" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
@@ -256,7 +317,7 @@ layout_mode = 2
 disabled = true
 tooltip_text = "Cloud VPN · Local placement"
 icon = ExtResource("4_vpn")
-icon_max_width = 28
+icon_max_width = 24
 expand_icon = true
 
 [node name="CloudLoadBalancing" type="Button" parent="Margin/Layout/Body/Center/QuickPlacement/Content/Choices"]
@@ -265,5 +326,86 @@ layout_mode = 2
 disabled = true
 tooltip_text = "Load Balancing · Local placement"
 icon = ExtResource("5_balancing")
-icon_max_width = 28
+icon_max_width = 24
 expand_icon = true
+
+[node name="InspectorResize" type="Control" parent="Margin/Layout/Body"]
+visible = false
+custom_minimum_size = Vector2(6, 0)
+layout_mode = 2
+mouse_default_cursor_shape = 10
+tooltip_text = "Drag to resize Inspector"
+
+[node name="Inspector" type="PanelContainer" parent="Margin/Layout/Body"]
+visible = false
+custom_minimum_size = Vector2(216, 0)
+layout_mode = 2
+
+[node name="Content" type="VBoxContainer" parent="Margin/Layout/Body/Inspector"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="Heading" type="HBoxContainer" parent="Margin/Layout/Body/Inspector/Content"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Margin/Layout/Body/Inspector/Content/Heading"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Inspector"
+theme_override_font_sizes/font_size = 14
+mouse_filter = 2
+
+[node name="Close" type="Button" parent="Margin/Layout/Body/Inspector/Content/Heading"]
+layout_mode = 2
+custom_minimum_size = Vector2(28, 28)
+text = "×"
+tooltip_text = "Close Inspector without deselecting the tile"
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/Layout/Body/Inspector/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Details" type="VBoxContainer" parent="Margin/Layout/Body/Inspector/Content/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Coordinates" type="Label" parent="Margin/Layout/Body/Inspector/Content/Scroll/Details"]
+layout_mode = 2
+text = "No tile selected"
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Kind" type="Label" parent="Margin/Layout/Body/Inspector/Content/Scroll/Details"]
+layout_mode = 2
+text = "Select a tile"
+theme_override_font_sizes/font_size = 18
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Placement" type="Label" parent="Margin/Layout/Body/Inspector/Content/Scroll/Details"]
+layout_mode = 2
+text = "Browse the library or use quick placement."
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Identity" type="Label" parent="Margin/Layout/Body/Inspector/Content/Scroll/Details"]
+layout_mode = 2
+text_overrun_behavior = 3
+mouse_filter = 2
+
+[node name="Deployment" type="Label" parent="Margin/Layout/Body/Inspector/Content/Scroll/Details"]
+layout_mode = 2
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Configure" type="Button" parent="Margin/Layout/Body/Inspector/Content/Scroll/Details"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 34)
+text = "Configure storage"
+disabled = true
+tooltip_text = "Open the existing Cloud Storage configuration dialog. Saving configuration does not deploy."

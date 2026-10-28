@@ -39,6 +39,7 @@ class Isometric3DGrid extends Node3D {
   async.StreamSubscription<IsomapGridState>? _stateSubscription;
   ResourcePalette3D? _palette;
   DesignEditor3D? _designEditor;
+  Workspace3D? _workspace;
   Node3D? _resourceRoot;
   // Render caches derived exclusively from BLoC state, not placement state.
   final _resources = <GridPos, ({ResourceKind kind, Node3D node})>{};
@@ -114,6 +115,13 @@ class Isometric3DGrid extends Node3D {
         (open) {
       _renderPalette(bloc.state, blocked: open);
     });
+    _workspace = Workspace3D(this, configureStorage: () {
+      if (_active &&
+          !(_designEditor?.isOpen ?? false) &&
+          di.sl.isRegistered<DesignCubit>()) {
+        di.sl<DesignCubit>().openResourceConfiguration();
+      }
+    });
     _resizeWorkspace();
     _stateSubscription = bloc.stream.listen((state) {
       if (_active) _renderState(state);
@@ -128,6 +136,12 @@ class Isometric3DGrid extends Node3D {
   @override
   void vInput(InputEvent? event) {
     if (_active && (_designEditor?.handleInput(event) ?? false)) {
+      getViewport()!.setInputAsHandled();
+      return;
+    }
+    if (_active &&
+        !(_designEditor?.isOpen ?? false) &&
+        (_workspace?.handleInput(event) ?? false)) {
       getViewport()!.setInputAsHandled();
     }
   }
@@ -217,10 +231,10 @@ class Isometric3DGrid extends Node3D {
   void _renderPalette(IsomapGridState state, {required bool blocked}) {
     final cubit =
         di.sl.isRegistered<DesignCubit>() ? di.sl<DesignCubit>() : null;
-    _palette?.render(state,
-        blocked: blocked,
-        canConfigure: cubit?.state.active != null &&
-            (cubit?.supportsPersistence ?? false));
+    final canConfigure =
+        cubit?.state.active != null && (cubit?.supportsPersistence ?? false);
+    _palette?.render(state, blocked: blocked, canConfigure: canConfigure);
+    _workspace?.render(state, blocked: blocked, canConfigure: canConfigure);
   }
 
   @override
@@ -236,6 +250,7 @@ class Isometric3DGrid extends Node3D {
     if (_ownsBloc && bloc != null) async.unawaited(bloc.close());
     _tiles.clear();
     _palette = null;
+    _workspace = null;
     _resourceRoot = null;
     // Scene-owned controls/cubes are freed with the scene, not by the BLoC.
     _resources.clear();
@@ -246,6 +261,7 @@ class Isometric3DGrid extends Node3D {
 
   void _resizeWorkspace() {
     final size = getViewport()!.getVisibleRect().size;
+    _workspace?.resize();
     _designEditor?.resize(size);
     _fitCamera();
   }
