@@ -94,50 +94,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="PlacementSeparator" type="VSeparator" parent="Margin/Layout/Header/Rows/Actions"]
-layout_mode = 2
-mouse_filter = 2
-
-[node name="PlacementChoices" type="HBoxContainer" parent="Margin/Layout/Header/Rows/Actions"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="CloudStorage" type="Button" parent="Margin/Layout/Header/Rows/Actions/PlacementChoices"]
-custom_minimum_size = Vector2(40, 32)
-layout_mode = 2
-disabled = true
-tooltip_text = "Cloud Storage · Local placement"
-icon = ExtResource("2_storage")
-icon_max_width = 20
-expand_icon = true
-
-[node name="ComputeEngine" type="Button" parent="Margin/Layout/Header/Rows/Actions/PlacementChoices"]
-custom_minimum_size = Vector2(40, 32)
-layout_mode = 2
-disabled = true
-tooltip_text = "Compute Engine · Local placement"
-icon = SubResource("ComputeIcon")
-icon_max_width = 20
-expand_icon = true
-
-[node name="CloudVpn" type="Button" parent="Margin/Layout/Header/Rows/Actions/PlacementChoices"]
-custom_minimum_size = Vector2(40, 32)
-layout_mode = 2
-disabled = true
-tooltip_text = "Cloud VPN · Local placement"
-icon = ExtResource("4_vpn")
-icon_max_width = 20
-expand_icon = true
-
-[node name="CloudLoadBalancing" type="Button" parent="Margin/Layout/Header/Rows/Actions/PlacementChoices"]
-custom_minimum_size = Vector2(40, 32)
-layout_mode = 2
-disabled = true
-tooltip_text = "Load Balancing · Local placement"
-icon = ExtResource("5_balancing")
-icon_max_width = 20
-expand_icon = true
-
 [node name="ActiveDesign" type="Label" parent="Margin/Layout/Header/Rows"]
 layout_mode = 2
 text = "No active Design · Local placements only"
@@ -376,7 +332,7 @@ mouse_filter = 2
 
 [node name="Placement" type="Label" parent="Margin/Layout/Body/Inspector/Content/Scroll/Details"]
 layout_mode = 2
-text = "Browse the library or use the top-toolbar shortcuts."
+text = "Open the Resource Library to choose a resource."
 autowrap_mode = 3
 mouse_filter = 2
 

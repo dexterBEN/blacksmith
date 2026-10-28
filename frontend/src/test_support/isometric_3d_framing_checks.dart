@@ -60,23 +60,30 @@ void checkEditorFraming(Node scene) {
           !scene.hasNode(
               NodePath.fromString('${Workspace3D.body}/Center/QuickPlacement')),
       'The canvas fills the body down to its bottom margin, with no footer allocation.');
-  for (final group in [Workspace3D.catalog, Workspace3D.choices]) {
-    final container = scene.getNodeT<Control>(group)!;
-    _check(container.getChildCount() == 4, 'Exactly four supported choices.');
-    if (!container.isVisibleInTree()) continue;
+  _check(
+      !scene.hasNode(NodePath.fromString(
+              '${Workspace3D.header}/Rows/Actions/PlacementChoices')) &&
+          !scene.hasNode(NodePath.fromString(
+              '${Workspace3D.header}/Rows/Actions/PlacementSeparator')),
+      'The header contains Design actions; resource tools belong to the Library.');
+  final container = scene.getNodeT<Control>(Workspace3D.catalog)!;
+  _check(container.getChildCount() == 4,
+      'Exactly four resource controls in the single Library palette.');
+  if (container.isVisibleInTree()) {
+    final scroll = scene
+        .getNodeT<Control>('${Workspace3D.sidebar}/Content/Scroll')!
+        .getGlobalRect();
     for (final entry in resourceVisuals3D.values) {
       final button = container.getNodeT<Button>(entry.buttonName)!;
       final bounds = button.getGlobalRect();
-      final panel = group == Workspace3D.catalog ? sidebar : header;
       // The native sidebar retains its vertical scroll container; no horizontal
-      // overflow is permitted. Toolbar choices must always be completely visible.
+      // overflow is permitted at the minimum dock width.
       _check(
-          bounds.position.x >= panel.position.x &&
-              bounds.end.x <= panel.end.x + .1 &&
-              (group == Workspace3D.catalog ||
-                  bounds.position.y >= panel.position.y &&
-                      bounds.end.y <= panel.end.y + .1),
-          'Resource buttons stay inside their panel (or its vertical scroll area).');
+          bounds.position.x >= sidebar.position.x &&
+              bounds.end.x <= sidebar.end.x + .1 &&
+              bounds.position.y >= scroll.position.y - .1 &&
+              bounds.end.y <= scroll.end.y + .1,
+          'All four labelled resource tools are fully visible in the open Library.');
     }
   }
   void point(Vector3 world) {
@@ -149,6 +156,14 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
   ]) {
     window.setContentScaleSize(Vector2i.fromXY(size.$1, size.$2));
     await _pause();
+    if (!scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
+      await _click(
+          scene,
+          scene
+              .getNodeT<Button>(Workspace3D.libraryToggle)!
+              .getGlobalRect()
+              .getCenter());
+    }
     checkEditorFraming(scene);
     final cameraSize = camera.getSize();
     final offset = camera.getVOffset();
@@ -167,7 +182,7 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
       }
     }
     final button =
-        scene.getNodeT<Button>('${Workspace3D.choices}/ComputeEngine')!;
+        scene.getNodeT<Button>('${Workspace3D.catalog}/ComputeEngine')!;
     final before = tileEvents();
     await _click(scene, button.getGlobalRect().getCenter());
     _check(

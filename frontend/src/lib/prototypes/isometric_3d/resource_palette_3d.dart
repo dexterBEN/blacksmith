@@ -11,12 +11,10 @@ class ResourcePalette3D {
     _guidance =
         owner.getNodeT<Label>('${Workspace3D.sidebar}/Content/Guidance')!;
     for (final entry in resourceVisuals3D.entries) {
-      for (final path in [Workspace3D.catalog, Workspace3D.choices]) {
-        final button =
-            owner.getNodeT<Button>('$path/${entry.value.buttonName}')!;
-        _buttons.add((button: button, kind: entry.key));
-        button.pressed.connect(owner, () => onChosen(entry.key));
-      }
+      final button = owner.getNodeT<Button>(
+          '${Workspace3D.catalog}/${entry.value.buttonName}')!;
+      _buttons.add((button: button, kind: entry.key));
+      button.pressed.connect(owner, () => onChosen(entry.key));
     }
   }
 

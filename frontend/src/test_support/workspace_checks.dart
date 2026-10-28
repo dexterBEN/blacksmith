@@ -95,16 +95,15 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
   await resize(1280, 720);
   await _capture(scene, '$output/dark_empty.png');
   await library();
-  for (final group in [Workspace3D.catalog, Workspace3D.choices]) {
-    for (final kind in ResourceKind.values) {
-      final button = _button(scene, group, kind);
-      _check(
-          button.isDisabled() &&
-              button.getButtonIcon() != null &&
-              button.getFocusMode() == ControlFocusMode.focusNone,
-          'All eight illustrated choices require a selected tile.');
-      await _click(scene, button.getGlobalRect().getCenter());
-    }
+  for (final kind in ResourceKind.values) {
+    final button = _button(scene, Workspace3D.catalog, kind);
+    _check(
+        button.isDisabled() &&
+            button.getButtonIcon() != null &&
+            button.getText().isNotEmpty &&
+            button.getFocusMode() == ControlFocusMode.focusNone,
+        'The four labelled Library choices require a selected tile.');
+    await _click(scene, button.getGlobalRect().getCenter());
   }
   _check(grid.state.selected == null && grid.state.tiles.isEmpty,
       'Disabled resource controls cannot select or place.');
@@ -166,21 +165,25 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     await select(position);
     await choose(Workspace3D.catalog, kind);
     final previous = _cube(scene, position).getInstanceId();
-    await choose(Workspace3D.choices, next);
+    await choose(Workspace3D.catalog, next);
     _check(!GD.isInstanceIdValid(previous),
         'Replacement frees the obsolete cube.');
-    await choose(Workspace3D.choices, kind);
+    await choose(Workspace3D.catalog, kind);
   }
 
   // Default Godot keyboard activation survives relocation; no custom shortcut
   // or duplicate pressed binding is introduced by moving the existing buttons.
   await closeDocks();
   await select(const GridPos(3, 2));
+  final beforeLibrary = grid.state;
+  await library();
+  _check(grid.state == beforeLibrary,
+      'Opening the Library exposes placement tools without changing selection.');
   final keyboardChoice =
-      _button(scene, Workspace3D.choices, ResourceKind.computeEngine);
+      _button(scene, Workspace3D.catalog, ResourceKind.computeEngine);
   keyboardChoice.grabFocus();
   await _settle(scene);
-  _check(keyboardChoice.hasFocus(), 'Toolbar choices retain keyboard focus.');
+  _check(keyboardChoice.hasFocus(), 'Library choices retain keyboard focus.');
   final keyboardEvents = placementEvents();
   final selectionEvents = tileEvents();
   for (final pressed in [true, false]) {
@@ -195,8 +198,9 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
       placementEvents() == keyboardEvents + 1 &&
           tileEvents() == selectionEvents &&
           grid.state.tiles[const GridPos(3, 2)] == ResourceKind.computeEngine,
-      'Enter activates the focused toolbar command exactly once.');
+      'Enter activates the focused Library command exactly once.');
   keyboardChoice.releaseFocus();
+  await click('${Workspace3D.sidebar}/Content/Heading/Close');
 
   // Opening Inspector reads the current selection, including changes made
   // while it was closed, rather than retaining the previously inspected tile.
@@ -234,8 +238,7 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
   ];
   for (var i = 0; i < corners.length; i++) {
     await select(corners[i]);
-    await choose(i.isEven ? Workspace3D.catalog : Workspace3D.choices,
-        ResourceKind.values[i]);
+    await choose(Workspace3D.catalog, ResourceKind.values[i]);
   }
   final ids = {for (final p in corners) p: _cube(scene, p).getInstanceId()};
 
@@ -391,7 +394,7 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     ..setSize(originalWindow);
   await _settle(scene);
   checkEditorFraming(scene);
-  GD.print(Variant('BLACKSMITH_WORKSPACE_PASSED resources=4 entry_points=2 '
+  GD.print(Variant('BLACKSMITH_WORKSPACE_PASSED resources=4 entry_points=1 '
       'panel_states=4 desktop_sizes=4 minimum=960x640 minimum_canvas=480x320 '
       'native_resize=true grips=true maximize_restore=true selection_preserved=true '
       'footer_absent=true commands_once=true keyboard=true inspector_reopen=true'));

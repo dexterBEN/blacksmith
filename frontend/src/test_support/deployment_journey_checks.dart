@@ -106,9 +106,9 @@ void afterStartup() {
         await _settle(scene);
         await _click(scene, _dialogButton(scene).getGlobalRect().getCenter());
         await _until(() => cubit.state.active != null && !cubit.state.pending);
-        // Save the sibling first through the top-toolbar shortcut; it must never deploy.
+        // Save the sibling first through the Resource Library; it must never deploy.
         await _select(scene, _secondPosition);
-        await _choose(scene, Workspace3D.choices, ResourceKind.cloudStorage);
+        await _choose(scene, Workspace3D.catalog, ResourceKind.cloudStorage);
         _fillJson(scene, _document('blacksmith-native-save-only'));
         await _settle(scene);
         await _click(scene,

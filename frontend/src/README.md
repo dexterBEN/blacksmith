@@ -38,17 +38,19 @@ The first command imports Godot's resources after a fresh checkout. Opening the
 project in the editor performs the same import before Run Project (F5).
 
 The 3D workspace uses native containers for its compact header, navigation rail,
-optional GCP Library/Inspector docks and four placement shortcuts in the header.
+optional GCP Library/Inspector docks. The header contains Design actions; all
+four labelled resource placement controls live in the left Library. Open it via
+the always-visible Library rail button.
 There is no bottom toolbar or reserved footer height. Its `SubViewportContainer`
 renders the existing world inside the remaining area. Camera fitting uses that viewport's real dimensions;
 main-window pointer coordinates are mapped to the canvas before ray picking.
-The resource palette helper connects both sets of buttons to the same existing
+The resource palette helper connects the four Library buttons to the existing
 placement action and derives enabled state from `IsomapGridBloc`.
 
 The workspace and New Design dialog use the same `workspace_dark.tres` theme.
 Both docks start closed. The Library defaults to 216 pixels (200–304), and the
 Inspector to 240 (216–304); their inner-edge grips resize them. Full service
-labels and toolbar-icon tooltips remain accessible. Tile/resource details are
+labels and resource tooltips remain accessible. Tile/resource details are
 projected into the Inspector from the current selection, including after reopening.
 Save/deployment feedback remains available in the existing header and dialogs. The native window minimum is
 960 × 640 and the map minimum is 480 × 320. When both requested docks cannot fit,
@@ -58,7 +60,7 @@ preferences are scene-local, with no database writes. The existing configuration
 form remains modal; its Save & Deploy authorization/consent rules are unchanged.
 
 `test-godot.py --application --trace-network --output OUTPUT --timeout 600`
-checks both placement entry points, four panel states at native 960×640,
+checks the single Library placement palette, four panel states at native 960×640,
 1280×720, 1600×900 and 1920×1080, grip clamps, maximize/restore, minimum size,
 state preservation, exactly-once placement, default Enter activation, Inspector
 reopening, reclaimed canvas height and native screenshots (`workspace_WIDTHxHEIGHT_closed.png`

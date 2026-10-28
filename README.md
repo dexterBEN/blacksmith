@@ -134,10 +134,10 @@ the existing Dart bindings and native libraries separately as described below.
 Normal Godot project startup opens `scenes/isometric_3d.tscn`. The existing 3D
 scene supports selecting a tile and placing or replacing Cloud Storage,
 Compute Engine, Cloud VPN and Cloud Load Balancing cubes through a native palette.
-The dark workspace starts with a compact header, navigation rail and four
-placement shortcuts in the header, leaving both optional docks closed. There is
-no persistent bottom strip: the 3D viewport fills the available body height. **Library** opens the four-service GCP
-catalog; **Inspect** opens selected tile/resource details and the existing Cloud
+The dark workspace starts with a compact Design header and navigation rail,
+leaving both optional docks closed. Open **Library** on the left rail to access
+the four labelled resource placement tools. The 3D viewport fills the available
+body height. **Inspect** opens selected tile/resource details and the existing Cloud
 Storage configuration entry point. Selected coordinates and resource/deployment
 details live in the Inspector; the existing header and dialogs keep save/deployment
 feedback accessible with it closed. Both docks reserve layout space beside the
