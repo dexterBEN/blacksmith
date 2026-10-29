@@ -245,7 +245,6 @@ public sealed class ResourceConfigurationTests : PostgreSqlTestDatabase
             Assert.Equal((4, 5), (saved.X, saved.Y));
             Assert.Null((await db.Resources.Include(x => x.Configuration).SingleAsync(x => x.Id != resource.Id)).Configuration);
         }
-        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/designs/{LegacyDesign.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/resources/{resource.Id}")).StatusCode);
         await using (var db = CreateContext())
         {

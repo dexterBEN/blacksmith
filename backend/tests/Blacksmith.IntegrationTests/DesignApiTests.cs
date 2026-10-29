@@ -92,7 +92,7 @@ public sealed class DesignApiTests : IDisposable
     }
 
     [Fact]
-    public async Task Multiple_resources_are_filtered_by_owner_and_nonempty_delete_returns_409_without_cascade()
+    public async Task Deleting_undeployed_design_removes_its_resources_and_preserves_other_owners()
     {
         var first = await CreateDesign("First");
         var second = await CreateDesign("Second");
@@ -107,16 +107,39 @@ public sealed class DesignApiTests : IDisposable
         Assert.Equal(2, firstResources.GetArrayLength());
         Assert.All(firstResources.EnumerateArray(), item => Assert.Equal(first, item.GetProperty("designId").GetGuid()));
         Assert.Single((await _client.GetFromJsonAsync<JsonElement>($"/designs/{second}/resources")).EnumerateArray());
-        var conflict = await _client.DeleteAsync($"/designs/{first}");
-        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
-        Assert.Equal("Cannot delete a design that contains resources.",
-            (await conflict.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
-        Assert.Equal(HttpStatusCode.OK, (await _client.GetAsync($"/designs/{first}")).StatusCode);
-        Assert.Equal(3, (await _client.GetFromJsonAsync<JsonElement>("/resources")).GetArrayLength());
-        foreach (var id in resourceIds.Take(2))
-            Assert.Equal(HttpStatusCode.NoContent, (await _client.DeleteAsync($"/resources/{id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await _client.DeleteAsync($"/designs/{first}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync($"/designs/{first}")).StatusCode);
+        foreach (var id in resourceIds.Take(2))
+            Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync($"/resources/{id}")).StatusCode);
+        Assert.Single((await _client.GetFromJsonAsync<JsonElement>("/resources")).EnumerateArray());
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.DeleteAsync($"/designs/{first}")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await _client.GetAsync($"/resources/{resourceIds[2]}")).StatusCode);
+        Assert.Empty(_factory.Cloud.Calls);
+    }
+
+    [Fact]
+    public async Task Deleting_undeployed_design_removes_configuration_and_preserves_catalog()
+    {
+        var owner = await CreateDesign("Configured");
+        var resource = Guid.NewGuid();
+        var request = new HttpRequestMessage(HttpMethod.Put, $"/designs/{owner}/resources/{resource}") {
+            Content = JsonContent.Create(StorageDeploymentTests.Body())
+        };
+        request.Headers.TryAddWithoutValidation("If-None-Match", "*");
+        Assert.Equal(HttpStatusCode.Created, (await _client.SendAsync(request)).StatusCode);
+        int catalogCount;
+        using (var scope = _factory.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<BlacksmithDbContext>();
+            Assert.Single(await db.ResourceConfigurations.ToListAsync());
+            catalogCount = await db.ResourceTypes.CountAsync();
+        }
+        Assert.Equal(HttpStatusCode.NoContent, (await _client.DeleteAsync($"/designs/{owner}")).StatusCode);
+        using (var scope = _factory.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<BlacksmithDbContext>();
+            Assert.Empty(await db.Resources.ToListAsync());
+            Assert.Empty(await db.ResourceConfigurations.ToListAsync());
+            Assert.Equal(catalogCount, await db.ResourceTypes.CountAsync());
+        }
         Assert.Empty(_factory.Cloud.Calls);
     }
 

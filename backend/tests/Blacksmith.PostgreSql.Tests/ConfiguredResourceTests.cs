@@ -247,8 +247,8 @@ public sealed class ConfiguredResourceTests : PostgreSqlTestDatabase
         Assert.DoesNotContain("DO_NOT_ECHO_FIXTURE", hidden);
         Assert.Contains("unsupported", hidden);
         Assert.Equal(HttpStatusCode.Conflict, (await client.GetAsync($"/resources/{id}/configuration")).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/designs/{LegacyDesign.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/resources/{id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/designs/{LegacyDesign.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/resources/{id}")).StatusCode);
         Assert.Equal(0L, await Scalar<long>("SELECT count(*) FROM resource_configurations"));
         Assert.Equal(0, factory.Cloud.Calls);
     }
