@@ -26,9 +26,12 @@ public sealed class EfResourceRepository(BlacksmithDbContext db) : IResourceRepo
             _transaction = await db.Database.BeginTransactionAsync(ct);
         // Serialize configuration and metadata-type writes on the existing parent.
         // The SQLite HTTP fixture uses its ordinary transaction instead.
-        return db.Database.IsNpgsql()
+        var resource = db.Database.IsNpgsql()
             ? await db.Resources.FromSqlInterpolated($"""SELECT * FROM resources WHERE "Id"={id} FOR UPDATE""").SingleOrDefaultAsync(ct)
             : await GetByIdAsync(id, ct);
+        if (await db.StorageDeletions.AnyAsync(x => x.ResourceId == id, ct))
+            throw new ResourceConflictException("resource_deleting", "This Resource has entered its deletion lifecycle.");
+        return resource;
     }
 
     public Task<ResourceConfiguration?> GetConfigurationAsync(Guid resourceId, CancellationToken ct) =>

@@ -81,6 +81,10 @@ consent and backend authorization. Ordinary Save and Open never provision Google
 See the [deployment API and recovery contract](docs/backend/storage-deployment.md) for
 default-off configuration, migration prerequisites, ownership checks and retry limitations.
 
+The backend also supports [explicit deletion of a Resource and its empty GCP bucket](docs/backend/storage-deletion.md),
+with dedicated consent, ownership verification and durable recovery. This is a separate API workflow;
+ordinary Resource/Design DELETE remains local-only. No deletion UI is added yet.
+
 The backend also provides [atomic configured Resource persistence](docs/backend/resource-persistence-api.md):
 client UUIDs, conditional writes, per-resource revisions, unique Design/tile occupancy,
 and opt-in complete configuration read-back. The frontend uses these aggregate reads

@@ -17,8 +17,33 @@ public sealed class BlacksmithDbContext : DbContext
     public DbSet<StorageDeployment> StorageDeployments => Set<StorageDeployment>();
     public DbSet<StorageDeploymentAttempt> StorageDeploymentAttempts => Set<StorageDeploymentAttempt>();
 
+    public DbSet<StorageDeletion> StorageDeletions => Set<StorageDeletion>();
+    public DbSet<StorageDeletionAttempt> StorageDeletionAttempts => Set<StorageDeletionAttempt>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<StorageDeletion>(entity =>
+        {
+            entity.ToTable("storage_deletions", table => table.HasCheckConstraint(
+                "CK_storage_deletions_status", "\"Status\" IN ('pending','succeeded','failed','unknown')"));
+            entity.HasKey(x => x.ResourceId);
+            entity.Property(x => x.ResourceId).ValueGeneratedNever();
+            entity.HasIndex(x => x.Id).IsUnique();
+            entity.Property(x => x.ProjectId).HasMaxLength(30);
+            entity.Property(x => x.BucketName).HasMaxLength(63);
+            entity.Property(x => x.Location).HasMaxLength(40);
+            entity.Property(x => x.OwnershipMarker).HasMaxLength(32);
+            entity.Property(x => x.Status).HasMaxLength(16);
+            entity.Property(x => x.Code).HasMaxLength(60);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+        });
+        modelBuilder.Entity<StorageDeletionAttempt>(entity =>
+        {
+            entity.ToTable("storage_deletion_attempts");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasOne(x => x.Deletion).WithMany().HasForeignKey(x => x.ResourceId).OnDelete(DeleteBehavior.Restrict);
+        });
         modelBuilder.Entity<StorageDeployment>(entity =>
         {
             entity.ToTable("storage_deployments", table => {

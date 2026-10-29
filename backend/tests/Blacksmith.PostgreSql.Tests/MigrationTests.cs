@@ -23,7 +23,7 @@ public sealed class MigrationTests : PostgreSqlTestDatabase
         Assert.Equal("NO", await Scalar<string>("SELECT is_nullable FROM information_schema.columns WHERE table_name='resources' AND column_name='design_id'"));
         Assert.Equal("RESTRICT", await Scalar<string>("SELECT delete_rule FROM information_schema.referential_constraints WHERE constraint_name='FK_resources_designs_design_id'"));
         Assert.Equal(1L, await Scalar<long>("SELECT count(*) FROM pg_indexes WHERE tablename='resources' AND indexname='IX_resources_design_id'"));
-        Assert.Equal(7, (await db.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(8, (await db.Database.GetAppliedMigrationsAsync()).Count());
         Assert.False(db.Database.HasPendingModelChanges());
         // Applying again must leave both the data and migration history unchanged.
         await db.Database.MigrateAsync();

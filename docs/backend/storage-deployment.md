@@ -182,3 +182,7 @@ It drives the real production Godot entrypoint, native controls, Dart repository
 EF and PostgreSQL, simulates a lost provider/HTTP response, reconciles without creation, fully
 quits Godot, and opens the same Design in a new process. The production API has no switch
 that selects a fake provider. The fixture does not access ADC and creates no GCP resources.
+
+## Explicit bucket deletion
+
+A separate [empty-bucket deletion API](storage-deletion.md) now manages remote deletion and local cleanup with durable recovery. Deployment APIs reject resources that have entered this lifecycle. Ordinary local DELETE and Design DELETE never destroy cloud resources.

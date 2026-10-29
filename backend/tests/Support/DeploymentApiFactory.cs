@@ -14,10 +14,10 @@ namespace Blacksmith.TestSupport;
 
 // Test-only composition. Production never has a configuration switch to choose a fake provider.
 public sealed class DeploymentApiFactory(Action<DbContextOptionsBuilder<BlacksmithDbContext>> database,
-    string environment = "Development", bool enabled = true) : WebApplicationFactory<DeploymentPolicy>
+    string environment = "Development", bool enabled = true, RecordingBucketProvider? cloud = null) : WebApplicationFactory<DeploymentPolicy>
 {
     public const string TestToken = "fixture-only-never-authorizes-real-cloud-0000";
-    public RecordingBucketProvider Cloud { get; } = new();
+    public RecordingBucketProvider Cloud { get; } = cloud ?? new();
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(environment);
@@ -30,11 +30,13 @@ public sealed class DeploymentApiFactory(Action<DbContextOptionsBuilder<Blacksmi
             services.AddScoped(_ => { var options = new DbContextOptionsBuilder<BlacksmithDbContext>(); database(options); return new BlacksmithDbContext(options.Options); });
             services.RemoveAll<ICloudBucketProvisioner>();
             services.AddSingleton<ICloudBucketProvisioner>(Cloud);
+            services.RemoveAll<ICloudBucketDeleter>();
+            services.AddSingleton<ICloudBucketDeleter>(Cloud);
         });
     }
 }
 
-public sealed class RecordingBucketProvider : ICloudBucketProvisioner
+public sealed class RecordingBucketProvider : ICloudBucketProvisioner, ICloudBucketDeleter
 {
     private int _creates, _inspections;
     public int Creates => _creates;
@@ -62,6 +64,29 @@ public sealed class RecordingBucketProvider : ICloudBucketProvisioner
     {
         Interlocked.Increment(ref _inspections);
         return Task.FromResult(Verify(target, marker));
+    }
+    public int Deletes { get; private set; }
+    public int DeletionInspections { get; private set; }
+    public string? DeleteFailure { get; set; }
+    public bool LoseDeleteResponse { get; set; }
+    public Func<Task>? BeforeDelete { get; set; }
+    public async Task<CloudBucketResult> DeleteEmptyAsync(CloudBucketTarget target, string marker, CancellationToken ct)
+    {
+        Deletes++;
+        if (BeforeDelete is not null) await BeforeDelete();
+        if (DeleteFailure is not null) return new("failed", DeleteFailure);
+        if (!_buckets.ContainsKey(target.BucketName)) return new("succeeded", "bucket_absent");
+        var verified = Verify(target, marker);
+        if (verified.Status != "succeeded") return verified;
+        _buckets.TryRemove(target.BucketName, out _);
+        return LoseDeleteResponse ? new("unknown", "provider_timeout") : new("succeeded", "bucket_deleted");
+    }
+    public Task<CloudBucketResult> InspectDeletionAsync(CloudBucketTarget target, string marker, CancellationToken ct)
+    {
+        DeletionInspections++;
+        if (!_buckets.ContainsKey(target.BucketName)) return Task.FromResult(new CloudBucketResult("succeeded", "bucket_absent"));
+        var verified = Verify(target, marker);
+        return Task.FromResult(verified.Status == "succeeded" ? new CloudBucketResult("failed", "bucket_still_exists") : verified);
     }
     public void AddUnrelated(CloudBucketTarget target) => _buckets[target.BucketName] = (target, "unrelated-marker");
     private CloudBucketResult Verify(CloudBucketTarget target, string marker) =>
