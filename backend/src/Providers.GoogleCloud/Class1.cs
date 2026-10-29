@@ -50,9 +50,20 @@ public class GoogleCloudStorageService : ICloudStorageService, ICloudBucketProvi
         try
         {
             // Resolve the configured project independently before any mutation.
-            var projectNumber = await ResolveProjectNumberAsync(target.ProjectId, ct);
+            var projectNumber = await (_projectResolver is null ? ResolveProjectNumberAsync(target.ProjectId, ct) : _projectResolver(target.ProjectId, ct));
             if (projectNumber is null) return new(create ? "failed" : "unknown", "project_identity_unverified");
-            var bucket = await FindBucketAsync(target.BucketName, ct);
+            Bucket? bucket;
+            try { bucket = await FindBucketAsync(target.BucketName, ct); }
+            catch (GoogleApiException error) when (!create && error.HttpStatusCode == HttpStatusCode.Forbidden)
+            {
+                // Read-only recovery may confirm absence even when metadata GET is forbidden.
+                try {
+                    await foreach (var candidate in _client.Value.ListBucketsAsync(target.ProjectId).WithCancellation(ct))
+                        if (candidate.Name == target.BucketName) return new("unknown", "provider_access_failed");
+                    return new("failed", "not_created");
+                }
+                catch (GoogleApiException) { return new("unknown", "bucket_absence_unverified"); }
+            }
             if (bucket is null)
             {
                 if (!create) return new("unknown", "bucket_not_found");
@@ -88,7 +99,20 @@ public class GoogleCloudStorageService : ICloudStorageService, ICloudBucketProvi
         {
             var project = await (_projectResolver is null ? ResolveProjectNumberAsync(target.ProjectId, ct) : _projectResolver(target.ProjectId, ct));
             if (project is null) return new("failed", "project_identity_unverified");
-            var bucket = await FindBucketAsync(target.BucketName, ct);
+            Bucket? bucket;
+            try { bucket = await FindBucketAsync(target.BucketName, ct); }
+            catch (GoogleApiException error) when (error.HttpStatusCode == HttpStatusCode.Forbidden)
+            {
+                // A bucket GET can return 403 even after deletion. Only a complete,
+                // successful project listing establishes absence; never delete a bucket here.
+                try
+                {
+                    await foreach (var candidate in _client.Value.ListBucketsAsync(target.ProjectId).WithCancellation(ct))
+                        if (candidate.Name == target.BucketName) return new("failed", "provider_rejected");
+                    return new("succeeded", "bucket_absent");
+                }
+                catch (GoogleApiException) { return new("unknown", "bucket_absence_unverified"); }
+            }
             if (bucket is null) return new("succeeded", "bucket_absent");
             var verified = Verify(bucket, target, marker, project);
             if (verified.Status != "succeeded") return verified;

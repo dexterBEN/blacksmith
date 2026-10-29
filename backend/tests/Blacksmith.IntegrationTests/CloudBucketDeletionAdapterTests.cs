@@ -1,6 +1,8 @@
 using System.Net;
 using Blacksmith.Application.Interfaces;
 using Google;
+using Google.Api.Gax;
+using System.Runtime.CompilerServices;
 using Google.Apis.Storage.v1.Data;
 using Google.Cloud.Storage.V1;
 using Providers.GoogleCloud;
@@ -89,14 +91,102 @@ public sealed class CloudBucketDeletionAdapterTests
         client.DeleteError = new OperationCanceledException();
         Assert.Equal("unknown", (await provider.DeleteEmptyAsync(_target, Marker, default)).Status);
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Forbidden_bucket_get_with_confirmed_project_absence_allows_cleanup_without_remote_delete(bool inspectOnly)
+    {
+        var client = new StubStorage {
+            GetError = new GoogleApiException("storage", "fixture") { HttpStatusCode = HttpStatusCode.Forbidden },
+            Listed = [new Bucket { Name = "other-bucket" }, new Bucket { Name = "blacksmith-fixture-suffix" }]
+        };
+        var provider = new GoogleCloudStorageService(client, (_, _) => Task.FromResult<string?>(Project));
+        var result = inspectOnly ? await provider.InspectDeletionAsync(_target, Marker, default) : await provider.DeleteEmptyAsync(_target, Marker, default);
+        Assert.Equal("succeeded", result.Status);
+        Assert.Equal("bucket_absent", result.Code);
+        Assert.Equal(_target.ProjectId, client.ListedProject);
+        Assert.Equal(2, client.ListedItemsRead);
+        Assert.Equal(0, client.Deletes);
+    }
+    [Fact]
+    public async Task Forbidden_bucket_get_with_bucket_present_never_allows_cleanup_or_remote_delete()
+    {
+        var client = new StubStorage {
+            GetError = new GoogleApiException("storage", "fixture") { HttpStatusCode = HttpStatusCode.Forbidden },
+            Listed = [new Bucket { Name = "other-bucket" }, new Bucket { Name = _target.BucketName }]
+        };
+        var provider = new GoogleCloudStorageService(client, (_, _) => Task.FromResult<string?>(Project));
+        Assert.Equal("failed", (await provider.DeleteEmptyAsync(_target, Marker, default)).Status);
+        Assert.Equal(2, client.ListedItemsRead);
+        Assert.Equal(0, client.Deletes);
+    }
+    [Theory]
+    [InlineData(403)]
+    [InlineData(404)]
+    [InlineData(503)]
+    public async Task Listing_failure_after_partial_results_never_confirms_absence(int status)
+    {
+        var client = new StubStorage {
+            GetError = new GoogleApiException("storage", "fixture") { HttpStatusCode = HttpStatusCode.Forbidden },
+            Listed = [new Bucket { Name = "other-bucket" }],
+            ListError = new GoogleApiException("storage", "fixture") { HttpStatusCode = (HttpStatusCode)status }
+        };
+        var provider = new GoogleCloudStorageService(client, (_, _) => Task.FromResult<string?>(Project));
+        var result = await provider.InspectDeletionAsync(_target, Marker, default);
+        Assert.Equal("unknown", result.Status);
+        Assert.Equal("bucket_absence_unverified", result.Code);
+        Assert.Equal(1, client.ListedItemsRead);
+        Assert.Equal(0, client.Deletes);
+    }
+    [Theory]
+    [InlineData(false, false, "failed", "not_created")]
+    [InlineData(true, false, "unknown", "provider_access_failed")]
+    [InlineData(false, true, "unknown", "bucket_absence_unverified")]
+    public async Task Deployment_recovery_resolves_only_confirmed_absence_without_mutation(bool present, bool listFails, string status, string code)
+    {
+        var client = new StubStorage {
+            GetError = new GoogleApiException("storage", "fixture") { HttpStatusCode = HttpStatusCode.Forbidden },
+            Listed = present ? [new Bucket { Name = _target.BucketName }] : [],
+            ListError = listFails ? new GoogleApiException("storage", "fixture") { HttpStatusCode = HttpStatusCode.Forbidden } : null
+        };
+        var provider = new GoogleCloudStorageService(client, (_, _) => Task.FromResult<string?>(Project));
+        var result = await provider.InspectAsync(_target, Marker, default);
+        Assert.Equal(status, result.Status);
+        Assert.Equal(code, result.Code);
+        Assert.Equal(0, client.Deletes);
+    }
     private sealed class StubStorage : StorageClient
     {
         public Bucket? Bucket { get; set; }
+        public Exception? GetError { get; set; }
+        public Exception? ListError { get; set; }
+        public Bucket[] Listed { get; set; } = [];
+        public string? ListedProject { get; private set; }
+        public int ListedItemsRead { get; private set; }
+        public override PagedAsyncEnumerable<Buckets, Bucket> ListBucketsAsync(string projectId, ListBucketsOptions? options = null)
+        {
+            ListedProject = projectId;
+            return new Listing(this);
+        }
+        private sealed class Listing(StubStorage owner) : PagedAsyncEnumerable<Buckets, Bucket>
+        {
+            public override IAsyncEnumerator<Bucket> GetAsyncEnumerator(CancellationToken cancellationToken = default) => Items(cancellationToken).GetAsyncEnumerator(cancellationToken);
+            private async IAsyncEnumerable<Bucket> Items([EnumeratorCancellation] CancellationToken ct)
+            {
+                await Task.Yield();
+                foreach (var bucket in owner.Listed) {
+                    ct.ThrowIfCancellationRequested();
+                    owner.ListedItemsRead++;
+                    yield return bucket;
+                }
+                if (owner.ListError is not null) throw owner.ListError;
+            }
+        }
         public Exception? DeleteError { get; set; }
         public int Deletes { get; private set; }
         public DeleteBucketOptions? Options { get; private set; }
         public override Task<Bucket> GetBucketAsync(string bucket, GetBucketOptions? options = null, CancellationToken cancellationToken = default) =>
-            Bucket is null ? Task.FromException<Bucket>(new GoogleApiException("storage", "fixture") { HttpStatusCode = HttpStatusCode.NotFound }) : Task.FromResult(Bucket);
+            GetError is not null ? Task.FromException<Bucket>(GetError) : Bucket is null ? Task.FromException<Bucket>(new GoogleApiException("storage", "fixture") { HttpStatusCode = HttpStatusCode.NotFound }) : Task.FromResult(Bucket);
         public override Task DeleteBucketAsync(string bucket, DeleteBucketOptions? options = null, CancellationToken cancellationToken = default)
         {
             Deletes++;
