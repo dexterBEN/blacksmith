@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline launcher regressions; uses dummy credentials and a fake Godot only.
+"""Offline launcher regressions; uses a fake Godot only.
 
 Run: python3 frontend/scripts/test_run_local.py
 Does not read backend/.env or launch a GUI, API, Docker or Google Cloud.
@@ -33,8 +33,7 @@ class LocalLauncherTests(unittest.TestCase):
 import json, os, sys
 from pathlib import Path
 expected = json.loads(Path(__file__).with_name('expected.json').read_text())
-valid = (os.environ.get('BLACKSMITH_DEPLOYMENT_TOKEN') == expected['token']
-    and os.environ.get('LD_LIBRARY_PATH') == expected['ld']
+valid = (os.environ.get('LD_LIBRARY_PATH') == expected['ld']
     and os.getcwd() == expected['cwd'] and sys.argv[1:] == expected['args'])
 if not valid:
     print('Godot stub: unexpected launch configuration', file=sys.stderr)
@@ -62,7 +61,7 @@ sys.exit(expected['exit'])
             self.godot.unlink()
             (self.bin / 'dirname').symlink_to(shutil.which('dirname'))
             env['PATH'] = str(self.bin)
-        env['BLACKSMITH_DEPLOYMENT_TOKEN'] = 'stale-parent-value'
+        env.pop('BLACKSMITH_DEPLOYMENT_TOKEN', None)
         if ld is None:
             env.pop('LD_LIBRARY_PATH', None)
         else:
@@ -78,7 +77,7 @@ sys.exit(expected['exit'])
         if error:
             self.assertIn(error.encode(), result.stderr)
         self.assertEqual((self.bin / 'called').exists(), error is None)
-        self.assertEqual(env['BLACKSMITH_DEPLOYMENT_TOKEN'], 'stale-parent-value')
+        self.assertNotIn('BLACKSMITH_DEPLOYMENT_TOKEN', env)
 
     def configuration(self, token=None):
         return f'BlacksmithDeployment__Token={token or self.token}\n'.encode()
@@ -118,34 +117,17 @@ sys.exit(expected['exit'])
         self.launch(self.configuration(), godot_exit=37, status=37)
 
     def test_missing_configuration(self):
-        self.launch(status=1, error='Missing backend/.env')
+        self.launch()
 
     def test_missing_godot(self):
         self.launch(self.configuration(), missing_godot=True,
                     status=127, error='exec: godot: not found')
 
-    def test_invalid_configuration(self):
-        cases = [
-            (b'', 'Missing BlacksmithDeployment__Token'),
-            (b'OTHER=value\n', 'Missing BlacksmithDeployment__Token'),
-            (b'BlacksmithDeployment__Token=\n', 'must not be empty'),
-            (b'BlacksmithDeployment__Token= \t \n', 'must not be empty'),
-            (b'BlacksmithDeployment__Token\n', 'Invalid BlacksmithDeployment__Token assignment'),
-            (b'BlacksmithDeployment__Token =value\n', 'Invalid BlacksmithDeployment__Token assignment'),
-            (self.configuration() * 2, 'Duplicate BlacksmithDeployment__Token'),
-            (self.configuration(self.token + '\rvalue'), 'invalid control character'),
-            (self.configuration(self.token + '\0value'), 'NUL bytes'),
-        ]
-        for data, error in cases:
-            with self.subTest(error=error):
-                self.launch(data, status=1, error=error)
-
-    @unittest.skipIf(os.geteuid() == 0, 'Root can read mode-000 files')
-    def test_unreadable_configuration(self):
-        self.env_file.write_bytes(self.configuration())
-        self.env_file.chmod(0)
-        self.addCleanup(self.env_file.chmod, 0o600)
-        self.launch(status=1, error='Cannot read backend/.env')
+    def test_configuration_is_ignored(self):
+        for data in [b'', b'OTHER=value\n', b'BlacksmithDeployment__Token=\n',
+                     b'BlacksmithDeployment__Token=short\n', b'invalid\0content']:
+            with self.subTest():
+                self.launch(data)
 
 
 if __name__ == '__main__':

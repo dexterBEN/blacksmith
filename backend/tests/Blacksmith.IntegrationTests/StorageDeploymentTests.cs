@@ -66,11 +66,16 @@ public sealed class StorageDeploymentTests : IDisposable
         Assert.Equal(HttpStatusCode.Conflict, (await Write(r, op, Body("different-bucket"))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await _client.DeleteAsync($"/resources/{r}")).StatusCode);
     }
-    [Theory] [InlineData(false,true,401)] [InlineData(true,false,400)]
-    public async Task Token_and_deliberate_consent_precede_save(bool token, bool consent, int status) {
+    [Theory] [InlineData(false,false,400)] [InlineData(true,false,400)]
+    public async Task Deliberate_consent_precedes_save_with_or_without_token(bool token, bool consent, int status) {
         Assert.Equal(status, (int)(await Write(Guid.NewGuid(), Guid.NewGuid(), Body(), token:token,consent:consent)).StatusCode);
         Assert.Equal(0,_factory.Cloud.Creates);
         using var scope = _factory.Services.CreateScope(); Assert.Empty(scope.ServiceProvider.GetRequiredService<BlacksmithDbContext>().Resources);
+    }
+    [Fact] public async Task Deployment_succeeds_without_token() {
+        var result = await Json(await Write(Guid.NewGuid(), Guid.NewGuid(), Body(), token: false));
+        Assert.Equal("succeeded", result.GetProperty("deployment").GetProperty("status").GetString());
+        Assert.Equal(1, _factory.Cloud.Creates);
     }
     [Fact] public async Task Policy_blocks_arbitrary_project_before_save() {
         Assert.Equal(HttpStatusCode.Forbidden, (await Write(Guid.NewGuid(),Guid.NewGuid(),Body(project:"other-project-123"))).StatusCode);

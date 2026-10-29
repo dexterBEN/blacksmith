@@ -57,7 +57,7 @@ Save/deployment feedback remains available in the existing header and dialogs. T
 the last opened/resized dock wins; widening restores the requested pair. Closing
 Inspector preserves selection. Selection alone never opens a dock. Presentation
 preferences are scene-local, with no database writes. The existing configuration
-form remains modal; its Save & Deploy authorization/consent rules are unchanged.
+form remains modal; Save & Deploy requires explicit consent but no deployment token.
 
 `test-godot.py --application --trace-network --output OUTPUT --timeout 600`
 checks the single Library placement palette, four panel states at native 960×640,

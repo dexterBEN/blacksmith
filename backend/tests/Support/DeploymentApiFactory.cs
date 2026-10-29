@@ -23,7 +23,6 @@ public sealed class DeploymentApiFactory(Action<DbContextOptionsBuilder<Blacksmi
         builder.UseEnvironment(environment);
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?> {
             ["BlacksmithDeployment:Enabled"] = enabled.ToString(),
-            ["BlacksmithDeployment:Token"] = TestToken,
             ["BlacksmithDeployment:ApprovedProjects:0"] = "example-project-123"
         }));
         builder.ConfigureTestServices(services => {

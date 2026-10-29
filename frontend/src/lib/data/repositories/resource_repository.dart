@@ -25,11 +25,11 @@ class ResourceRepository {
       {required String baseUrl,
       http.Client? client,
       Duration requestTimeout = const Duration(seconds: 30),
+      // Retained for compatibility with existing callers; no token is required.
       String? deploymentToken})
       : _base = _validateUrl(baseUrl),
         _client = client ?? http.Client(),
-        _timeout = requestTimeout,
-        _deploymentToken = deploymentToken {
+        _timeout = requestTimeout {
     if (_timeout <= Duration.zero) {
       throw ArgumentError('Invalid request timeout.');
     }
@@ -38,8 +38,7 @@ class ResourceRepository {
   final http.Client _client;
   final Duration _timeout;
   bool _closed = false;
-  final String? _deploymentToken;
-  bool get deploymentEnabled => (_deploymentToken?.length ?? 0) >= 32;
+  bool get deploymentEnabled => true;
   String deploymentReview(String text) {
     final config = parseConfiguration(text);
     return 'Project: ${config.values['projectId']} · Bucket: ${config.values['bucketName']}\n'
@@ -81,12 +80,7 @@ class ResourceRepository {
   }
 
   Map<String, String> _deploymentHeaders({bool consent = false, String? etag}) {
-    if (!deploymentEnabled) {
-      throw const ResourceFailure(
-          'Deployment is disabled. Configure local deployment authorization first.');
-    }
     return {
-      'X-Blacksmith-Deployment-Token': _deploymentToken!,
       if (consent) 'X-Blacksmith-Deploy-Consent': 'true',
       if (etag != null) 'If-Match': etag
     };

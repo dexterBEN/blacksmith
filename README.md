@@ -112,8 +112,7 @@ See [local startup and the five-cycle non-cloud smoke test](docs/local-smoke-tes
 for host/container terminal contexts, port 5100 diagnostics, safe dependency refresh,
 deployment-state semantics and isolated regression commands.
 
-On the Ubuntu host, open the Godot editor with the existing backend deployment
-token automatically loaded:
+On the Ubuntu host, open the Godot editor without a deployment token:
 
 ```bash
 cd frontend
@@ -122,14 +121,9 @@ bash scripts/run_local.sh
 bash scripts/run_local.sh --verbose
 ```
 
-Run this on the host, outside the backend Dev Container. The launcher reads only
-`BlacksmithDeployment__Token` from the ignored `backend/.env` and passes it as
-`BLACKSMITH_DEPLOYMENT_TOKEN` to Godot and its children. It sets the project directory
-and preserves existing `LD_LIBRARY_PATH` entries. Values are read literally, as in
-[Docker's env-file format](https://github.com/docker/cli/blob/master/pkg/kvfile/kvfile.go);
-the file is never executed. Missing, empty, malformed or duplicate token assignments
-stop the launch without displaying the secret. The same script can be invoked by
-its path from any working directory. It performs no build or deployment; prepare
+Run this on the host, outside the backend Dev Container. The launcher requires no `backend/.env` file or deployment token. It sets the project
+directory and preserves existing `LD_LIBRARY_PATH` entries. The same script can be
+invoked by its path from any working directory. It performs no build or deployment; prepare
 the existing Dart bindings and native libraries separately as described below.
 
 Normal Godot project startup opens `scenes/isometric_3d.tscn`. The existing 3D

@@ -17,7 +17,7 @@ public sealed class StorageDeploymentsController(IStorageDeploymentService deplo
     public async Task<IActionResult> SaveAndDeploy(Guid designId, Guid resourceId, Guid operationId,
         [FromBody] JsonElement request, CancellationToken ct)
     {
-        policy.RequireLocalToken(Request, consent: true);
+        policy.RequireLocalDeployment(Request, consent: true);
         try
         {
             var create = Request.Headers.IfNoneMatch.Count == 1 && Request.Headers.IfNoneMatch[0] == "*";
@@ -41,7 +41,7 @@ public sealed class StorageDeploymentsController(IStorageDeploymentService deplo
     [HttpPost("reconcile")]
     public async Task<IActionResult> Reconcile(Guid designId, Guid resourceId, Guid operationId, CancellationToken ct)
     {
-        policy.RequireLocalToken(Request);
+        policy.RequireLocalDeployment(Request);
         var result = await deployments.ReconcileAsync(designId, resourceId, operationId, ct);
         return StatusCode(result.Status == "pending" ? 202 : 200, result);
     }
@@ -49,7 +49,7 @@ public sealed class StorageDeploymentsController(IStorageDeploymentService deplo
     [HttpPost("retry/{requestId:guid}")]
     public async Task<IActionResult> Retry(Guid designId, Guid resourceId, Guid operationId, Guid requestId, CancellationToken ct)
     {
-        policy.RequireLocalToken(Request, consent: true);
+        policy.RequireLocalDeployment(Request, consent: true);
         var revision = ParseRevision(resourceId);
         if (revision is null) return StatusCode(428, new { code = "precondition_required", error = "Read the Resource revision before retrying." });
         var result = await deployments.RetryAsync(designId, resourceId, operationId, requestId, revision.Value, ct);

@@ -339,17 +339,17 @@ void main() {
     expect(cubit.state.configurationDraft, isNull);
   });
   test(
-      'repository sends one protected PUT with revision, consent and validated target',
+      'repository deploys without a token with revision, consent and validated target',
       () async {
     var calls = 0;
     final repo = ResourceRepository(
         baseUrl: 'http://localhost:5100',
-        deploymentToken: token,
         client: MockClient((request) async {
           calls++;
           expect(request.method, 'PUT');
           expect(request.url.path, contains('/deployments/$operation'));
-          expect(request.headers['X-Blacksmith-Deployment-Token'], token);
+          expect(request.headers.containsKey('X-Blacksmith-Deployment-Token'),
+              isFalse);
           expect(request.headers['X-Blacksmith-Deploy-Consent'], 'true');
           expect(request.headers['If-None-Match'], '*');
           expect(request.body, isNot(contains(token)));

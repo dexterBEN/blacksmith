@@ -16,15 +16,15 @@ Supply these values externally to the API process, never in a tracked configurat
 
 - `BlacksmithDeployment__Enabled=true`
 - `BlacksmithDeployment__ApprovedProjects__0=<explicit approved project ID>`
-- `BlacksmithDeployment__Token=<private random token with at least 32 UTF-8 bytes>`
 - Existing `ConnectionStrings__BlacksmithDb` and valid Application Default Credentials.
 
-Launch Godot/the normal launcher with `BLACKSMITH_DEPLOYMENT_TOKEN` set to that same private
-token and `BLACKSMITH_BACKEND_URL` pointing to the intended local API. The token is used only
-in deployment request headers, never in JSON configuration, a Design, or a deployment record.
+Launch Godot with `BLACKSMITH_BACKEND_URL` pointing to the intended local API if needed.
+No deployment token is required by the frontend, launchers or local API. The consent
+checkbox requires a valid configuration and an idle, resolved request state; it does
+not depend on an environment variable. The API still requires Development mode,
+explicit deployment enablement, an approved project and consent for cloud mutations.
 After an ambiguous response, **Check Save** reads only database metadata; **Check deployment**
 explicitly requests a read-only provider verification.
-Missing frontend authorization disables cloud mutations; metadata reads and Save-only remain available.
 Keep this single-operator development endpoint on a trusted local connection; it is not a hosted
 multi-user security model. Use TLS for transport beyond a trusted local environment.
 
