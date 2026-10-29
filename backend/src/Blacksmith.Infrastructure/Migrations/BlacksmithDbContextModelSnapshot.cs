@@ -209,6 +209,89 @@ namespace Blacksmith.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Blacksmith.Domain.Entities.StorageDeletion", b =>
+                {
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BucketName")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid>("CurrentAttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DesignId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LeaseUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("OwnershipMarker")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<long>("ResourceRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("ResourceId");
+
+                    b.HasIndex("Id")
+                        .IsUnique();
+
+                    b.ToTable("storage_deletions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_storage_deletions_status", "\"Status\" IN ('pending','succeeded','failed','unknown')");
+                        });
+                });
+
+            modelBuilder.Entity("Blacksmith.Domain.Entities.StorageDeletionAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResourceId");
+
+                    b.ToTable("storage_deletion_attempts", (string)null);
+                });
+
             modelBuilder.Entity("Blacksmith.Domain.Entities.StorageDeployment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -360,6 +443,17 @@ namespace Blacksmith.Infrastructure.Migrations
                     b.Navigation("Design");
 
                     b.Navigation("ResourceType");
+                });
+
+            modelBuilder.Entity("Blacksmith.Domain.Entities.StorageDeletionAttempt", b =>
+                {
+                    b.HasOne("Blacksmith.Domain.Entities.StorageDeletion", "Deletion")
+                        .WithMany()
+                        .HasForeignKey("ResourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Deletion");
                 });
 
             modelBuilder.Entity("Blacksmith.Domain.Entities.StorageDeployment", b =>

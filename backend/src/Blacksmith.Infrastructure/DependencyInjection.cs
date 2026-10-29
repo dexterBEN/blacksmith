@@ -13,7 +13,9 @@ public static class DependencyInjection
     {
         services.AddDbContext<BlacksmithDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IResourceRepository, EfResourceRepository>();
-        services.AddScoped<IStorageDeploymentStore, EfStorageDeploymentStore>();
+        services.AddScoped<EfStorageDeploymentStore>();
+        services.AddScoped<IStorageDeploymentStore>(s => s.GetRequiredService<EfStorageDeploymentStore>());
+        services.AddScoped<IStorageDeletionStore>(s => s.GetRequiredService<EfStorageDeploymentStore>());
         services.AddScoped<IDesignRepository, EfDesignRepository>();
         services.AddScoped<IResourceTypeRepository, EfResourceTypeRepository>();
         services.AddScoped<IDatabaseHealthCheck, PostgreSqlDatabaseHealthCheck>();

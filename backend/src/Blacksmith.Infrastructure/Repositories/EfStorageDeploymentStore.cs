@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Blacksmith.Infrastructure.Repositories;
 
-public sealed class EfStorageDeploymentStore(BlacksmithDbContext db) : IStorageDeploymentStore
+public sealed class EfStorageDeploymentStore(BlacksmithDbContext db) : IStorageDeploymentStore, IStorageDeletionStore
 {
     public async Task<IDeploymentTransaction> LockResourceAsync(Guid resourceId, CancellationToken ct)
     {
@@ -31,6 +31,23 @@ public sealed class EfStorageDeploymentStore(BlacksmithDbContext db) : IStorageD
         db.StorageDeploymentAttempts.FirstOrDefaultAsync(x => x.Id == id, ct);
     public void Add(StorageDeployment operation) => db.StorageDeployments.Add(operation);
     public void AddAttempt(StorageDeploymentAttempt attempt) => db.StorageDeploymentAttempts.Add(attempt);
+
+    public Task<StorageDeletion?> FindDeletionAsync(Guid id, CancellationToken ct) =>
+        db.StorageDeletions.SingleOrDefaultAsync(x => x.ResourceId == id, ct);
+    public Task<ResourceEntity?> DeletionResourceAsync(Guid id, CancellationToken ct) =>
+        db.Resources.Include(x => x.Deployments).SingleOrDefaultAsync(x => x.Id == id, ct);
+    public Task<bool> HasDeletionAttemptAsync(Guid id, CancellationToken ct) =>
+        db.StorageDeletionAttempts.AnyAsync(x => x.Id == id, ct);
+    public void AddDeletion(StorageDeletion deletion) => db.StorageDeletions.Add(deletion);
+    public void AddDeletionAttempt(StorageDeletionAttempt attempt) => db.StorageDeletionAttempts.Add(attempt);
+    public async Task RemoveDeletedResourceAsync(Guid id, CancellationToken ct)
+    {
+        var history = await db.StorageDeployments.Include(x => x.Attempts).Where(x => x.ResourceId == id).ToListAsync(ct);
+        db.StorageDeploymentAttempts.RemoveRange(history.SelectMany(x => x.Attempts));
+        db.StorageDeployments.RemoveRange(history);
+        var resource = await db.Resources.SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (resource is not null) db.Resources.Remove(resource);
+    }
 
     private sealed class Transaction(BlacksmithDbContext db, IDbContextTransaction transaction) : IDeploymentTransaction
     {

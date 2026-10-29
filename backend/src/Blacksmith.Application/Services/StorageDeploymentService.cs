@@ -11,7 +11,7 @@ namespace Blacksmith.Application.Services;
 
 /// Resource/configuration/intent commit first; external effects never belong to that transaction.
 public sealed class StorageDeploymentService(IStorageDeploymentStore store, IResourceService resources,
-    ICloudBucketProvisioner cloud, IDeploymentTargetPolicy policy) : IStorageDeploymentService
+    ICloudBucketProvisioner cloud, IDeploymentTargetPolicy policy, IStorageDeletionStore deletions) : IStorageDeploymentService
 {
     public async Task<StorageDeploymentResult> SaveAndDeployAsync(Guid designId, Guid resourceId, Guid operationId,
         JsonElement body, bool createOnly, long? revision, CancellationToken ct)
@@ -27,6 +27,7 @@ public sealed class StorageDeploymentService(IStorageDeploymentStore store, IRes
         var execute = false;
         await using (var transaction = await store.LockResourceAsync(resourceId, ct))
         {
+            await RequireNotDeleting(resourceId, ct);
             var existing = await store.FindAsync(operationId, ct);
             if (existing is not null)
             {
@@ -111,6 +112,7 @@ public sealed class StorageDeploymentService(IStorageDeploymentStore store, IRes
         string marker, previousStatus;
         await using (var transaction = await store.LockResourceAsync(resourceId, CancellationToken.None))
         {
+            await RequireNotDeleting(resourceId, CancellationToken.None);
             var operation = await store.FindAsync(id, CancellationToken.None)
                 ?? throw Conflict("deployment_not_found", "Deployment operation not found.", 404);
             Scope(operation, designId, resourceId);
@@ -179,6 +181,7 @@ public sealed class StorageDeploymentService(IStorageDeploymentStore store, IRes
 
         await using (var transaction = await store.LockResourceAsync(resourceId, CancellationToken.None))
         {
+            await RequireNotDeleting(resourceId, CancellationToken.None);
             var operation = await store.FindAsync(id, CancellationToken.None)
                 ?? throw Conflict("deployment_not_found", "Deployment operation not found.", 404);
             // An expired, superseded execution must not overwrite a newer verification.
@@ -198,6 +201,12 @@ public sealed class StorageDeploymentService(IStorageDeploymentStore store, IRes
             await transaction.CommitAsync(CancellationToken.None);
             return StorageDeploymentResponse.From(operation);
         }
+    }
+
+    private async Task RequireNotDeleting(Guid resourceId, CancellationToken ct)
+    {
+        if (await deletions.FindDeletionAsync(resourceId, ct) is not null)
+            throw Conflict("resource_deleting", "This Resource has entered its deletion lifecycle.");
     }
 
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();

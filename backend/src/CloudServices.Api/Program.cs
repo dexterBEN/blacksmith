@@ -29,6 +29,8 @@ builder.Services.AddScoped<ICloudBucketProvisioner>(_ => new GoogleCloudStorageS
 builder.Services.AddSingleton<DeploymentPolicy>();
 builder.Services.AddSingleton<IDeploymentTargetPolicy>(services => services.GetRequiredService<DeploymentPolicy>());
 builder.Services.AddScoped<IStorageDeploymentService, StorageDeploymentService>();
+builder.Services.AddScoped<ICloudBucketDeleter>(_ => new GoogleCloudStorageService());
+builder.Services.AddScoped<IStorageDeletionService, StorageDeletionService>();
 
 var cs = builder.Configuration.GetConnectionString("BlacksmithDb");
 builder.Services.AddBlacksmithInfrastructure(cs);

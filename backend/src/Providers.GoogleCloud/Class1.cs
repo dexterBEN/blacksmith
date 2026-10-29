@@ -11,11 +11,17 @@ using Google.Cloud.Storage.V1;
 namespace Providers.GoogleCloud;
 
 /// ADC is lazy: metadata CRUD and disabled deployment never read credentials.
-public class GoogleCloudStorageService : ICloudStorageService, ICloudBucketProvisioner
+public class GoogleCloudStorageService : ICloudStorageService, ICloudBucketProvisioner, ICloudBucketDeleter
 {
     private readonly Lazy<GoogleCredential> _credential = new(() => GoogleCredential.GetApplicationDefault()
         .CreateScoped("https://www.googleapis.com/auth/cloud-platform"));
     private readonly Lazy<StorageClient> _client;
+    private readonly Func<string, CancellationToken, Task<string?>>? _projectResolver;
+    public GoogleCloudStorageService(StorageClient client, Func<string, CancellationToken, Task<string?>> projectResolver)
+    {
+        _client = new(() => client);
+        _projectResolver = projectResolver;
+    }
     public GoogleCloudStorageService() => _client = new(() => StorageClient.Create(_credential.Value));
 
     public Task<string> CreateBucketAsync(string projectId, string bucketName) =>
@@ -44,9 +50,20 @@ public class GoogleCloudStorageService : ICloudStorageService, ICloudBucketProvi
         try
         {
             // Resolve the configured project independently before any mutation.
-            var projectNumber = await ResolveProjectNumberAsync(target.ProjectId, ct);
+            var projectNumber = await (_projectResolver is null ? ResolveProjectNumberAsync(target.ProjectId, ct) : _projectResolver(target.ProjectId, ct));
             if (projectNumber is null) return new(create ? "failed" : "unknown", "project_identity_unverified");
-            var bucket = await FindBucketAsync(target.BucketName, ct);
+            Bucket? bucket;
+            try { bucket = await FindBucketAsync(target.BucketName, ct); }
+            catch (GoogleApiException error) when (!create && error.HttpStatusCode == HttpStatusCode.Forbidden)
+            {
+                // Read-only recovery may confirm absence even when metadata GET is forbidden.
+                try {
+                    await foreach (var candidate in _client.Value.ListBucketsAsync(target.ProjectId).WithCancellation(ct))
+                        if (candidate.Name == target.BucketName) return new("unknown", "provider_access_failed");
+                    return new("failed", "not_created");
+                }
+                catch (GoogleApiException) { return new("unknown", "bucket_absence_unverified"); }
+            }
             if (bucket is null)
             {
                 if (!create) return new("unknown", "bucket_not_found");
@@ -69,6 +86,54 @@ public class GoogleCloudStorageService : ICloudStorageService, ICloudBucketProvi
         catch (OperationCanceledException) { return new("unknown", "provider_timeout"); }
         catch (HttpRequestException) { return new("unknown", "provider_unavailable"); }
         catch (Exception) { return new(!create || writeMayHaveHappened ? "unknown" : "failed", "credentials_or_provider_unavailable"); }
+    }
+
+    public Task<CloudBucketResult> DeleteEmptyAsync(CloudBucketTarget target, string marker, CancellationToken ct) =>
+        DeleteOrInspectAsync(target, marker, inspectOnly: false, ct);
+    public Task<CloudBucketResult> InspectDeletionAsync(CloudBucketTarget target, string marker, CancellationToken ct) =>
+        DeleteOrInspectAsync(target, marker, inspectOnly: true, ct);
+
+    private async Task<CloudBucketResult> DeleteOrInspectAsync(CloudBucketTarget target, string marker, bool inspectOnly, CancellationToken ct)
+    {
+        try
+        {
+            var project = await (_projectResolver is null ? ResolveProjectNumberAsync(target.ProjectId, ct) : _projectResolver(target.ProjectId, ct));
+            if (project is null) return new("failed", "project_identity_unverified");
+            Bucket? bucket;
+            try { bucket = await FindBucketAsync(target.BucketName, ct); }
+            catch (GoogleApiException error) when (error.HttpStatusCode == HttpStatusCode.Forbidden)
+            {
+                // A bucket GET can return 403 even after deletion. Only a complete,
+                // successful project listing establishes absence; never delete a bucket here.
+                try
+                {
+                    await foreach (var candidate in _client.Value.ListBucketsAsync(target.ProjectId).WithCancellation(ct))
+                        if (candidate.Name == target.BucketName) return new("failed", "provider_rejected");
+                    return new("succeeded", "bucket_absent");
+                }
+                catch (GoogleApiException) { return new("unknown", "bucket_absence_unverified"); }
+            }
+            if (bucket is null) return new("succeeded", "bucket_absent");
+            var verified = Verify(bucket, target, marker, project);
+            if (verified.Status != "succeeded") return verified;
+            if (inspectOnly) return new("failed", "bucket_still_exists");
+            if (bucket.Metageneration is not > 0) return new("failed", "remote_identity_unverified");
+            // No recursive delete, object enumeration or automatic retry. Google enforces emptiness.
+            await _client.Value.DeleteBucketAsync(target.BucketName, new DeleteBucketOptions {
+                IfMetagenerationMatch = bucket.Metageneration, DeleteObjects = false, RetryOptions = RetryOptions.Never
+            }, ct);
+            return new("succeeded", "bucket_deleted");
+        }
+        catch (GoogleApiException error) when (error.HttpStatusCode == HttpStatusCode.NotFound)
+        { return new("succeeded", "bucket_absent"); }
+        catch (GoogleApiException error) when (error.HttpStatusCode == HttpStatusCode.Conflict)
+        { return new("failed", "bucket_not_empty"); }
+        catch (GoogleApiException error) when (error.HttpStatusCode == HttpStatusCode.PreconditionFailed)
+        { return new("failed", "remote_changed"); }
+        catch (GoogleApiException error) when (error.HttpStatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized or HttpStatusCode.BadRequest)
+        { return new("failed", "provider_rejected"); }
+        catch (OperationCanceledException) { return new("unknown", "provider_timeout"); }
+        catch (Exception) { return new("unknown", "provider_unconfirmed"); }
     }
 
     private async Task<Bucket?> FindBucketAsync(string name, CancellationToken ct)
