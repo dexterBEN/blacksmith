@@ -21,7 +21,7 @@ public sealed class OwnershipConcurrencyTests : PostgreSqlTestDatabase
         try
         {
             await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(15));
-            // Independent connection commits after HasResourcesAsync returned false.
+            // Independent connection commits after the deletion snapshot was read.
             await using var competitor = CreateContext();
             competitor.Resources.Add(new ResourceEntity
             { Id = Guid.NewGuid(), DesignId = owner, Name = "Concurrent", Type = "generic" });
@@ -31,11 +31,94 @@ public sealed class OwnershipConcurrencyTests : PostgreSqlTestDatabase
 
         var response = await deleting;
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal("Cannot delete a design that contains resources.",
+        Assert.Equal("Cannot delete this design: deployment history exists or its resources changed concurrently.",
             (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
         await using var verification = CreateContext();
         Assert.True(await verification.Designs.AnyAsync(x => x.Id == owner));
         Assert.Equal(owner, (await verification.Resources.SingleAsync()).DesignId);
+        Assert.Equal(0, factory.Cloud.Calls);
+    }
+
+    [PostgreSqlFact]
+    public async Task Concurrent_insert_rolls_back_deletion_of_existing_resources_and_configuration()
+    {
+        var owner = await SeedDesign();
+        var existing = Guid.NewGuid();
+        await using (var db = CreateContext()) {
+            db.Resources.Add(new ResourceEntity { Id = existing, DesignId = owner, Name = "Saved", Type = "generic" });
+            db.ResourceConfigurations.Add(new ResourceConfiguration { ResourceId = existing, SchemaVersion = 1, Configuration = "{}" });
+            await db.SaveChangesAsync();
+        }
+        var gate = SaveGate.DesignDelete();
+        using var factory = new PostgreSqlApiFactory(ConnectionString, gate);
+        using var client = CreateClient(factory);
+        var deleting = client.DeleteAsync($"/designs/{owner}");
+        try {
+            await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            await using var competitor = CreateContext();
+            competitor.Resources.Add(new ResourceEntity { Id = Guid.NewGuid(), DesignId = owner, Name = "Concurrent", Type = "generic", X = 1 });
+            await competitor.SaveChangesAsync();
+        } finally { gate.Continue.TrySetResult(); }
+        Assert.Equal(HttpStatusCode.Conflict, (await deleting).StatusCode);
+        await using var verification = CreateContext();
+        Assert.True(await verification.Designs.AnyAsync(x => x.Id == owner));
+        Assert.Equal(2, await verification.Resources.CountAsync());
+        Assert.Equal(existing, (await verification.ResourceConfigurations.SingleAsync()).ResourceId);
+        Assert.Equal(0, factory.Cloud.Calls);
+    }
+
+    [PostgreSqlFact]
+    public async Task Deployment_inserted_after_snapshot_blocks_delete_and_preserves_configuration()
+    {
+        var owner = await SeedDesign();
+        var resource = Guid.NewGuid();
+        await using (var db = CreateContext()) {
+            db.Resources.Add(new ResourceEntity { Id = resource, DesignId = owner, Name = "Saved", Type = "generic" });
+            db.ResourceConfigurations.Add(new ResourceConfiguration { ResourceId = resource, SchemaVersion = 1, Configuration = "{}" });
+            await db.SaveChangesAsync();
+        }
+        var gate = SaveGate.DesignDelete();
+        using var factory = new PostgreSqlApiFactory(ConnectionString, gate);
+        using var client = CreateClient(factory);
+        var deleting = client.DeleteAsync($"/designs/{owner}");
+        try {
+            await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            await using var competitor = CreateContext();
+            competitor.StorageDeployments.Add(new StorageDeployment {
+                Id = Guid.NewGuid(), ResourceId = resource, DesignId = owner, ResourceRevision = 1,
+                Configuration = "{}", RequestHash = new string('a', 64), ConfigurationHash = new string('b', 64),
+                OwnershipMarker = new string('c', 32), ProjectId = "example-project-123",
+                BucketName = "blacksmith-fixture", Location = "europe-west9"
+            });
+            await competitor.SaveChangesAsync();
+        } finally { gate.Continue.TrySetResult(); }
+        Assert.Equal(HttpStatusCode.Conflict, (await deleting).StatusCode);
+        await using var verification = CreateContext();
+        Assert.True(await verification.Designs.AnyAsync(x => x.Id == owner));
+        Assert.Single(await verification.Resources.ToListAsync());
+        Assert.Single(await verification.ResourceConfigurations.ToListAsync());
+        Assert.Single(await verification.StorageDeployments.ToListAsync());
+        Assert.Equal(0, factory.Cloud.Calls);
+    }
+
+    [PostgreSqlFact]
+    public async Task Undeployed_design_deletion_removes_jsonb_configuration_atomically()
+    {
+        var owner = await SeedDesign();
+        var resource = Guid.NewGuid();
+        await using (var db = CreateContext()) {
+            db.Resources.Add(new ResourceEntity { Id = resource, DesignId = owner, Name = "Saved", Type = "generic" });
+            db.ResourceConfigurations.Add(new ResourceConfiguration { ResourceId = resource, SchemaVersion = 1, Configuration = "{}" });
+            await db.SaveChangesAsync();
+        }
+        using var factory = new PostgreSqlApiFactory(ConnectionString);
+        using var client = CreateClient(factory);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/designs/{owner}")).StatusCode);
+        await using var verification = CreateContext();
+        Assert.False(await verification.Designs.AnyAsync(x => x.Id == owner));
+        Assert.Empty(await verification.Resources.ToListAsync());
+        Assert.Empty(await verification.ResourceConfigurations.ToListAsync());
+        Assert.Equal(6, await verification.ResourceTypes.CountAsync());
         Assert.Equal(0, factory.Cloud.Calls);
     }
 
@@ -88,7 +171,7 @@ public sealed class OwnershipConcurrencyTests : PostgreSqlTestDatabase
     }
 
     [PostgreSqlFact]
-    public async Task PostgreSql_http_crud_supports_ownership_reassignment_and_restrict_delete()
+    public async Task PostgreSql_http_crud_supports_ownership_reassignment_and_undeployed_delete()
     {
         var first = await SeedDesign();
         using var factory = new PostgreSqlApiFactory(ConnectionString);
@@ -105,7 +188,6 @@ public sealed class OwnershipConcurrencyTests : PostgreSqlTestDatabase
         var postedTime = resource.GetProperty("createdAtUtc").GetDateTime();
         Assert.Equal(new DateTime(postedTime.Ticks - postedTime.Ticks % 10, DateTimeKind.Utc),
             persisted.GetProperty("createdAtUtc").GetDateTime());
-        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/designs/{first}")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/designs/{second}", new { name = "Renamed" })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/resources/{id}",
             new { designId = second, name = "Moved", type = "generic", x = 2, y = -8 })).StatusCode);
@@ -113,10 +195,9 @@ public sealed class OwnershipConcurrencyTests : PostgreSqlTestDatabase
         Assert.Equal(second, moved.GetProperty("designId").GetGuid());
         Assert.Equal(persisted.GetProperty("createdAtUtc").GetDateTime(), moved.GetProperty("createdAtUtc").GetDateTime());
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/designs/{first}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/designs/{second}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/resources/{id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/designs/{second}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/designs/{second}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/resources/{id}")).StatusCode);
         Assert.Equal(0, factory.Cloud.Calls);
     }
 

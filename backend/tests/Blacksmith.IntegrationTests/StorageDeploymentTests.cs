@@ -77,6 +77,33 @@ public sealed class StorageDeploymentTests : IDisposable
         Assert.Equal("succeeded", result.GetProperty("deployment").GetProperty("status").GetString());
         Assert.Equal(1, _factory.Cloud.Creates);
     }
+    [Theory]
+    [InlineData("succeeded")]
+    [InlineData("failed")]
+    [InlineData("pending")]
+    [InlineData("unknown")]
+    public async Task Design_deletion_preserves_all_resources_configuration_and_history(string status) {
+        var resource = Guid.NewGuid();
+        await Json(await Write(resource, Guid.NewGuid(), Body()));
+        var local = await _client.PostAsJsonAsync("/resources", new { designId = Design, name = "Local", type = "generic", x = 1 });
+        Assert.Equal(HttpStatusCode.Created, local.StatusCode);
+        using (var scope = _factory.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<BlacksmithDbContext>();
+            (await db.StorageDeployments.SingleAsync()).Status = status;
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.Conflict, (await _client.DeleteAsync($"/designs/{Design}")).StatusCode);
+        using (var scope = _factory.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<BlacksmithDbContext>();
+            Assert.Single(await db.Designs.ToListAsync());
+            Assert.Equal(2, await db.Resources.CountAsync());
+            Assert.Single(await db.ResourceConfigurations.ToListAsync());
+            Assert.Equal(status, (await db.StorageDeployments.SingleAsync()).Status);
+            Assert.Single(await db.StorageDeploymentAttempts.ToListAsync());
+        }
+        Assert.Equal(1, _factory.Cloud.Creates);
+        Assert.Equal(0, _factory.Cloud.Inspections);
+    }
     [Fact] public async Task Policy_blocks_arbitrary_project_before_save() {
         Assert.Equal(HttpStatusCode.Forbidden, (await Write(Guid.NewGuid(),Guid.NewGuid(),Body(project:"other-project-123"))).StatusCode);
         Assert.Equal(0,_factory.Cloud.Creates);

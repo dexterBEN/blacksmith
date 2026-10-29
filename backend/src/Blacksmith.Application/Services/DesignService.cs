@@ -42,16 +42,8 @@ public sealed class DesignService(IDesignRepository repository) : IDesignService
         return ToResponse(design);
     }
 
-    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
-    {
-        var design = await repository.GetByIdAsync(id, ct);
-        if (design is null) return false;
-        if (await repository.HasResourcesAsync(id, ct)) throw new DesignDeletionConflictException(id);
-        repository.Remove(design);
-        // Infrastructure also translates a concurrent insert rejected by the restrictive FK.
-        await repository.SaveChangesAsync(ct);
-        return true;
-    }
+    public Task<bool> DeleteAsync(Guid id, CancellationToken ct) =>
+        repository.DeleteUndeployedAsync(id, ct);
 
     private static void Validate(string name)
     {

@@ -6,7 +6,7 @@ namespace Blacksmith.Application.Tests;
 internal sealed class MemoryDesignRepository : IDesignRepository
 {
     public List<DesignEntity> Designs { get; } = [];
-    public bool ContainsResources { get; set; }
+    public bool ContainsDeploymentHistory { get; set; }
     public int Saves { get; private set; }
     public int LegacyEnsures { get; private set; }
     public CancellationToken LastToken { get; private set; }
@@ -27,10 +27,16 @@ internal sealed class MemoryDesignRepository : IDesignRepository
         Check(ct);
         return Task.FromResult(Designs.Any(x => x.Id == id));
     }
-    public Task<bool> HasResourcesAsync(Guid id, CancellationToken ct)
+    public Task<bool> DeleteUndeployedAsync(Guid id, CancellationToken ct)
     {
         Check(ct);
-        return Task.FromResult(ContainsResources);
+        var design = Designs.FirstOrDefault(x => x.Id == id);
+        if (design is null) return Task.FromResult(false);
+        if (ContainsDeploymentHistory)
+            throw new Blacksmith.Application.Exceptions.DesignDeletionConflictException(id);
+        Designs.Remove(design);
+        Saves++;
+        return Task.FromResult(true);
     }
     public Task EnsureLegacyDesignAsync(CancellationToken ct)
     {
@@ -41,7 +47,6 @@ internal sealed class MemoryDesignRepository : IDesignRepository
         return Task.CompletedTask;
     }
     public void Add(DesignEntity design) => Designs.Add(design);
-    public void Remove(DesignEntity design) => Designs.Remove(design);
     public Task SaveChangesAsync(CancellationToken ct)
     {
         Check(ct);

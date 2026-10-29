@@ -73,7 +73,6 @@ public sealed class ResourceConfigurationApiTests : PostgreSqlTestDatabase
         var saved = await client.GetStringAsync($"/resources/{ids[0]}/configuration");
         Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/resources/{ids[0]}", new { name = "Renamed", type = "gcp.storage.bucket", x = 4, y = 5 })).StatusCode);
         Assert.Equal(saved, await client.GetStringAsync($"/resources/{ids[0]}/configuration"));
-        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/designs/{LegacyDesign.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/resources/{ids[0]}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/resources/{ids[0]}/configuration")).StatusCode);
         await using var db = CreateContext();

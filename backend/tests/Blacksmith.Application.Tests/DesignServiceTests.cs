@@ -67,16 +67,28 @@ public sealed class DesignServiceTests
     }
 
     [Fact]
-    public async Task Nonempty_design_cannot_be_removed()
+    public async Task Design_with_deployment_history_cannot_be_removed()
     {
-        var repository = new MemoryDesignRepository { ContainsResources = true };
+        var repository = new MemoryDesignRepository { ContainsDeploymentHistory = true };
         var design = new DesignEntity { Id = Guid.NewGuid(), Name = "In use" };
         repository.Designs.Add(design);
         var error = await Assert.ThrowsAsync<DesignDeletionConflictException>(() =>
             new DesignService(repository).DeleteAsync(design.Id, default));
-        Assert.Equal("Cannot delete a design that contains resources.", error.Message);
+        Assert.Equal("Cannot delete this design: deployment history exists or its resources changed concurrently.", error.Message);
         Assert.Same(design, Assert.Single(repository.Designs));
         Assert.Equal(0, repository.Saves);
+    }
+
+    [Fact]
+    public async Task Design_with_local_resources_is_deleted_without_deployment_history()
+    {
+        var repository = new MemoryDesignRepository();
+        var design = new DesignEntity { Id = Guid.NewGuid(), Name = "Local" };
+        design.Resources.Add(new ResourceEntity { Id = Guid.NewGuid(), DesignId = design.Id, Name = "Local", Type = "generic" });
+        repository.Designs.Add(design);
+        Assert.True(await new DesignService(repository).DeleteAsync(design.Id, default));
+        Assert.Empty(repository.Designs);
+        Assert.Equal(1, repository.Saves);
     }
 
     [Fact]

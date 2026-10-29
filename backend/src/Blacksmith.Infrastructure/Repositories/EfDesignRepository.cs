@@ -18,8 +18,38 @@ public sealed class EfDesignRepository(BlacksmithDbContext db) : IDesignReposito
     public Task<bool> ExistsAsync(Guid id, CancellationToken ct) =>
         db.Designs.AnyAsync(design => design.Id == id, ct);
 
-    public Task<bool> HasResourcesAsync(Guid id, CancellationToken ct) =>
-        db.Resources.AnyAsync(resource => resource.DesignId == id, ct);
+    public async Task<bool> DeleteUndeployedAsync(Guid id, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var design = await GetByIdAsync(id, ct);
+        if (design is null) return false;
+
+        // All outcomes count as history, including failed, pending and unknown.
+        if (await db.StorageDeployments.AnyAsync(x => x.DesignId == id || x.Resource.DesignId == id, ct))
+            throw new DesignDeletionConflictException(id);
+
+        var resources = await db.Resources.Where(x => x.DesignId == id).ToListAsync(ct);
+        db.Resources.RemoveRange(resources);
+        db.Designs.Remove(design);
+        try
+        {
+            // One SaveChanges transaction; configuration rows cascade from resources.
+            // Restrictive FKs remain the final guard against concurrent inserts/deployments.
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new DesignDeletionConflictException(id, exception);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+            { SqlState: PostgresErrorCodes.ForeignKeyViolation, ConstraintName:
+                BlacksmithDbContext.ResourceDesignForeignKey or "FK_storage_deployments_resources_resource_id" })
+        {
+            throw new DesignDeletionConflictException(id, exception);
+        }
+    }
 
     public async Task EnsureLegacyDesignAsync(CancellationToken ct)
     {
@@ -34,18 +64,6 @@ public sealed class EfDesignRepository(BlacksmithDbContext db) : IDesignReposito
     }
 
     public void Add(DesignEntity design) => db.Designs.Add(design);
-    public void Remove(DesignEntity design) => db.Designs.Remove(design);
 
-    public async Task SaveChangesAsync(CancellationToken ct)
-    {
-        try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
-        { SqlState: PostgresErrorCodes.ForeignKeyViolation, ConstraintName: BlacksmithDbContext.ResourceDesignForeignKey })
-        {
-            var deleted = db.ChangeTracker.Entries<DesignEntity>()
-                .FirstOrDefault(entry => entry.State == EntityState.Deleted);
-            if (deleted is null) throw;
-            throw new DesignDeletionConflictException(deleted.Entity.Id, exception);
-        }
-    }
+    public async Task SaveChangesAsync(CancellationToken ct) => await db.SaveChangesAsync(ct);
 }

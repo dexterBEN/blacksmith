@@ -58,7 +58,7 @@ The backend uses a **layered architecture with ports-and-adapters principles**. 
 | Endpoint | Purpose |
 | --- | --- |
 | `POST /designs`, `GET /designs` | Create and list designs |
-| `GET /designs/{id}`, `PUT /designs/{id}`, `DELETE /designs/{id}` | Manage a design; deletion is restricted if it contains resources |
+| `GET /designs/{id}`, `PUT /designs/{id}`, `DELETE /designs/{id}` | Manage a design; deletion atomically removes undeployed resources; deployment history blocks deletion |
 | `GET /designs/{id}/resources` | List resources belonging to one design |
 | `POST /resources`, `GET /resources` | Persist resources and list all resources |
 | `GET /resources/{id}`, `PUT /resources/{id}`, `DELETE /resources/{id}` | Read, update, or delete a stored resource |
@@ -88,7 +88,7 @@ to restore multiple Cloud Storage placements, including saved configurations.
 
 - A **Design** contains zero or more **Resources**.
 - Every persisted **Resource** belongs to exactly one **Design**.
-- A **Design** with resources cannot be deleted (**restrictive deletion**).
+- Deleting a **Design** atomically removes its resources and configurations if no deployment history exists. Any deployment history blocks deletion (`409`); cloud resources are never deleted by this action.
 - Each resource may reference a **ResourceType**. This reference is currently optional to preserve unknown historical resource types.
 - The initial generic resource catalog contains `virtual-machine`, `storage`, `database`, `network`, `gateway`, and `load-balancer`.
 - Existing resource type strings remain supported for backward compatibility.
