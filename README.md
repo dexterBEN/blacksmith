@@ -112,6 +112,10 @@ a persisted kind or deleting it through Save remains unsupported.
 
 ## Local 3D editor
 
+See the [frontend script guide](frontend/scripts/README.md) for `dev.sh build`,
+`host-build`, `run`, `test`, `check` and `preview`, including the host/container
+Dart configuration limitation.
+
 See [local startup and the five-cycle non-cloud smoke test](docs/local-smoke-test.md)
 for host/container terminal contexts, port 5100 diagnostics, safe dependency refresh,
 deployment-state semantics and isolated regression commands.
@@ -172,6 +176,7 @@ use this VM's Dart SDK at `/usr/lib/dart/bin/dart`:
 
 ```bash
 cd frontend/src
+export PUB_CACHE="${PUB_CACHE:-$PWD/../.pub-cache}"
 /usr/lib/dart/bin/dart pub get
 /usr/lib/dart/bin/dart run build_runner build --delete-conflicting-outputs
 cd ../..
@@ -187,11 +192,11 @@ godot --path frontend
 godot --path frontend res://main.tscn
 
 # Production-bootstrap checks, clean-launch captures and optional Linux tracing.
-python3 frontend/scripts/test-godot.py --application --trace-network --timeout 600 --output /tmp/blacksmith-startup
+python3 frontend/scripts/tests/test-godot.py --application --trace-network --timeout 600 --output /tmp/blacksmith-startup
 
 # Existing detailed 3D and explicit legacy 2D regression fixtures.
-python3 frontend/scripts/run-isometric-3d.py --check --timeout 600 --output /tmp/blacksmith-placement
-python3 frontend/scripts/test-godot.py --timeout 600
+python3 frontend/scripts/preview/run-isometric-3d.py --check --timeout 600 --output /tmp/blacksmith-placement
+python3 frontend/scripts/tests/test-godot.py --timeout 600
 ```
 
 Use Godot's **Run Project (F5)** for the default 3D editor. `main.tscn` and its

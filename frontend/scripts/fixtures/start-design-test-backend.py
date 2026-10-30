@@ -6,8 +6,8 @@ never prints it, copies credentials, or changes the development database.
 Applies existing migrations only to a uniquely named disposable database.
 No containers, volumes, or GCP resources are created or deleted.
 
-Start: python3 frontend/scripts/start-design-test-backend.py CONTAINER --port 5139
-Stop/cleanup: python3 frontend/scripts/start-design-test-backend.py CONTAINER --stop RUN_PATH
+Start: python3 frontend/scripts/fixtures/start-design-test-backend.py CONTAINER --port 5139
+Stop/cleanup: python3 frontend/scripts/fixtures/start-design-test-backend.py CONTAINER --stop RUN_PATH
 Restart the fake deployment API, retaining its test DB: ... CONTAINER --restart RUN_PATH
 Verify SQL: ... CONTAINER --verify RUN_PATH DESIGN_ID DESIGN_NAME
 The initial command stays running until --stop is requested in another terminal.
@@ -53,7 +53,7 @@ def main():
                    f'{run}/test-host/bin/Release/net8.0/DesignTestBackend.dll',
                    run, 'verify', *args.verify[1:])
         return
-    repo = Path(__file__).resolve().parents[2]
+    repo = Path(__file__).resolve().parents[3]
     backend = repo / 'backend'
     snapshot = Path(tempfile.mkdtemp(prefix='blacksmith-design-backend-'))
     for path in (backend / 'src').rglob('*'):
@@ -70,7 +70,7 @@ def main():
                     ignore=shutil.ignore_patterns('bin', 'obj'))
     # ProjectReference is resolved relative to the temporary test-host directory.
     project = snapshot / 'test-host/DesignTestBackend.csproj'
-    project.write_text(project.read_text().replace('../../../backend/src/', '../src/').replace('../../../backend/tests/', '../tests/'))
+    project.write_text(project.read_text().replace('../../../../backend/src/', '../src/').replace('../../../../backend/tests/', '../tests/'))
     run = f'/tmp/{snapshot.name}'
     print(f'RUN_PATH={run}', flush=True)
     docker('cp', str(snapshot), f'{args.container}:/tmp/')

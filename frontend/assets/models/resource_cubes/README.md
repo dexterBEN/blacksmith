@@ -47,19 +47,19 @@ Run from the repository root with Python 3 and Godot 4.4:
 python3 frontend/scripts/check_resource_cubes.py --require-tracked
 
 # Open a standalone native preview; close its window to exit.
-python3 frontend/scripts/preview-resource-cubes.py
+python3 frontend/scripts/preview/preview-resource-cubes.py
 
 # Fresh import, geometry/material validation and actual viewport captures.
-python3 frontend/scripts/preview-resource-cubes.py --check --output /tmp/blacksmith-cubes
+python3 frontend/scripts/preview/preview-resource-cubes.py --check --output /tmp/blacksmith-cubes
 
 # Regenerate the shared mesh and check geometry without rendering the scene.
-python3 frontend/scripts/preview-resource-cubes.py --generate-mesh --headless
+python3 frontend/scripts/preview/preview-resource-cubes.py --generate-mesh --headless
 
 # Open the interactive Dart grid: select a tile, then choose a local resource.
-python3 frontend/scripts/run-isometric-3d.py
+python3 frontend/scripts/preview/run-isometric-3d.py
 
 # Exercise actual palette input, placement/replacement, replay and lifecycle.
-python3 frontend/scripts/run-isometric-3d.py --check --timeout 600 --output /tmp/blacksmith-placement
+python3 frontend/scripts/preview/run-isometric-3d.py --check --timeout 600 --output /tmp/blacksmith-placement
 ```
 
 The asset-only launcher creates a fresh temporary Godot project containing

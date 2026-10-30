@@ -7,7 +7,6 @@ Only fake selection dependencies are registered. Requires the existing Dart
 packages, generated bindings and Linux Godot/Dart native libraries.
 """
 import argparse
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -15,7 +14,9 @@ import sys
 import tempfile
 
 sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from check_resource_cubes import validate_assets
+from script_support import FRONTEND_DIR, isolated_environment
 
 
 def main():
@@ -33,7 +34,7 @@ def main():
                         default='opaque',
                         help='Isolated material comparison; transparent variants never change production assets.')
     args = parser.parse_args()
-    source = Path(__file__).resolve().parents[1]
+    source = FRONTEND_DIR
     dependencies = validate_assets(source)
     print(f'Resource dependencies: PASS ({len(dependencies)} files)', flush=True)
     project = Path(tempfile.mkdtemp(prefix='blacksmith-isometric3d-'))
@@ -81,9 +82,7 @@ def main():
     (project / 'src/main.dart').write_text(
         "import 'test_support/isometric_3d_main.dart' as preview;\n"
         'void main() => preview.main();\n')
-    env = os.environ.copy()
-    for name in ['DATA', 'CONFIG', 'CACHE']:
-        env[f'XDG_{name}_HOME'] = str(project / f'xdg-{name.lower()}')
+    env = isolated_environment(project)
     env['BLACKSMITH_ISSUE17_MODE'] = (
         'headless' if args.headless else 'check' if args.check else 'interactive')
     env['BLACKSMITH_ISSUE17_OUTPUT'] = str(output)

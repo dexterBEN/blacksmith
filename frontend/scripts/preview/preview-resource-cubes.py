@@ -6,7 +6,6 @@ materials, reflection and background. Only its Dart root script is replaced.
 Source application scenes and the issue #27 stash remain untouched.
 """
 import argparse
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,7 +13,9 @@ import sys
 import tempfile
 
 sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from check_resource_cubes import validate_assets
+from script_support import FRONTEND_DIR, isolated_environment
 
 
 def main():
@@ -29,7 +30,7 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--timeout', type=int, default=180)
     args = parser.parse_args()
-    source = Path(__file__).resolve().parents[1]
+    source = FRONTEND_DIR
     dependencies = validate_assets(source)
     print(f'Resource dependencies: PASS ({len(dependencies)} files)', flush=True)
     project = Path(tempfile.mkdtemp(prefix='blacksmith-resource-cubes-'))
@@ -63,9 +64,7 @@ def main():
         'window/stretch/mode="viewport"\n'
         '[rendering]\nrenderer/rendering_method="gl_compatibility"\n'
         'anti_aliasing/quality/msaa_3d=2\n')
-    env = os.environ.copy()
-    for name in ['DATA', 'CONFIG', 'CACHE']:
-        env[f'XDG_{name}_HOME'] = str(project / f'xdg-{name.lower()}')
+    env = isolated_environment(project)
     env['BLACKSMITH_CUBES_CHECK'] = '1' if args.check or args.headless else '0'
     env['BLACKSMITH_CUBES_OUTPUT'] = str(output)
 

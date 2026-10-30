@@ -6,7 +6,6 @@ native libraries. --application also runs the unchanged production entrypoint.
 Temporary files/logs are retained at the printed path for inspection.
 """
 import argparse
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -17,13 +16,15 @@ from urllib.parse import urlparse
 import sys
 
 sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from check_resource_cubes import validate_assets
+from script_support import FRONTEND_DIR, isolated_environment
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path,
-                        default=Path(__file__).resolve().parents[1])
+                        default=FRONTEND_DIR)
     parser.add_argument('--native-dir', type=Path)
     parser.add_argument('--godot', default='godot')
     parser.add_argument('--timeout', type=int, default=300,
@@ -45,7 +46,7 @@ def main():
     parser.add_argument('--reopen-cycles', type=int, default=1,
                         help='Repeat the fake deployment Open phase in distinct native processes, preserving per-cycle evidence.')
     parser.add_argument('--local-editor', action='store_true',
-                        help='For a deployment fixture, import with the real host run_local.sh launcher before the player cycles (requires backend/.env).')
+                        help='For a deployment fixture, import with the real host run_local.sh launcher before the player cycles (no deployment token required).')
     args = parser.parse_args()
     if sum(bool(mode) for mode in [args.design, args.application, args.persistence, args.deployment]) > 1:
         parser.error('--design and --application are separate checks.')
@@ -103,10 +104,8 @@ def main():
         (project / 'src/main.dart').write_text(
             "import 'test_support/godot_smoke_main.dart' as smoke;\n"
             "void main() => smoke.main();\n")
-    env = os.environ.copy()
     # Confine Godot's editor/runtime caches; never copy env or credential files.
-    for name in ['DATA', 'CONFIG', 'CACHE']:
-        env[f'XDG_{name}_HOME'] = str(project / f'xdg-{name.lower()}')
+    env = isolated_environment(project)
     # Clean application launches must not depend on any old fixture environment.
     if args.application or args.design or args.persistence or args.deployment:
         env = {key: value for key, value in env.items()
@@ -246,7 +245,7 @@ def main():
         return
 
     if args.application:
-        copy('scripts/check-workspace-scene-save.gd')
+        copy('scripts/tests/check-workspace-scene-save.gd')
         configuration = (project / 'project.godot').read_bytes()
         original_main = (project / 'src/main.dart').read_bytes()
         if b'run/main_scene="res://scenes/isometric_3d.tscn"' not in configuration:
@@ -259,7 +258,7 @@ def main():
         # native launches use these saved files, so losing the viewport fails
         # here instead of escaping startup-only coverage.
         run('workspace-scene-save', ['--script',
-            'res://scripts/check-workspace-scene-save.gd'],
+            'res://scripts/tests/check-workspace-scene-save.gd'],
             'BLACKSMITH_WORKSPACE_SCENE_SAVE_PASSED', trace=args.trace_network)
         # Instrument only this phase. The actual bootstrap function is unchanged
         # and creates the real BLoC; only cloud dependencies are fail-closed doubles.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline launcher regressions; uses a fake Godot only.
 
-Run: python3 frontend/scripts/test_run_local.py
+Run: python3 frontend/scripts/tests/test_run_local.py
 Does not read backend/.env or launch a GUI, API, Docker or Google Cloud.
 """
 import json
@@ -26,7 +26,7 @@ class LocalLauncherTests(unittest.TestCase):
         for directory in [self.front / 'scripts', self.back, self.bin]:
             directory.mkdir(parents=True)
         self.script = self.front / 'scripts/run_local.sh'
-        shutil.copyfile(Path(__file__).with_name('run_local.sh'), self.script)
+        shutil.copyfile(Path(__file__).resolve().parents[1] / 'run_local.sh', self.script)
         self.env_file = self.back / '.env'
         self.godot = self.bin / 'godot'
         self.godot.write_text('''#!/usr/bin/env python3

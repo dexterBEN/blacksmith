@@ -6,6 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../backend/src/Blacksmith.Infrastructure/Blacksmith.Infrastructure.csproj" />
+    <ProjectReference Include="../../../../backend/src/Blacksmith.Infrastructure/Blacksmith.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
