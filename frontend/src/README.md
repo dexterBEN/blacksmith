@@ -1,5 +1,9 @@
 # Blacksmith Dart sources
 
+For the supported host and DevContainer commands, see the
+[development script guide](../scripts/README.md). The recommended host sequence is
+`../scripts/dev.sh host-build` followed by `../scripts/dev.sh run` from this directory.
+
 `main.dart` is the normal Godot/Dart entry point. It registers the existing script
 resolver for editor/runtime use and initializes the shared GetIt services only
 during application execution. The default Godot scene is
@@ -11,6 +15,7 @@ already installed, run from this directory. Validation on this VM uses Dart
 wrapper that otherwise appears first in this VM's `PATH`.
 
 ```bash
+export PUB_CACHE="${PUB_CACHE:-$PWD/../.pub-cache}"
 /usr/lib/dart/bin/dart pub get
 /usr/lib/dart/bin/dart run build_runner build --delete-conflicting-outputs
 /usr/lib/dart/bin/dart analyze
@@ -102,20 +107,20 @@ From the repository root, with the same native prerequisites as the other tests:
 
 ```bash
 # UI regression with controlled responses; no actual HTTP connections.
-python3 frontend/scripts/test-godot.py --design --trace-network --timeout 600 --output /tmp/blacksmith-design-ui
+python3 frontend/scripts/tests/test-godot.py --design --trace-network --timeout 600 --output /tmp/blacksmith-design-ui
 
 # Start the unchanged API in the existing backend Dev Container against a NEW
 # disposable database (existing cached dependencies/database access required).
-python3 frontend/scripts/start-design-test-backend.py CONTAINER_ID --port 5139
+python3 frontend/scripts/fixtures/start-design-test-backend.py CONTAINER_ID --port 5139
 # Keep this running; note the printed RUN_PATH and the container's reachable IP.
 
 # Sends one real POST then GET; writes only to the dedicated database above.
-python3 frontend/scripts/test-godot.py --design --design-live http://CONTAINER_IP:5139 --timeout 600 --output /tmp/blacksmith-design-live
+python3 frontend/scripts/tests/test-godot.py --design --design-live http://CONTAINER_IP:5139 --timeout 600 --output /tmp/blacksmith-design-live
 # Use id/name from /tmp/blacksmith-design-live/design_result.json:
-python3 frontend/scripts/start-design-test-backend.py CONTAINER_ID --verify RUN_PATH DESIGN_ID 'DESIGN_NAME'
+python3 frontend/scripts/fixtures/start-design-test-backend.py CONTAINER_ID --verify RUN_PATH DESIGN_ID 'DESIGN_NAME'
 # Stop only this test API and drop only its generated database, including the
 # dedicated test Design. Never use this command to stop the user's normal API.
-python3 frontend/scripts/start-design-test-backend.py CONTAINER_ID --stop RUN_PATH
+python3 frontend/scripts/fixtures/start-design-test-backend.py CONTAINER_ID --stop RUN_PATH
 ```
 
 The native checks invoke the unchanged production bootstrap with test-only HTTP
@@ -180,8 +185,8 @@ migrations and sets an unusable GCP credential path for its API process. With th
 backend running, use its numeric container IP and test port:
 
 ```bash
-python3 frontend/scripts/test-godot.py --persistence http://CONTAINER_IP:5144 --persistence-phase save --trace-network --timeout 600 --output /tmp/blacksmith-persistence
-python3 frontend/scripts/test-godot.py --persistence http://CONTAINER_IP:5144 --persistence-phase open --trace-network --timeout 600 --output /tmp/blacksmith-persistence
+python3 frontend/scripts/tests/test-godot.py --persistence http://CONTAINER_IP:5144 --persistence-phase save --trace-network --timeout 600 --output /tmp/blacksmith-persistence
+python3 frontend/scripts/tests/test-godot.py --persistence http://CONTAINER_IP:5144 --persistence-phase open --trace-network --timeout 600 --output /tmp/blacksmith-persistence
 ```
 
 Run from the repository root (unlike the Dart commands above). This native test

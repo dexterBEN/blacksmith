@@ -12,6 +12,13 @@ var shared_cube_mesh: Mesh
 
 
 func _ready() -> void:
+	# The production camera now belongs to the workspace SubViewport. This native
+	# fixture renders the board directly, so reuse that camera in the root viewport.
+	var camera: Camera3D = get_node("WorkspaceLayer/Workspace/Margin/Layout/Body/Center/Canvas/WorldViewport/Camera3D")
+	camera.reparent(self)
+	camera.make_current()
+	$WorkspaceLayer.queue_free()
+	$DesignLayer.queue_free()
 	var tile_scene: PackedScene = load("res://scenes/isometric_3d/tile.tscn")
 	for row in range(6):
 		for col in range(6):
@@ -102,6 +109,7 @@ func validate_model(model: Node3D, service: String, cell: Vector2i) -> void:
 
 
 func capture() -> void:
+	assert(get_viewport().get_camera_3d() == $Camera3D)
 	var output := OS.get_environment("BLACKSMITH_CUBES_OUTPUT")
 	var headless := DisplayServer.get_name() == "headless"
 	if not headless:

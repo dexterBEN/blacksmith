@@ -170,11 +170,11 @@ dart analyze
 dart test
 
 # From repository root; this API fixture injects a fake in test composition only.
-python3 frontend/scripts/start-design-test-backend.py CONTAINER --deployment --port 5148
-python3 frontend/scripts/test-godot.py --deployment http://CONTAINER_IP:5148 \
+python3 frontend/scripts/fixtures/start-design-test-backend.py CONTAINER --deployment --port 5148
+python3 frontend/scripts/tests/test-godot.py --deployment http://CONTAINER_IP:5148 \
   --trace-network --timeout 600 --output /tmp/blacksmith-deployment-check
 # Stop the exact RUN_PATH printed by the first command to drop its temporary DB.
-python3 frontend/scripts/start-design-test-backend.py CONTAINER --stop RUN_PATH
+python3 frontend/scripts/fixtures/start-design-test-backend.py CONTAINER --stop RUN_PATH
 ```
 
 The native harness checks a test-only marker before starting; it refuses an ordinary API.
