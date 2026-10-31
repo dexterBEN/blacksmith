@@ -39,18 +39,21 @@ void checkEditorFraming(Node scene) {
             panel.position.y >= 0 &&
             panel.end.x <= viewport.x + .1 &&
             panel.end.y <= viewport.y + .1,
-        'Every workspace panel must fit the actual main viewport.');
+        'Every workspace panel must fit the actual main viewport: '
+        'position=${panel.position.x},${panel.position.y} '
+        'size=${panel.size.x}x${panel.size.y} '
+        'viewport=${viewport.x}x${viewport.y}.');
   }
   _check(
-      (rect.position.x - WorkspaceLayout.margin).abs() < .1 &&
-          (rect.size.x - (viewport.x - 2 * WorkspaceLayout.margin)).abs() < .1,
-      'The viewport fills the complete body width without a navigation allocation.');
+      rect.position.length < .1 &&
+          (rect.size - viewport).length < .1 &&
+          header.position.y == 0 &&
+          header.end.y < 80,
+      'The canvas fills the window behind the compact top overlay.');
   _check(
-      rect.position.y >= header.end.y + 7 &&
-          (rect.end.y - (viewport.y - 8)).abs() <= .1 &&
-          !scene.hasNode(
-              NodePath.fromString('${Workspace3D.body}/Center/QuickPlacement')),
-      'The canvas fills the body down to its bottom margin, with no footer allocation.');
+      !scene.hasNode(
+          NodePath.fromString('${Workspace3D.body}/Center/QuickPlacement')),
+      'No layout row or footer reserves camera space.');
   _check(
       !scene.hasNode(NodePath.fromString(
               '${Workspace3D.header}/Rows/Actions/PlacementChoices')) &&

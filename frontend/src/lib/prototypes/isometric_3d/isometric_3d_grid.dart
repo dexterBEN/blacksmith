@@ -318,7 +318,7 @@ class Isometric3DGrid extends Node3D {
         1.04;
     final projectedCenter = (top + bottom) / 2 * math.sqrt(2 / 3);
     final camera = Workspace3D.camera(this);
-    // Fit only the real render viewport; layout containers reserve all UI space.
+    // Fit the full-window render viewport; UI overlays reserve no camera space.
     // Selection input maps the main viewport point to this canvas before picking.
     camera
       ..setOrthogonal(unitsPerPixel * size.y, 0.1, 50)

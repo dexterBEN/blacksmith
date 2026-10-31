@@ -26,7 +26,7 @@ class DesignEditor3D {
       final id = _cubit?.state.active?.id;
       if (id != null) DisplayServer.singleton.clipboardSet(id);
     });
-    _active = owner.getNodeT<Label>('${Workspace3D.header}/Rows/ActiveDesign')!;
+    _active = owner.getNodeT<Label>(Workspace3D.status)!;
     _shade = _controls.getNodeT<ColorRect>('Shade')!;
     _dialog = _shade.getNodeT<Panel>('Dialog')!;
     _name = _dialog.getNodeT<LineEdit>('Name')!;
@@ -96,8 +96,8 @@ class DesignEditor3D {
         ? 'No active Design · ${state.persistenceMessage}'
         : '${state.active!.name} · ${state.persistenceMessage}');
     _active.setTooltipText(state.active == null
-        ? state.persistenceMessage
-        : 'Design ID: ${state.active!.id}\n${state.persistenceMessage}');
+        ? _active.getText()
+        : '${_active.getText()}\nDesign ID: ${state.active!.id}');
     _shade.setVisible(state.dialogOpen);
     _configuration.render(state);
     _onModalChanged(blocked);

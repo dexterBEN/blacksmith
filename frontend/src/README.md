@@ -42,8 +42,13 @@ godot --path frontend res://main.tscn
 The first command imports Godot's resources after a fresh checkout. Opening the
 project in the editor performs the same import before Run Project (F5).
 
-The 3D workspace keeps the existing compact Design header and a full-width
-`SubViewportContainer` below it. A bottom-left floating Speed Dial starts collapsed
+The 3D workspace uses a full-window `SubViewportContainer` behind a translucent
+56-pixel Design toolbar. Brand, actions and dynamic right-aligned status share
+one row; long status text elides with the complete text and Design ID in a tooltip.
+The toolbar reserves no viewport height. Decorative regions pass input through;
+actual action buttons block tile picking, including when disabled.
+
+A bottom-left floating Speed Dial starts collapsed
 as **+**; expanding it shows **Resources** and **Inspect** in one upward stack.
 Its 160 ms animation is authored in the native `AnimationPlayer` scene.
 
@@ -59,6 +64,10 @@ that keeps the dialog open; an invalidated tile disables confirmation and shows
 feedback. Opening an existing Design/configuration modal hands control to it. Popup close returns focus to the main button. Selection/placement,
 configuration, persistence and deployment retain their existing state owners.
 The native window minimum remains 960 × 640; the map minimum is 480 × 320.
+
+Use `preview --toolbar-overlay --check` for real-window checks at 1152×648,
+960×640 and 1600×900, including full-window geometry, map centering, status
+overflow and pointer passthrough, followed by the existing modal and dial checks.
 
 Use `preview --resources-modal --check` (or `--headless`) for the centered-dialog
 regressions and current screenshots at 1152×648 and 960×640. See the

@@ -46,7 +46,7 @@ Future<void> checkSpeedDial(Node scene, IsomapGridBloc bloc,
     await _pause();
     await dismissWorkspaceMenus(scene);
     final canvas = Workspace3D.canvasRect(scene);
-    _check((canvas.size.x - (size.$1 - 24)).abs() < 1,
+    _check((canvas.size.x - size.$1).abs() < 1,
         'The complete body width belongs to the render viewport.');
     final toggle = control(Workspace3D.speedToggle).getGlobalRect();
     _check(

@@ -6,7 +6,7 @@ void main() {
     final result = WorkspaceLayout().resolve(1280);
     expect(result.library, isFalse);
     expect(result.inspector, isFalse);
-    expect(result.canvasWidth, 1256);
+    expect(result.canvasWidth, 1280);
   });
 
   for (final width in [960.0, 1280.0, 1600.0, 1920.0]) {
@@ -44,7 +44,7 @@ void main() {
     for (final panel in WorkspacePanel.values) {
       state.resize(panel, 10000);
       state.request(panel, true);
-      expect(state.resolve(960).canvasWidth, 936);
+      expect(state.resolve(960).canvasWidth, 960);
       expect(
           panel == WorkspacePanel.library
               ? state.libraryWidth

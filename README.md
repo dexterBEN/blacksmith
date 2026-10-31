@@ -137,8 +137,9 @@ the existing Dart bindings and native libraries separately as described below.
 Normal Godot project startup opens `scenes/isometric_3d.tscn`. The existing 3D
 scene supports selecting a tile and placing or replacing Cloud Storage,
 Compute Engine, Cloud VPN and Cloud Load Balancing cubes through a native palette.
-The workspace keeps the existing Design header and fills the available width
-below it. A compact **+** Speed Dial floats at the bottom-left. Open it to show
+The 3D viewport and background fill the entire window. A compact, translucent
+Design toolbar overlays the top edge with actions on the left and dynamic status
+on the right; long status text elides and remains available in a tooltip. A compact **+** Speed Dial floats at the bottom-left. Open it to show
 **Resources** and **Inspect** vertically above **×**. Resources opens a centered modal; select a tile first, choose a resource row,
 then confirm with **Place Resource**. Row selection alone never places anything. Inspect shows current
 tile/resource details and the existing Cloud Storage configuration entry point.

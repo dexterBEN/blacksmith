@@ -36,6 +36,10 @@ class Workspace3D {
         .focusExited
         .connect(_scene, () => _setDial(false));
     _control(center).resized.connect(_scene, resize);
+    // Wrapped text minima settle after container layout. Reapply the bounds
+    // when they change so a scene reload cannot leave the dialog at an old,
+    // temporarily clamped height larger than the window.
+    _control(sidebar).minimumSizeChanged.connect(_scene, resize);
     resize();
   }
 
@@ -50,13 +54,20 @@ class Workspace3D {
 
   static void attach(Node scene) {
     // Keep the established world and all its nodes. A separate camera viewport
-    // renders it only inside the container, never underneath the UI panels.
+    // renders it across the full window, underneath the UI overlays.
     viewport(scene).setWorld_3d(scene.getViewport()!.findWorld_3d());
   }
 
   static const root = 'WorkspaceLayer/Workspace';
-  static const header = '$root/Margin/Layout/Header';
-  static const body = '$root/Margin/Layout/Body';
+  static const header = '$root/Header';
+  static const status = '$header/Rows/Actions/ActiveDesign';
+  static const toolbarButtons = [
+    '$header/Rows/Actions/NewDesign',
+    '$header/Rows/Actions/OpenDesign',
+    '$header/Rows/Actions/SaveDesign',
+    '$header/Rows/Actions/CopyDesignId',
+  ];
+  static const body = '$root/Body';
   static const center = '$body/Center';
   static const speedDial = '$center/SpeedDial';
   static const speedToggle = '$speedDial/Toggle';
@@ -172,6 +183,7 @@ class Workspace3D {
   bool blocksPointer(Vector2 point) =>
       isResourcesOpen ||
       [
+        ...toolbarButtons,
         speedToggle,
         if (_dialOpen) ...[libraryToggle, inspectorToggle],
         sidebar,

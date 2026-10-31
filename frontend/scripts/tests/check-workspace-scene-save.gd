@@ -5,7 +5,8 @@ extends SceneTree
 # used to silently discard children added inside a non-editable scene instance.
 const WORKSPACE = "res://scenes/isometric_3d/workspace_controls.tscn"
 const SCENE = "res://scenes/isometric_3d.tscn"
-const CANVAS = "Margin/Layout/Body/Center/Canvas"
+const CANVAS = "Body/Center/Canvas"
+const DIAL = "Body/Center/SpeedDial"
 
 func _initialize():
 	for cycle in range(2):
@@ -19,6 +20,12 @@ func _initialize():
 				scene.free()
 				quit(1)
 				return
+			var dial = scene.get_node_or_null(prefix + DIAL)
+			if not dial is Control or not is_equal_approx(dial.offset_left, 18.0) or not is_equal_approx(dial.offset_bottom, -18.0):
+				push_error("Speed Dial margins changed after editor save: " + path)
+				scene.free()
+				quit(1)
+				return
 			var saved = PackedScene.new()
 			var result = saved.pack(scene)
 			if result == OK:
@@ -28,5 +35,5 @@ func _initialize():
 				push_error("Could not save workspace regression fixture: " + path)
 				quit(1)
 				return
-	print("BLACKSMITH_WORKSPACE_SCENE_SAVE_PASSED cycles=2 viewport=true camera=true")
+	print("BLACKSMITH_WORKSPACE_SCENE_SAVE_PASSED cycles=2 viewport=true camera=true dial_margins=true")
 	quit()

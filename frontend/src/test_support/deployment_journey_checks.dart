@@ -224,8 +224,7 @@ void afterStartup() {
             'Both Resource IDs, tiles, complete configurations, revisions and deployment records survive restart.');
         _check(cubit.state.persistenceMessage.contains('succeeded'),
             'The existing workspace summary displays the persisted outcome.');
-        final summary =
-            scene.getNodeT<Label>('${Workspace3D.header}/Rows/ActiveDesign')!;
+        final summary = scene.getNodeT<Label>(Workspace3D.status)!;
         _check(
             !scene
                     .getNodeT<Control>(Workspace3D.inspector)!
