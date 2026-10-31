@@ -4,6 +4,7 @@ import 'dart:async' as async;
 import 'dart:convert';
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
+import 'workspace_test_input.dart';
 import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import 'package:http/http.dart' as http;
 import '../lib/core/di/service_locator.dart' as di;
@@ -140,6 +141,7 @@ void afterStartup() {
       }
 
       Future<void> select(GridPos pos) async {
+        await dismissWorkspaceMenus(scene);
         final p = const GridLayout3D().worldPosition(pos);
         final screen = Workspace3D.project(
             scene, (scene as Node3D).toGlobal(Vector3(x: p.x, y: .12, z: p.z)));
@@ -150,12 +152,7 @@ void afterStartup() {
       Future<void> place() async {
         await select(const GridPos(0, 0));
         if (!scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
-          await _click(
-              scene,
-              scene
-                  .getNodeT<Button>(Workspace3D.libraryToggle)!
-                  .getGlobalRect()
-                  .getCenter());
+          await openWorkspaceAction(scene, Workspace3D.libraryToggle);
         }
         await _click(
             scene,

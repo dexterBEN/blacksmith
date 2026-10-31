@@ -13,7 +13,7 @@ compatible Godot/Dart libraries and generated bindings.
 | `./scripts/dev.sh run [Godot arguments]` | Open the Godot editor through the canonical `run_local.sh` launcher |
 | `./scripts/dev.sh test [options]` | Run `tests/test-godot.py`; default is the existing legacy 2D check |
 | `./scripts/dev.sh check [options]` | Validate resource cube dependencies (`--require-tracked` checks the Git index) |
-| `./scripts/dev.sh preview [options]` | Run the isolated Dart 3D scene; supports `--check`, `--headless` and material variants |
+| `./scripts/dev.sh preview [options]` | Run the isolated Dart 3D scene; supports `--check`, `--headless`, focused `--speed-dial` checks and material variants |
 | `./scripts/dev.sh preview-cubes [options]` | Preview/check native resource cubes without Dart |
 
 `build`, `host-build` and `reset` all preserve `src/pubspec.lock`; they never run a

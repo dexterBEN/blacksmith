@@ -159,7 +159,10 @@ class Isometric3DGrid extends Node3D {
       return;
     }
     final rect = Workspace3D.canvasRect(this);
-    if (!rect.hasPoint(event.getPosition())) return;
+    if (!rect.hasPoint(event.getPosition()) ||
+        (_workspace?.blocksPointer(event.getPosition()) ?? false)) {
+      return;
+    }
     final viewportSize = Workspace3D.viewport(this).getVisibleRect().size;
     final local = event.getPosition() - rect.position;
     final point = Vector2(

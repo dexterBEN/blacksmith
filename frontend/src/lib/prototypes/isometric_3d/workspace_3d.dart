@@ -7,12 +7,16 @@ import 'workspace_layout.dart';
 /// Native desktop workspace geometry. No editing/business state.
 class Workspace3D {
   Workspace3D(this._scene, {required void Function() configureStorage}) {
+    _button(speedToggle).pressed.connect(_scene, () {
+      _closePanels(focusMain: false);
+      _setDial(!_dialOpen);
+    });
     _button(libraryToggle)
         .pressed
-        .connect(_scene, () => _toggle(WorkspacePanel.library));
+        .connect(_scene, () => _request(WorkspacePanel.library, true));
     _button(inspectorToggle)
         .pressed
-        .connect(_scene, () => _toggle(WorkspacePanel.inspector));
+        .connect(_scene, () => _request(WorkspacePanel.inspector, true));
     _button('$sidebar/Content/Heading/Close')
         .pressed
         .connect(_scene, () => _request(WorkspacePanel.library, false));
@@ -20,34 +24,19 @@ class Workspace3D {
         .pressed
         .connect(_scene, () => _request(WorkspacePanel.inspector, false));
     _button('$details/Configure').pressed.connect(_scene, configureStorage);
-    for (final panel in WorkspacePanel.values) {
-      _control(panel == WorkspacePanel.library ? libraryGrip : inspectorGrip)
-          .guiInput
-          .connect(_scene, (event) {
-        if (event is InputEventMouseButton &&
-            event.isPressed() &&
-            event.getButtonIndex() == MouseButton.left) {
-          _dragging = panel;
-          _dragStart = event.getGlobalPosition().x;
-          _initialWidth = panel == WorkspacePanel.library
-              ? layout.libraryWidth
-              : layout.inspectorWidth;
-          _scene.getViewport()!.setInputAsHandled();
-        }
-      });
-    }
     _scene
         .getTree()!
         .getRoot()!
         .focusExited
-        .connect(_scene, () => _dragging = null);
+        .connect(_scene, () => _setDial(false));
+    _control(center).resized.connect(_scene, resize);
     resize();
   }
 
   final Node _scene;
   final layout = WorkspaceLayout();
-  WorkspacePanel? _dragging;
-  double _dragStart = 0, _initialWidth = 0;
+  bool _dialOpen = false;
+  bool _blocked = false;
   bool _hadSelection = false;
   static const minimumWidth = WorkspaceLayout.minimumWindowWidth;
   static const minimumHeight = WorkspaceLayout.minimumWindowHeight;
@@ -61,16 +50,17 @@ class Workspace3D {
   static const root = 'WorkspaceLayer/Workspace';
   static const header = '$root/Margin/Layout/Header';
   static const body = '$root/Margin/Layout/Body';
-  static const rail = '$body/NavigationRail';
-  static const libraryToggle = '$rail/LibraryToggle';
-  static const inspectorToggle = '$rail/InspectorToggle';
-  static const sidebar = '$root/Margin/Layout/Body/Sidebar';
-  static const inspector = '$body/Inspector';
+  static const center = '$body/Center';
+  static const speedDial = '$center/SpeedDial';
+  static const speedToggle = '$speedDial/Toggle';
+  static const speedActions = '$speedDial/Actions';
+  static const libraryToggle = '$speedActions/LibraryToggle';
+  static const inspectorToggle = '$speedActions/InspectorToggle';
+  static const sidebar = '$center/Sidebar';
+  static const inspector = '$center/Inspector';
   static const details = '$inspector/Content/Scroll/Details';
-  static const libraryGrip = '$body/LibraryResize';
-  static const inspectorGrip = '$body/InspectorResize';
   static const catalog = '$sidebar/Content/Scroll/Choices';
-  static const canvas = '$root/Margin/Layout/Body/Center/Canvas';
+  static const canvas = '$center/Canvas';
   static const cameraPath = '$canvas/WorldViewport/Camera3D';
 
   static SubViewport viewport(Node scene) =>
@@ -82,75 +72,118 @@ class Workspace3D {
   Control _control(String path) => _scene.getNodeT<Control>(path)!;
   Button _button(String path) => _scene.getNodeT<Button>(path)!;
 
-  void _request(WorkspacePanel panel, bool open) {
-    layout.request(panel, open);
-    resize();
+  void _setDial(bool open, {bool focusMain = false}) {
+    _dialOpen = open && !_blocked;
+    _control(speedActions).setVisible(_dialOpen);
+    _button(speedToggle)
+      ..setText(_dialOpen ? '×' : '+')
+      ..setTooltipText(
+          _dialOpen ? 'Close workspace actions' : 'Open workspace actions');
+    final animation =
+        _scene.getNodeT<AnimationPlayer>('$speedDial/AnimationPlayer')!;
+    if (_dialOpen) {
+      animation.play(name: 'expand');
+    } else {
+      animation.stop();
+    }
+    if (focusMain && !_blocked) _button(speedToggle).grabFocus();
   }
 
-  void _toggle(WorkspacePanel panel) {
-    final visible =
-        layout.resolve(_scene.getViewport()!.getVisibleRect().size.x);
-    _request(
-        panel,
-        !(panel == WorkspacePanel.library
-            ? visible.library
-            : visible.inspector));
+  void _closePanels({bool focusMain = false}) {
+    layout.request(WorkspacePanel.library, false);
+    layout.request(WorkspacePanel.inspector, false);
+    resize();
+    if (focusMain && !_blocked) _button(speedToggle).grabFocus();
+  }
+
+  void _request(WorkspacePanel panel, bool open) {
+    _setDial(false);
+    layout.request(panel, open);
+    resize();
+    if (!open) {
+      if (!_blocked) _button(speedToggle).grabFocus();
+      return;
+    }
+    var target = '$inspector/Content/Heading/Close';
+    if (panel == WorkspacePanel.library) {
+      target = '$sidebar/Content/Heading/Close';
+      for (final entry in resourceVisuals3D.values) {
+        final path = '$catalog/${entry.buttonName}';
+        if (!_button(path).isDisabled()) {
+          target = path;
+          break;
+        }
+      }
+    }
+    _button(target).grabFocus();
   }
 
   void resize() {
     final result =
         layout.resolve(_scene.getViewport()!.getVisibleRect().size.x);
-    _control(sidebar)
-      ..setVisible(result.library)
-      ..setCustomMinimumSize(Vector2(x: layout.libraryWidth, y: 0));
-    _control(inspector)
-      ..setVisible(result.inspector)
-      ..setCustomMinimumSize(Vector2(x: layout.inspectorWidth, y: 0));
-    _control(libraryGrip).setVisible(result.library);
-    _control(inspectorGrip).setVisible(result.inspector);
-    _button(libraryToggle)
-      ..setPressedNoSignal(result.library)
-      ..setTooltipText(
-          result.library ? 'Close Resource Library' : 'Open Resource Library');
-    _button(inspectorToggle)
-      ..setPressedNoSignal(result.inspector)
-      ..setTooltipText(result.inspector
-          ? 'Close Inspector'
-          : 'Open tile and resource Inspector');
+    final size = _control(center).getSize();
+    for (final panel in WorkspacePanel.values) {
+      final resource = panel == WorkspacePanel.library;
+      final control = _control(resource ? sidebar : inspector);
+      final width = resource ? layout.libraryWidth : layout.inspectorWidth;
+      final height = (resource ? 340.0 : 380.0)
+          .clamp(0.0, size.y - 36.0 < 0 ? 0.0 : size.y - 36.0);
+      control
+        ..setVisible(resource ? result.library : result.inspector)
+        ..setPosition(Vector2(x: 82, y: size.y - height - 18))
+        ..setSize(Vector2(x: width, y: height));
+    }
   }
 
+  /// Full-screen transparent controls never block picking. Only live buttons
+  /// and the visible popup rectangles consume canvas input.
+  bool blocksPointer(Vector2 point) => [
+        speedToggle,
+        if (_dialOpen) ...[libraryToggle, inspectorToggle],
+        sidebar,
+        inspector,
+      ].any((path) {
+        final control = _control(path);
+        return control.isVisibleInTree() &&
+            control.getGlobalRect().hasPoint(point);
+      });
+
   bool handleInput(InputEvent? event) {
-    final dragging = _dragging;
-    if (dragging == null) return false;
-    if (event is InputEventMouseButton &&
-        event.getButtonIndex() == MouseButton.left &&
-        !event.isPressed()) {
-      _dragging = null;
-      // Let Godot clear its GUI mouse capture. World picking ignores releases.
-      return false;
+    if (_blocked) return false;
+    final panel = layout.resolve(_scene.getViewport()!.getVisibleRect().size.x);
+    if (event is InputEventKey &&
+        event.isPressed() &&
+        !event.isEcho() &&
+        event.getKeycode() == Key.escape) {
+      if (_dialOpen || panel.library || panel.inspector) {
+        _setDial(false);
+        _closePanels(focusMain: true);
+        return true;
+      }
     }
-    if (event is InputEventMouseMotion) {
-      final delta = event.getPosition().x - _dragStart;
-      layout.resize(
-          dragging,
-          _initialWidth +
-              (dragging == WorkspacePanel.library ? delta : -delta));
-      resize();
-      return true;
+    if (event is InputEventMouseButton &&
+        event.isPressed() &&
+        event.getButtonIndex() == MouseButton.left &&
+        !blocksPointer(event.getPosition())) {
+      _setDial(false);
+      _closePanels();
+      // Outside clicks still reach the normal grid/UI input route.
     }
     return false;
   }
 
   void render(IsomapGridState state,
       {required bool blocked, required bool canConfigure}) {
-    if (blocked) _dragging = null;
+    _blocked = blocked;
+    if (blocked || (_hadSelection && state.selected == null)) {
+      _setDial(false);
+      _closePanels();
+    }
+    _button(speedToggle).setDisabled(blocked);
     _button(libraryToggle).setDisabled(blocked);
     _button(inspectorToggle).setDisabled(blocked);
     _button('$sidebar/Content/Heading/Close').setDisabled(blocked);
     _button('$inspector/Content/Heading/Close').setDisabled(blocked);
-    if (_hadSelection && state.selected == null) {
-      _request(WorkspacePanel.inspector, false);
-    }
     _hadSelection = state.selected != null;
     final position = state.selected;
     final resource = state.resources[position];
@@ -176,7 +209,7 @@ class Workspace3D {
     label(
         'Placement',
         resource == null
-            ? 'Open the Resource Library to choose a resource.'
+            ? 'Open Resources to choose a resource.'
             : resource.id == null
                 ? 'Local placement'
                 : resource.configuration == null

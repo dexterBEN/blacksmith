@@ -2,6 +2,7 @@
 // ignore_for_file: avoid_relative_lib_imports
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
+import 'workspace_test_input.dart';
 import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import '../lib/prototypes/isometric_3d/workspace_layout.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
@@ -21,13 +22,7 @@ void checkEditorFraming(Node scene) {
       scene.getNodeT<PanelContainer>(Workspace3D.header)!.getGlobalRect();
   final sidebar =
       scene.getNodeT<PanelContainer>(Workspace3D.sidebar)!.getGlobalRect();
-  final docks = [
-    Workspace3D.rail,
-    Workspace3D.sidebar,
-    Workspace3D.inspector,
-    Workspace3D.libraryGrip,
-    Workspace3D.inspectorGrip
-  ]
+  final docks = [Workspace3D.sidebar, Workspace3D.inspector]
       .map((path) => scene.getNodeT<Control>(path)!)
       .where((control) => control.isVisibleInTree())
       .map((control) => control.getGlobalRect())
@@ -46,14 +41,10 @@ void checkEditorFraming(Node scene) {
             panel.end.y <= viewport.y + .1,
         'Every workspace panel must fit the actual main viewport.');
   }
-  for (final panel in [header, ...docks]) {
-    final intersects = rect.position.x < panel.end.x - .1 &&
-        rect.end.x > panel.position.x + .1 &&
-        rect.position.y < panel.end.y - .1 &&
-        rect.end.y > panel.position.y + .1;
-    _check(!intersects,
-        'No visible dock, rail, grip or toolbar overlaps the render canvas.');
-  }
+  _check(
+      (rect.position.x - WorkspaceLayout.margin).abs() < .1 &&
+          (rect.size.x - (viewport.x - 2 * WorkspaceLayout.margin)).abs() < .1,
+      'The viewport fills the complete body width without a navigation allocation.');
   _check(
       rect.position.y >= header.end.y + 7 &&
           (rect.end.y - (viewport.y - 8)).abs() <= .1 &&
@@ -157,14 +148,10 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
     window.setContentScaleSize(Vector2i.fromXY(size.$1, size.$2));
     await _pause();
     if (!scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
-      await _click(
-          scene,
-          scene
-              .getNodeT<Button>(Workspace3D.libraryToggle)!
-              .getGlobalRect()
-              .getCenter());
+      await openWorkspaceAction(scene, Workspace3D.libraryToggle);
     }
     checkEditorFraming(scene);
+    await dismissWorkspaceMenus(scene);
     final cameraSize = camera.getSize();
     final offset = camera.getVOffset();
     for (var row = 0; row < 6; row++) {
@@ -181,6 +168,7 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
             'All 36 tile centers remain selectable after resize.');
       }
     }
+    await openWorkspaceAction(scene, Workspace3D.libraryToggle);
     final button =
         scene.getNodeT<Button>('${Workspace3D.catalog}/ComputeEngine')!;
     final before = tileEvents();

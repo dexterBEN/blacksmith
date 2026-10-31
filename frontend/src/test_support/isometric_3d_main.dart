@@ -50,6 +50,11 @@ void main() {
           () => scene.getNodeT<Node3D>('GridRoot')!.getChildCount() == 36);
       await _pause();
       _validate(scene);
+      if (Platform.environment['BLACKSMITH_ISSUE73_ONLY'] == '1') {
+        await fixture.checkSpeedDialOnly(tree, capture: mode == 'check');
+        tree.quit();
+        return;
+      }
       if (mode == 'interactive') {
         GD.print(Variant('BLACKSMITH_ISSUE17_SCENE_PASSED tiles=36 '
             'responsive_window=true local_placement=true'));
