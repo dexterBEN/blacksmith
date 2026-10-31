@@ -58,6 +58,7 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     _check(!button.isDisabled(),
         'Selected local tile enables its existing resource action.');
     await workspaceClick(scene, button.getGlobalRect().getCenter());
+    await confirmResourceChoice(scene);
     if (kind == ResourceKind.cloudStorage) {
       _check(design.state.configurationDraft != null,
           'Cloud Storage still opens its existing configuration dialog.');
@@ -99,8 +100,11 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
         inLocalCoords: true);
     await _settle();
   }
+  _check(placementEvents() == commands,
+      'Enter on a resource row only selects it.');
+  await confirmResourceChoice(scene);
   _check(placementEvents() == commands + 1 && tileEvents() == selectionEvents,
-      'Enter activates the focused existing resource choice exactly once.');
+      'Keyboard row selection followed by confirmation places exactly once.');
   await dismissWorkspaceMenus(scene);
   await openWorkspaceAction(scene, Workspace3D.inspectorToggle);
   _check(

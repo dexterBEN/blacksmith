@@ -70,6 +70,7 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
     } else {
       _check(!button.isDisabled(), 'Selected tile enables local placement.');
       await _click(scene, button.getGlobalRect().getCenter());
+      await confirmResourceChoice(scene);
     }
     _check(bloc.state.selected == selected && tileEvents() == before,
         'Palette must consume input before the 3D grid.');

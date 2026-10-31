@@ -173,6 +173,7 @@ Future<void> checkEditorResizing(Node scene, IsomapGridBloc bloc,
         scene.getNodeT<Button>('${Workspace3D.catalog}/ComputeEngine')!;
     final before = tileEvents();
     await _click(scene, button.getGlobalRect().getCenter());
+    await confirmResourceChoice(scene);
     _check(
         tileEvents() == before &&
             bloc.state.selected == const GridPos(5, 5) &&

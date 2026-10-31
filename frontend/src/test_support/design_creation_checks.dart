@@ -160,6 +160,7 @@ void afterStartup() {
                 .getNodeT<Button>('${Workspace3D.catalog}/ComputeEngine')!
                 .getGlobalRect()
                 .getCenter());
+        await confirmResourceChoice(scene);
         _check(
             grid.state.tiles[const GridPos(0, 0)] == ResourceKind.computeEngine,
             'Placement remains local.');

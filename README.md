@@ -139,12 +139,13 @@ scene supports selecting a tile and placing or replacing Cloud Storage,
 Compute Engine, Cloud VPN and Cloud Load Balancing cubes through a native palette.
 The workspace keeps the existing Design header and fills the available width
 below it. A compact **+** Speed Dial floats at the bottom-left. Open it to show
-**Resources** and **Inspect** vertically above **×**. Resources opens the existing
-four-item picker; select a tile before choosing a resource. Inspect shows current
+**Resources** and **Inspect** vertically above **×**. Resources opens a centered modal; select a tile first, choose a resource row,
+then confirm with **Place Resource**. Row selection alone never places anything. Inspect shows current
 tile/resource details and the existing Cloud Storage configuration entry point.
-Both panels float over the map without changing viewport dimensions. Only one
-panel is open at a time; Escape, its close button, or an outside click dismisses
-it without clearing the current selection. The dial collapses when an action or
+Inspect remains a floating panel. Resources dims and blocks the entire editor
+behind its dialog, with a scrollable catalog, selected-tile context, Cancel and
+Place Resource. Cancel, × and Escape preserve selection; clicking its backdrop
+keeps it open and never reaches the grid. Neither UI changes viewport dimensions. The dial collapses when an action or
 modal is opened. Transparent overlay areas keep normal grid input.
 The catalog retains full service labels and tooltips. The workspace and New Design
 dialog share one dark UI theme. Configuration/deployment dialogs retain their existing modal behavior.

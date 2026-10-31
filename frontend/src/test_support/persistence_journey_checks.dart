@@ -524,6 +524,7 @@ Future<void> _choose(Node scene, String group, ResourceKind kind) async {
           .getNodeT<Button>('$group/${resourceVisuals3D[kind]!.buttonName}')!
           .getGlobalRect()
           .getCenter());
+  if (group == Workspace3D.catalog) await confirmResourceChoice(scene);
 }
 
 void _check(bool value, String message) {
