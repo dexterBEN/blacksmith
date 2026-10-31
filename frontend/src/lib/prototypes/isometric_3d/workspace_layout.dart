@@ -8,7 +8,6 @@ class WorkspaceLayout {
   static const minimumWindowHeight = 640;
   static const minimumCanvasWidth = 480.0;
   static const minimumCanvasHeight = 320.0;
-  static const margin = 12.0;
   static const minimumLibraryWidth = 200.0;
   static const minimumInspectorWidth = 216.0;
   static const maximumPanelWidth = 304.0;
@@ -39,7 +38,6 @@ class WorkspaceLayout {
       (
         library: _active == WorkspacePanel.library,
         inspector: _active == WorkspacePanel.inspector,
-        canvasWidth:
-            math.max(width, minimumWindowWidth.toDouble()) - 2 * margin,
+        canvasWidth: math.max(width, minimumWindowWidth.toDouble()),
       );
 }

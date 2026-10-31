@@ -238,7 +238,7 @@ void afterStartup() {
           design.name == testName &&
               grid.state.selected == null &&
               scene
-                  .getNodeT<Label>('${Workspace3D.header}/Rows/ActiveDesign')!
+                  .getNodeT<Label>(Workspace3D.status)!
                   .getText()
                   .contains(testName),
           'Only API-confirmed success sets the active Design and empties the logical grid.');

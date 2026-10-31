@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Theme" path="res://scenes/isometric_3d/workspace_dark.tres" id="1_theme"]
 [ext_resource type="Texture2D" path="res://assets/models/resource_cubes/icons/white/cloud_storage.svg" id="2_storage"]
@@ -63,6 +63,13 @@ corner_radius_top_right = 6
 corner_radius_bottom_left = 6
 corner_radius_bottom_right = 6
 
+[sub_resource type="StyleBoxFlat" id="Toolbar"]
+content_margin_left = 16.0
+content_margin_right = 16.0
+content_margin_top = 10.0
+content_margin_bottom = 10.0
+bg_color = Color(0.018, 0.035, 0.065, 0.72)
+
 [node name="Workspace" type="Control"]
 layout_mode = 3
 anchors_preset = 15
@@ -81,92 +88,23 @@ anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.018, 0.028, 0.05, 1)
 
-[node name="Margin" type="MarginContainer" parent="."]
+[node name="Body" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 8
 mouse_filter = 2
 
-[node name="Layout" type="VBoxContainer" parent="Margin"]
-layout_mode = 2
-mouse_filter = 2
-theme_override_constants/separation = 8
-
-[node name="Header" type="PanelContainer" parent="Margin/Layout"]
-layout_mode = 2
-
-[node name="Rows" type="VBoxContainer" parent="Margin/Layout/Header"]
-layout_mode = 2
-mouse_filter = 2
-theme_override_constants/separation = 4
-
-[node name="Actions" type="HBoxContainer" parent="Margin/Layout/Header/Rows"]
-layout_mode = 2
-mouse_filter = 2
-theme_override_constants/separation = 8
-
-[node name="Brand" type="Label" parent="Margin/Layout/Header/Rows/Actions"]
-layout_mode = 2
-text = "Blacksmith"
-theme_override_font_sizes/font_size = 20
-mouse_filter = 2
-
-[node name="NewDesign" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
-custom_minimum_size = Vector2(104, 32)
-layout_mode = 2
-text = "New Design"
-tooltip_text = "Create a persistent Design. Resource placements remain local."
-
-[node name="OpenDesign" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
-custom_minimum_size = Vector2(76, 32)
-layout_mode = 2
-text = "Open"
-tooltip_text = "Open an existing Design by ID. Resources are read from Blacksmith, never deployed."
-
-[node name="SaveDesign" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
-custom_minimum_size = Vector2(76, 32)
-layout_mode = 2
-text = "Save"
-disabled = true
-tooltip_text = "Save one Cloud Storage description to the active Design. No GCP provisioning."
-
-[node name="CopyDesignId" type="Button" parent="Margin/Layout/Header/Rows/Actions"]
-custom_minimum_size = Vector2(76, 32)
-layout_mode = 2
-text = "Copy ID"
-disabled = true
-tooltip_text = "Copy the active Design ID so it can be reopened after quitting."
-
-[node name="Spacer" type="Control" parent="Margin/Layout/Header/Rows/Actions"]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_filter = 2
-
-[node name="ActiveDesign" type="Label" parent="Margin/Layout/Header/Rows"]
-layout_mode = 2
-text = "No active Design · Local placements only"
-theme_override_font_sizes/font_size = 12
-text_overrun_behavior = 3
-mouse_filter = 2
-
-[node name="Body" type="HBoxContainer" parent="Margin/Layout"]
-layout_mode = 2
-size_flags_vertical = 3
-mouse_filter = 2
-theme_override_constants/separation = 8
-
-[node name="Center" type="Control" parent="Margin/Layout/Body"]
-layout_mode = 2
+[node name="Center" type="Control" parent="Body"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 mouse_filter = 2
 
-[node name="Canvas" type="SubViewportContainer" parent="Margin/Layout/Body/Center"]
+[node name="Canvas" type="SubViewportContainer" parent="Body/Center"]
 custom_minimum_size = Vector2(480, 320)
 layout_mode = 1
 anchors_preset = 15
@@ -177,13 +115,13 @@ size_flags_vertical = 3
 mouse_filter = 2
 stretch = true
 
-[node name="WorldViewport" type="SubViewport" parent="Margin/Layout/Body/Center/Canvas"]
+[node name="WorldViewport" type="SubViewport" parent="Body/Center/Canvas"]
 handle_input_locally = false
 gui_disable_input = true
 size = Vector2i(2, 2)
 render_target_update_mode = 4
 
-[node name="Camera3D" type="Camera3D" parent="Margin/Layout/Body/Center/Canvas/WorldViewport"]
+[node name="Camera3D" type="Camera3D" parent="Body/Center/Canvas/WorldViewport"]
 cull_mask = 5
 transform = Transform3D(0.707107, -0.408248, 0.57735, 0, 0.816497, 0.57735, -0.707107, -0.408248, 0.57735, 10, 10, 10)
 projection = 1
@@ -192,83 +130,142 @@ size = 6.0
 near = 0.1
 far = 50.0
 
-[node name="Inspector" type="PanelContainer" parent="Margin/Layout/Body/Center"]
+[node name="Header" type="PanelContainer" parent="."]
+layout_mode = 1
+anchor_right = 1.0
+offset_bottom = 56.0
+mouse_filter = 2
+z_index = 3
+theme_override_styles/panel = SubResource("Toolbar")
+
+[node name="Rows" type="MarginContainer" parent="Header"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Actions" type="HBoxContainer" parent="Header/Rows"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Brand" type="Label" parent="Header/Rows/Actions"]
+layout_mode = 2
+text = "Blacksmith"
+theme_override_font_sizes/font_size = 20
+mouse_filter = 2
+
+[node name="NewDesign" type="Button" parent="Header/Rows/Actions"]
+custom_minimum_size = Vector2(104, 36)
+layout_mode = 2
+text = "New Design"
+tooltip_text = "Create a persistent Design. Resource placements remain local."
+
+[node name="OpenDesign" type="Button" parent="Header/Rows/Actions"]
+custom_minimum_size = Vector2(76, 36)
+layout_mode = 2
+text = "Open"
+tooltip_text = "Open an existing Design by ID. Resources are read from Blacksmith, never deployed."
+
+[node name="SaveDesign" type="Button" parent="Header/Rows/Actions"]
+custom_minimum_size = Vector2(76, 36)
+layout_mode = 2
+text = "Save"
+disabled = true
+tooltip_text = "Save one Cloud Storage description to the active Design. No GCP provisioning."
+
+[node name="CopyDesignId" type="Button" parent="Header/Rows/Actions"]
+custom_minimum_size = Vector2(76, 36)
+layout_mode = 2
+text = "Copy ID"
+disabled = true
+tooltip_text = "Copy the active Design ID so it can be reopened after quitting."
+
+[node name="ActiveDesign" type="Label" parent="Header/Rows/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+clip_text = true
+horizontal_alignment = 2
+text = "No active Design · Local placements only"
+theme_override_font_sizes/font_size = 12
+text_overrun_behavior = 3
+mouse_filter = 1
+
+[node name="Inspector" type="PanelContainer" parent="Body/Center"]
 visible = false
 custom_minimum_size = Vector2(240, 0)
 layout_mode = 0
 mouse_filter = 0
 z_index = 2
 
-[node name="Content" type="VBoxContainer" parent="Margin/Layout/Body/Center/Inspector"]
+[node name="Content" type="VBoxContainer" parent="Body/Center/Inspector"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 10
 
-[node name="Heading" type="HBoxContainer" parent="Margin/Layout/Body/Center/Inspector/Content"]
+[node name="Heading" type="HBoxContainer" parent="Body/Center/Inspector/Content"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Title" type="Label" parent="Margin/Layout/Body/Center/Inspector/Content/Heading"]
+[node name="Title" type="Label" parent="Body/Center/Inspector/Content/Heading"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Inspector"
 theme_override_font_sizes/font_size = 14
 mouse_filter = 2
 
-[node name="Close" type="Button" parent="Margin/Layout/Body/Center/Inspector/Content/Heading"]
+[node name="Close" type="Button" parent="Body/Center/Inspector/Content/Heading"]
 layout_mode = 2
 custom_minimum_size = Vector2(28, 28)
 text = "×"
 tooltip_text = "Close Inspector without deselecting the tile"
 
-[node name="Scroll" type="ScrollContainer" parent="Margin/Layout/Body/Center/Inspector/Content"]
+[node name="Scroll" type="ScrollContainer" parent="Body/Center/Inspector/Content"]
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="Details" type="VBoxContainer" parent="Margin/Layout/Body/Center/Inspector/Content/Scroll"]
+[node name="Details" type="VBoxContainer" parent="Body/Center/Inspector/Content/Scroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 theme_override_constants/separation = 12
 
-[node name="Coordinates" type="Label" parent="Margin/Layout/Body/Center/Inspector/Content/Scroll/Details"]
+[node name="Coordinates" type="Label" parent="Body/Center/Inspector/Content/Scroll/Details"]
 layout_mode = 2
 text = "No tile selected"
 autowrap_mode = 3
 mouse_filter = 2
 
-[node name="Kind" type="Label" parent="Margin/Layout/Body/Center/Inspector/Content/Scroll/Details"]
+[node name="Kind" type="Label" parent="Body/Center/Inspector/Content/Scroll/Details"]
 layout_mode = 2
 text = "Select a tile"
 theme_override_font_sizes/font_size = 18
 autowrap_mode = 3
 mouse_filter = 2
 
-[node name="Placement" type="Label" parent="Margin/Layout/Body/Center/Inspector/Content/Scroll/Details"]
+[node name="Placement" type="Label" parent="Body/Center/Inspector/Content/Scroll/Details"]
 layout_mode = 2
 text = "Open the Resources to choose a resource."
 autowrap_mode = 3
 mouse_filter = 2
 
-[node name="Identity" type="Label" parent="Margin/Layout/Body/Center/Inspector/Content/Scroll/Details"]
+[node name="Identity" type="Label" parent="Body/Center/Inspector/Content/Scroll/Details"]
 layout_mode = 2
 text_overrun_behavior = 3
 mouse_filter = 2
 
-[node name="Deployment" type="Label" parent="Margin/Layout/Body/Center/Inspector/Content/Scroll/Details"]
+[node name="Deployment" type="Label" parent="Body/Center/Inspector/Content/Scroll/Details"]
 layout_mode = 2
 autowrap_mode = 3
 mouse_filter = 2
 
-[node name="Configure" type="Button" parent="Margin/Layout/Body/Center/Inspector/Content/Scroll/Details"]
+[node name="Configure" type="Button" parent="Body/Center/Inspector/Content/Scroll/Details"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 34)
 text = "Configure storage"
 disabled = true
 tooltip_text = "Open the existing Cloud Storage configuration dialog. Saving configuration does not deploy."
 
-[node name="SpeedDial" parent="Margin/Layout/Body/Center" instance=ExtResource("6_dial")]
+[node name="SpeedDial" parent="Body/Center" instance=ExtResource("6_dial")]
 
 [node name="ResourcesOverlay" type="Control" parent="."]
 visible = false

@@ -14,7 +14,7 @@ var shared_cube_mesh: Mesh
 func _ready() -> void:
 	# The production camera now belongs to the workspace SubViewport. This native
 	# fixture renders the board directly, so reuse that camera in the root viewport.
-	var camera: Camera3D = get_node("WorkspaceLayer/Workspace/Margin/Layout/Body/Center/Canvas/WorldViewport/Camera3D")
+	var camera: Camera3D = get_node("WorkspaceLayer/Workspace/Body/Center/Canvas/WorldViewport/Camera3D")
 	camera.reparent(self)
 	camera.make_current()
 	$WorkspaceLayer.queue_free()

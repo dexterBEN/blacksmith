@@ -13,7 +13,7 @@ compatible Godot/Dart libraries and generated bindings.
 | `./scripts/dev.sh run [Godot arguments]` | Open the Godot editor through the canonical `run_local.sh` launcher |
 | `./scripts/dev.sh test [options]` | Run `tests/test-godot.py`; default is the existing legacy 2D check |
 | `./scripts/dev.sh check [options]` | Validate resource cube dependencies (`--require-tracked` checks the Git index) |
-| `./scripts/dev.sh preview [options]` | Run the isolated Dart 3D scene; supports `--check`, `--headless`, focused `--speed-dial` / `--resources-modal` checks and material variants |
+| `./scripts/dev.sh preview [options]` | Run the isolated Dart 3D scene; supports `--check`, `--headless`, focused `--toolbar-overlay` / `--speed-dial` / `--resources-modal` checks and material variants |
 | `./scripts/dev.sh preview-cubes [options]` | Preview/check native resource cubes without Dart |
 
 `build`, `host-build` and `reset` all preserve `src/pubspec.lock`; they never run a
@@ -44,6 +44,7 @@ DART_BIN=/usr/lib/dart/bin/dart ./scripts/dev.sh build
 ./scripts/dev.sh run --verbose
 ./scripts/dev.sh test --application --trace-network --timeout 600 --output /tmp/blacksmith-startup
 ./scripts/dev.sh preview --check --timeout 600 --output /tmp/blacksmith-placement
+./scripts/dev.sh preview --toolbar-overlay --check --timeout 600 --output /tmp/blacksmith-toolbar
 ```
 
 The default cache is `frontend/.pub-cache`, matching the existing installer and

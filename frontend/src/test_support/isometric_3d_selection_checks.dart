@@ -4,6 +4,7 @@ import 'dart:async' as async;
 import 'dart:io';
 import 'speed_dial_checks.dart';
 import 'resource_modal_checks.dart';
+import 'toolbar_overlay_checks.dart';
 import 'workspace_test_input.dart';
 import 'package:bloc/bloc.dart' as bloc_core;
 import 'package:godot_dart/godot_dart.dart';
@@ -102,6 +103,33 @@ class SelectionFixture {
   bool _disposed = false;
 
   IsomapGridState get state => _bloc.state;
+
+  Future<void> checkToolbarOverlayOnly(SceneTree tree,
+      {required bool capture}) async {
+    final scene = tree.getCurrentScene()!;
+    scene.getViewport()!
+      ..setDisableInput(false)
+      ..call('notify_mouse_entered');
+    const cells = [GridPos(3, 1), GridPos(1, 2), GridPos(2, 4), GridPos(4, 3)];
+    for (var i = 0; i < cells.length; i++) {
+      _bloc.add(TileClicked(cells[i]));
+      _bloc.add(PlaceResource(ResourceKind.values[i]));
+      await _pause();
+    }
+    await checkToolbarOverlay(scene, _bloc,
+        tileEvents: () => _bloc.tileEvents,
+        capture: capture,
+        output: Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']!);
+    await checkResourcesModalOnly(tree, capture: capture);
+    await checkSpeedDial(scene, _bloc,
+        tileEvents: () => _bloc.tileEvents,
+        capture: capture,
+        output: Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']);
+    _check(_repository.calls == 0 && _client.requests == 0,
+        'Toolbar, Speed Dial and modal never perform network/cloud operations.');
+    GD.print(Variant(
+        'BLACKSMITH_ISSUE77_IO_PASSED repository_calls=0 http_requests=0'));
+  }
 
   Future<void> checkResourcesModalOnly(SceneTree tree,
       {required bool capture}) async {

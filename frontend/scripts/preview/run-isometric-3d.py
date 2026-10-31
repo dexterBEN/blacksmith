@@ -24,9 +24,12 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--check', action='store_true')
     mode.add_argument('--headless', action='store_true')
-    parser.add_argument('--resources-modal', action='store_true',
+    focused = parser.add_mutually_exclusive_group()
+    focused.add_argument('--toolbar-overlay', action='store_true',
+                         help='Check the full-window toolbar, Resources modal and Speed Dial; requires --check or --headless.')
+    focused.add_argument('--resources-modal', action='store_true',
                         help='Run focused centered Resources modal checks; combine with --check or --headless.')
-    parser.add_argument('--speed-dial', action='store_true',
+    focused.add_argument('--speed-dial', action='store_true',
                         help='Run only the focused floating-menu regression; combine with --check or --headless.')
     parser.add_argument('--godot', default='godot')
     parser.add_argument('--timeout', type=int, default=300)
@@ -38,9 +41,8 @@ def main():
                         default='opaque',
                         help='Isolated material comparison; transparent variants never change production assets.')
     args = parser.parse_args()
-    if args.resources_modal and args.speed_dial:
-        parser.error('Choose one focused suite.')
-    if (args.speed_dial or args.resources_modal) and not (args.check or args.headless):
+    focused_check = args.speed_dial or args.resources_modal or args.toolbar_overlay
+    if focused_check and not (args.check or args.headless):
         parser.error('Focused checks require --check or --headless')
     source = FRONTEND_DIR
     dependencies = validate_assets(source)
@@ -94,6 +96,7 @@ def main():
     env['BLACKSMITH_ISSUE17_MODE'] = (
         'headless' if args.headless else 'check' if args.check else 'interactive')
     env['BLACKSMITH_ISSUE17_OUTPUT'] = str(output)
+    env['BLACKSMITH_ISSUE77_ONLY'] = '1' if args.toolbar_overlay else '0'
     env['BLACKSMITH_ISSUE75_ONLY'] = '1' if args.resources_modal else '0'
     env['BLACKSMITH_ISSUE73_ONLY'] = '1' if args.speed_dial else '0'
     env['BLACKSMITH_ISSUE25_VARIANT'] = args.material_variant
@@ -114,14 +117,19 @@ def main():
             if (any(line.startswith(('ERROR:', 'SCRIPT ERROR:', 'SHADER ERROR:'))
                     for line in contents.splitlines()) or
                     'ObjectDB instances leaked at exit' in contents or
+                    (args.toolbar_overlay and
+                     not all(marker in contents for marker in [
+                         'BLACKSMITH_ISSUE77_IO_PASSED',
+                         'BLACKSMITH_ISSUE75_MODAL_PASSED',
+                         'BLACKSMITH_ISSUE73_SPEED_DIAL_PASSED'])) or
                     (args.resources_modal and
                      'BLACKSMITH_ISSUE75_IO_PASSED' not in contents) or
                     (args.speed_dial and
                      'BLACKSMITH_ISSUE73_FLOW_PASSED' not in contents) or
-                    ((args.check or args.headless) and not (args.speed_dial or args.resources_modal) and
+                    ((args.check or args.headless) and not focused_check and
                      ('BLACKSMITH_ISSUE33_PLACEMENT_PASSED' not in contents or
                       'BLACKSMITH_ISSUE35_FRAMING_PASSED' not in contents)) or
-                    (args.check and not (args.speed_dial or args.resources_modal) and
+                    (args.check and not focused_check and
                      'BLACKSMITH_ISSUE35_WINDOW_RESIZE_PASSED' not in contents)):
                 raise RuntimeError(f'{name} interactive placement failed; inspect {log}')
         print(f'{name}: PASS ({marker})', flush=True)
@@ -135,7 +143,8 @@ def main():
     arguments = ['--headless'] if args.headless else [
         '--display-driver', 'x11', '--rendering-method', 'gl_compatibility',
         '--resolution', '1152x648', '--max-fps', '60']
-    marker = ('BLACKSMITH_ISSUE75_MODAL_PASSED' if args.resources_modal else
+    marker = ('BLACKSMITH_ISSUE77_TOOLBAR_PASSED' if args.toolbar_overlay else
+              'BLACKSMITH_ISSUE75_MODAL_PASSED' if args.resources_modal else
               'BLACKSMITH_ISSUE73_SPEED_DIAL_PASSED' if args.speed_dial else
               'BLACKSMITH_ISSUE17_RENDER_PASSED' if args.check else
               'BLACKSMITH_ISSUE17_SELECTION_PASSED' if args.headless else

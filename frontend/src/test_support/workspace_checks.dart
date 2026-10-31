@@ -29,11 +29,55 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
   }
   await dismissWorkspaceMenus(scene);
   design.open();
-  design.changeName('Floating workspace validation');
+  design.changeName(
+      'Toolbar validation ${List.filled(12, 'long name').join(' ')}');
   await design.submit();
   await _settle();
   final active = design.state.active;
   _check(active != null, 'One explicit fake Design creation, without HTTP.');
+
+  final summary = scene.getNodeT<Label>(Workspace3D.status)!;
+  _check(
+      summary.getText().contains(active!.name) &&
+          summary.getTooltipText().contains(active.id),
+      'Right-hand status follows the existing active Design and exposes its ID.');
+  final originalStatus = summary.getText();
+  Button action(String name) =>
+      scene.getNodeT<Button>('${Workspace3D.header}/Rows/Actions/$name')!;
+  _check(
+      !action('NewDesign').isDisabled() &&
+          !action('OpenDesign').isDisabled() &&
+          action('SaveDesign').isDisabled() &&
+          !action('CopyDesignId').isDisabled(),
+      'Toolbar preserves existing action availability for an empty active Design.');
+  final beforeToolbar = tileEvents();
+  for (final name in ['NewDesign', 'OpenDesign']) {
+    await workspaceClick(scene, action(name).getGlobalRect().getCenter());
+    _check(design.state.dialogOpen && tileEvents() == beforeToolbar,
+        'Native toolbar action opens its existing dialog without picking a tile.');
+    await workspaceClick(
+        scene,
+        scene
+            .getNodeT<Button>('DesignLayer/DesignControls/Shade/Dialog/Cancel')!
+            .getGlobalRect()
+            .getCenter());
+    _check(!design.state.modalOpen && design.state.active == active,
+        'Cancelling preserves the active Design.');
+  }
+  final previousClipboard = DisplayServer.singleton.clipboardGet();
+  try {
+    await workspaceClick(
+        scene, action('CopyDesignId').getGlobalRect().getCenter());
+    _check(
+        DisplayServer.singleton.clipboardGet() == active.id &&
+            summary.getText() == originalStatus &&
+            tileEvents() == beforeToolbar,
+        'Copy ID retains its callback, dynamic status and grid selection.');
+  } finally {
+    DisplayServer.singleton.clipboardSet(previousClipboard);
+  }
+  GD.print(Variant('BLACKSMITH_ISSUE77_ACTIONS_PASSED new=true open=true '
+      'copy=true empty_save_disabled=true dynamic_status=true'));
 
   Future<void> select(GridPos position) async {
     await dismissWorkspaceMenus(scene);
