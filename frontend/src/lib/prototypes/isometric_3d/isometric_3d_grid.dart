@@ -12,6 +12,7 @@ import '../../domain/models/grid_position.dart';
 import '../../domain/models/resource_kind.dart';
 import 'grid_layout.dart';
 import 'resource_palette_3d.dart';
+import 'resource_picker_draft.dart';
 import 'resource_visuals_3d.dart';
 import 'design_editor_3d.dart';
 import 'workspace_3d.dart';
@@ -76,21 +77,45 @@ class Isometric3DGrid extends Node3D {
       }
     }
     _resourceRoot = getNodeT<Node3D>('ResourceRoot')!;
-    _palette = ResourcePalette3D(this, (kind) {
+    _palette = ResourcePalette3D(this, (kind, target) async {
       final bloc = _bloc;
-      if (_active &&
-          !(_designEditor?.isOpen ?? false) &&
-          bloc != null &&
-          !bloc.isClosed) {
-        if (kind == ResourceKind.cloudStorage) {
-          if (di.sl.isRegistered<DesignCubit>()) {
-            di.sl<DesignCubit>().openResourceConfiguration();
+      if (!_active ||
+          (_designEditor?.isOpen ?? false) ||
+          bloc == null ||
+          bloc.isClosed ||
+          bloc.state.selected != target) {
+        throw const ResourcePickerFailure(
+            'The selected tile is no longer available.');
+      }
+      if (kind == ResourceKind.cloudStorage) {
+        if (!di.sl.isRegistered<DesignCubit>()) {
+          throw const ResourcePickerFailure(
+              'Create or open a Design to configure Cloud Storage.');
+        }
+        final cubit = di.sl<DesignCubit>();
+        cubit.openResourceConfiguration();
+        if (cubit.state.configurationDraft == null) {
+          throw ResourcePickerFailure(
+              cubit.state.error ?? cubit.state.persistenceMessage);
+        }
+      } else {
+        final alreadyPlaced = bloc.state.tiles[target] == kind;
+        final applied = alreadyPlaced
+            ? null
+            : bloc.stream
+                .firstWhere((state) =>
+                    state.selected != target || state.tiles[target] == kind)
+                .timeout(const Duration(seconds: 10));
+        bloc.add(PlaceResource(kind));
+        if (applied != null) {
+          final result = await applied;
+          if (result.selected != target || result.tiles[target] != kind) {
+            throw const ResourcePickerFailure(
+                'Placement was not applied to the selected tile.');
           }
-        } else {
-          bloc.add(PlaceResource(kind));
         }
       }
-    });
+    }, onPlaced: () => _workspace?.dismissResources());
     // The camera is fixed: react to viewport changes instead of polling Godot
     // through Dart on every rendered frame. The connection is owned by this node.
     getViewport()!.sizeChanged.connect(this, _resizeWorkspace);
@@ -115,13 +140,16 @@ class Isometric3DGrid extends Node3D {
         (open) {
       _renderPalette(bloc.state, blocked: open);
     });
-    _workspace = Workspace3D(this, configureStorage: () {
-      if (_active &&
-          !(_designEditor?.isOpen ?? false) &&
-          di.sl.isRegistered<DesignCubit>()) {
-        di.sl<DesignCubit>().openResourceConfiguration();
-      }
-    });
+    _workspace = Workspace3D(this,
+        onResourcesOpened: () => _palette?.open(),
+        onResourcesClosed: () => _palette?.close(),
+        configureStorage: () {
+          if (_active &&
+              !(_designEditor?.isOpen ?? false) &&
+              di.sl.isRegistered<DesignCubit>()) {
+            di.sl<DesignCubit>().openResourceConfiguration();
+          }
+        });
     _resizeWorkspace();
     _stateSubscription = bloc.stream.listen((state) {
       if (_active) _renderState(state);
@@ -135,6 +163,10 @@ class Isometric3DGrid extends Node3D {
 
   @override
   void vInput(InputEvent? event) {
+    if (_active && (_workspace?.isResourcesOpen ?? false)) {
+      if (_workspace!.handleInput(event)) getViewport()!.setInputAsHandled();
+      return;
+    }
     if (_active && (_designEditor?.handleInput(event) ?? false)) {
       getViewport()!.setInputAsHandled();
       return;
@@ -252,6 +284,7 @@ class Isometric3DGrid extends Node3D {
     _bloc = null;
     if (_ownsBloc && bloc != null) async.unawaited(bloc.close());
     _tiles.clear();
+    _palette?.close();
     _palette = null;
     _workspace = null;
     _resourceRoot = null;

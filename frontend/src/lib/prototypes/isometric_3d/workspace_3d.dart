@@ -6,7 +6,12 @@ import 'workspace_layout.dart';
 
 /// Native desktop workspace geometry. No editing/business state.
 class Workspace3D {
-  Workspace3D(this._scene, {required void Function() configureStorage}) {
+  Workspace3D(this._scene,
+      {required void Function() configureStorage,
+      required void Function() onResourcesOpened,
+      required void Function() onResourcesClosed})
+      : _onResourcesOpened = onResourcesOpened,
+        _onResourcesClosed = onResourcesClosed {
     _button(speedToggle).pressed.connect(_scene, () {
       _closePanels(focusMain: false);
       _setDial(!_dialOpen);
@@ -20,6 +25,7 @@ class Workspace3D {
     _button('$sidebar/Content/Heading/Close')
         .pressed
         .connect(_scene, () => _request(WorkspacePanel.library, false));
+    _button(resourceCancel).pressed.connect(_scene, () => dismissResources());
     _button('$inspector/Content/Heading/Close')
         .pressed
         .connect(_scene, () => _request(WorkspacePanel.inspector, false));
@@ -34,6 +40,7 @@ class Workspace3D {
   }
 
   final Node _scene;
+  final void Function() _onResourcesOpened, _onResourcesClosed;
   final layout = WorkspaceLayout();
   bool _dialOpen = false;
   bool _blocked = false;
@@ -56,7 +63,10 @@ class Workspace3D {
   static const speedActions = '$speedDial/Actions';
   static const libraryToggle = '$speedActions/LibraryToggle';
   static const inspectorToggle = '$speedActions/InspectorToggle';
-  static const sidebar = '$center/Sidebar';
+  static const resourceOverlay = '$root/ResourcesOverlay';
+  static const sidebar = '$resourceOverlay/Dialog';
+  static const resourceConfirm = '$sidebar/Content/Footer/Place';
+  static const resourceCancel = '$sidebar/Content/Footer/Cancel';
   static const inspector = '$center/Inspector';
   static const details = '$inspector/Content/Scroll/Details';
   static const catalog = '$sidebar/Content/Scroll/Choices';
@@ -90,16 +100,27 @@ class Workspace3D {
   }
 
   void _closePanels({bool focusMain = false}) {
+    final resourcesWereOpen = isResourcesOpen;
     layout.request(WorkspacePanel.library, false);
+    if (resourcesWereOpen) _onResourcesClosed();
     layout.request(WorkspacePanel.inspector, false);
     resize();
     if (focusMain && !_blocked) _button(speedToggle).grabFocus();
   }
 
+  bool get isResourcesOpen => _control(resourceOverlay).isVisible();
+
+  void dismissResources() => _request(WorkspacePanel.library, false);
+
   void _request(WorkspacePanel panel, bool open) {
     _setDial(false);
+    final resourcesWereOpen = isResourcesOpen;
     layout.request(panel, open);
     resize();
+    if (panel == WorkspacePanel.library && open) _onResourcesOpened();
+    if (resourcesWereOpen && !(panel == WorkspacePanel.library && open)) {
+      _onResourcesClosed();
+    }
     if (!open) {
       if (!_blocked) _button(speedToggle).grabFocus();
       return;
@@ -122,22 +143,35 @@ class Workspace3D {
     final result =
         layout.resolve(_scene.getViewport()!.getVisibleRect().size.x);
     final size = _control(center).getSize();
-    for (final panel in WorkspacePanel.values) {
-      final resource = panel == WorkspacePanel.library;
-      final control = _control(resource ? sidebar : inspector);
-      final width = resource ? layout.libraryWidth : layout.inspectorWidth;
-      final height = (resource ? 340.0 : 380.0)
-          .clamp(0.0, size.y - 36.0 < 0 ? 0.0 : size.y - 36.0);
-      control
-        ..setVisible(resource ? result.library : result.inspector)
-        ..setPosition(Vector2(x: 82, y: size.y - height - 18))
-        ..setSize(Vector2(x: width, y: height));
+    final inspectorHeight =
+        380.0.clamp(0.0, (size.y - 36.0).clamp(0.0, double.infinity));
+    _control(inspector)
+      ..setVisible(result.inspector)
+      ..setPosition(Vector2(x: 82, y: size.y - inspectorHeight - 18))
+      ..setSize(Vector2(x: layout.inspectorWidth, y: inspectorHeight));
+    _control(resourceOverlay).setVisible(result.library);
+    for (final path in [speedToggle, libraryToggle, inspectorToggle]) {
+      _button(path).setDisabled(_blocked || result.library);
     }
+    final canvasBounds = canvasRect(_scene);
+    final width = 520.0
+        .clamp(0.0, (canvasBounds.size.x - 32).clamp(0.0, double.infinity));
+    final height = 500.0
+        .clamp(0.0, (canvasBounds.size.y - 32).clamp(0.0, double.infinity));
+    _control(sidebar)
+      ..setSize(Vector2(x: width, y: height))
+      ..setPosition(canvasBounds.position -
+          _control(root).getGlobalRect().position +
+          Vector2(
+              x: (canvasBounds.size.x - width) / 2,
+              y: (canvasBounds.size.y - height) / 2));
   }
 
   /// Full-screen transparent controls never block picking. Only live buttons
   /// and the visible popup rectangles consume canvas input.
-  bool blocksPointer(Vector2 point) => [
+  bool blocksPointer(Vector2 point) =>
+      isResourcesOpen ||
+      [
         speedToggle,
         if (_dialOpen) ...[libraryToggle, inspectorToggle],
         sidebar,
@@ -149,6 +183,46 @@ class Workspace3D {
       });
 
   bool handleInput(InputEvent? event) {
+    if (isResourcesOpen) {
+      if (event is InputEventKey && event.isPressed() && !event.isEcho()) {
+        if (event.getKeycode() == Key.escape) {
+          if (!_button(resourceCancel).isDisabled()) dismissResources();
+          return true;
+        }
+        final paths = [
+          '$sidebar/Content/Heading/Close',
+          for (final item in resourceVisuals3D.values)
+            '$catalog/${item.buttonName}',
+          resourceCancel,
+          resourceConfirm
+        ];
+        final controls = paths
+            .map(_button)
+            .where((b) => !b.isDisabled() && b.isVisibleInTree())
+            .toList();
+        final focused = controls.indexWhere((b) => b.hasFocus());
+        if (event.getKeycode() == Key.tab) {
+          if (controls.isNotEmpty) {
+            final next =
+                (focused + (event.isShiftPressed() ? -1 : 1)) % controls.length;
+            controls[next].grabFocus();
+          }
+          return true;
+        }
+        if (focused < 0) {
+          if (controls.isNotEmpty) controls.first.grabFocus();
+          return true;
+        }
+      }
+      // Backdrop policy: keep the modal open and swallow all background input.
+      if (event is InputEventMouseButton) {
+        return !_control(sidebar).getGlobalRect().hasPoint(event.getPosition());
+      }
+      if (event is InputEventMouseMotion) {
+        return !_control(sidebar).getGlobalRect().hasPoint(event.getPosition());
+      }
+      return false;
+    }
     if (_blocked) return false;
     final panel = layout.resolve(_scene.getViewport()!.getVisibleRect().size.x);
     if (event is InputEventKey &&
@@ -175,14 +249,17 @@ class Workspace3D {
   void render(IsomapGridState state,
       {required bool blocked, required bool canConfigure}) {
     _blocked = blocked;
-    if (blocked || (_hadSelection && state.selected == null)) {
+    if (blocked ||
+        (_hadSelection && state.selected == null && !isResourcesOpen)) {
       _setDial(false);
       _closePanels();
     }
-    _button(speedToggle).setDisabled(blocked);
-    _button(libraryToggle).setDisabled(blocked);
-    _button(inspectorToggle).setDisabled(blocked);
-    _button('$sidebar/Content/Heading/Close').setDisabled(blocked);
+    for (final path in [speedToggle, libraryToggle, inspectorToggle]) {
+      _button(path).setDisabled(blocked || isResourcesOpen);
+    }
+    if (!isResourcesOpen) {
+      _button('$sidebar/Content/Heading/Close').setDisabled(blocked);
+    }
     _button('$inspector/Content/Heading/Close').setDisabled(blocked);
     _hadSelection = state.selected != null;
     final position = state.selected;

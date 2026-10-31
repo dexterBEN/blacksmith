@@ -3,6 +3,7 @@
 import 'dart:async' as async;
 import 'dart:io';
 import 'speed_dial_checks.dart';
+import 'resource_modal_checks.dart';
 import 'workspace_test_input.dart';
 import 'package:bloc/bloc.dart' as bloc_core;
 import 'package:godot_dart/godot_dart.dart';
@@ -48,6 +49,7 @@ class _ObservedBloc extends IsomapGridBloc {
   int listeners = 0;
   int tileEvents = 0;
   int otherEvents = 0;
+  int placementEvents = 0;
 
   @override
   Stream<IsomapGridState> get stream => async.Stream.multi((controller) {
@@ -62,6 +64,7 @@ class _ObservedBloc extends IsomapGridBloc {
 
   @override
   void onEvent(IsomapGridEvent event) {
+    if (event is PlaceResource) placementEvents++;
     if (event is TileClicked) {
       tileEvents++;
     } else {
@@ -100,6 +103,24 @@ class SelectionFixture {
 
   IsomapGridState get state => _bloc.state;
 
+  Future<void> checkResourcesModalOnly(SceneTree tree,
+      {required bool capture}) async {
+    final scene = tree.getCurrentScene()!;
+    scene.getViewport()!
+      ..setDisableInput(false)
+      ..call('notify_mouse_entered');
+    await checkResourceModal(scene, _bloc,
+        tileEvents: () => _bloc.tileEvents,
+        placements: () => _bloc.placementEvents,
+        restore: _bloc.restore,
+        capture: capture,
+        output: Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']!);
+    _check(_repository.calls == 0 && _client.requests == 0,
+        'Modal never provisions or performs HTTP.');
+    GD.print(Variant(
+        'BLACKSMITH_ISSUE75_IO_PASSED repository_calls=0 http_requests=0'));
+  }
+
   Future<void> checkSpeedDialOnly(SceneTree tree,
       {required bool capture}) async {
     final scene = tree.getCurrentScene()!;
@@ -137,6 +158,7 @@ class SelectionFixture {
             .getNodeT<Button>('${Workspace3D.catalog}/ComputeEngine')!
             .getGlobalRect()
             .getCenter());
+    await confirmResourceChoice(scene);
     _check(
         _bloc.state.selected == selected &&
             _bloc.tileEvents == selections &&

@@ -181,6 +181,7 @@ void afterStartup() {
           // Geometry-only legacy projection fixture, no configuration write.
           if (!button.isDisabled()) {
             await _click(scene, button.getGlobalRect().getCenter());
+            await confirmResourceChoice(scene);
             _check(di.sl<DesignCubit>().state.configurationDraft != null,
                 'Cloud Storage opens the shared configuration form.');
             di.sl<DesignCubit>().cancelResourceConfiguration();
@@ -190,6 +191,7 @@ void afterStartup() {
           await _pause();
         } else {
           await _click(scene, button.getGlobalRect().getCenter());
+          await confirmResourceChoice(scene);
         }
         _check(
             bloc.state.selected == selected &&

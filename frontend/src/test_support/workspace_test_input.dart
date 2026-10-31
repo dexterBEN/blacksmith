@@ -30,6 +30,10 @@ Future<void> workspaceClick(Node scene, Vector2 point) async {
 }
 
 Future<void> openWorkspaceAction(Node scene, String action) async {
+  if (scene.getNodeT<Control>(Workspace3D.resourceOverlay)!.isVisibleInTree()) {
+    if (action == Workspace3D.libraryToggle) return;
+    await dismissWorkspaceMenus(scene);
+  }
   if (!scene.getNodeT<Control>(Workspace3D.speedActions)!.isVisibleInTree()) {
     await workspaceClick(
         scene,
@@ -51,4 +55,25 @@ Future<void> dismissWorkspaceMenus(Node scene) async {
         inLocalCoords: true);
   }
   await Future<void>.delayed(const Duration(milliseconds: 180));
+}
+
+Future<void> confirmResourceChoice(Node scene) async {
+  await workspaceClick(
+      scene,
+      scene
+          .getNodeT<Button>(Workspace3D.resourceConfirm)!
+          .getGlobalRect()
+          .getCenter());
+  for (var i = 0;
+      i < 100 &&
+          scene
+              .getNodeT<Control>(Workspace3D.resourceOverlay)!
+              .isVisibleInTree();
+      i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  }
+  if (scene.getNodeT<Control>(Workspace3D.resourceOverlay)!.isVisibleInTree()) {
+    throw StateError(
+        'Resource confirmation did not complete: ${scene.getNodeT<Label>('${Workspace3D.sidebar}/Content/Feedback')!.getText()}');
+  }
 }

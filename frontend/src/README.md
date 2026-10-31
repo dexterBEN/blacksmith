@@ -47,13 +47,22 @@ The 3D workspace keeps the existing compact Design header and a full-width
 as **+**; expanding it shows **Resources** and **Inspect** in one upward stack.
 Its 160 ms animation is authored in the native `AnimationPlayer` scene.
 
-Resources reuses the four existing placement buttons, enabled from `IsomapGridBloc`.
-Inspect reuses the current details/configuration controls. Their panels now float
-above the canvas instead of reserving dock width. One popup is visible at a time.
-Escape, outside clicks, close controls, modals and selection reset dismiss the
-appropriate UI. Popup close returns focus to the main button. Selection/placement,
+Resources reuses the four existing catalog rows and availability rules in a
+centered modal. Rows select a UI-only draft; **Place Resource** invokes the existing
+placement/configuration path against the tile selected before opening. The
+full-editor scrim blocks the toolbar, dial and grid, with trapped keyboard focus.
+Cancel, × and Escape cancel the draft; backdrop clicks leave the dialog open.
+Inspect retains its existing floating details/configuration panel. Neither UI
+reserves canvas space.
+Inspect retains its outside-click dismissal. Resources uses a blocking backdrop
+that keeps the dialog open; an invalidated tile disables confirmation and shows
+feedback. Opening an existing Design/configuration modal hands control to it. Popup close returns focus to the main button. Selection/placement,
 configuration, persistence and deployment retain their existing state owners.
 The native window minimum remains 960 × 640; the map minimum is 480 × 320.
+
+Use `preview --resources-modal --check` (or `--headless`) for the centered-dialog
+regressions and current screenshots at 1152×648 and 960×640. See the
+[Issue #75 report](../../issue_75_report.md) for validation and reference differences.
 
 Add `--speed-dial` to `preview --check` or `preview --headless` to run only the
 focused menu/placement checks, without the longer grid regression matrix.
