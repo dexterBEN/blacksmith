@@ -130,6 +130,37 @@ size = 6.0
 near = 0.1
 far = 50.0
 
+[node name="EmptyState" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+z_index = 1
+
+[node name="Message" type="VBoxContainer" parent="EmptyState"]
+custom_minimum_size = Vector2(440, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="EmptyState/Message"]
+layout_mode = 2
+text = "No design open"
+horizontal_alignment = 1
+mouse_filter = 2
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_outline_color = Color(0.01, 0.02, 0.04, 0.9)
+theme_override_constants/outline_size = 4
+
+[node name="Hint" type="Label" parent="EmptyState/Message"]
+layout_mode = 2
+text = "Create a new design or open an existing one\nto get started."
+horizontal_alignment = 1
+mouse_filter = 2
+theme_override_colors/font_outline_color = Color(0.01, 0.02, 0.04, 0.9)
+theme_override_constants/outline_size = 4
+
 [node name="Header" type="PanelContainer" parent="."]
 layout_mode = 1
 anchor_right = 1.0
@@ -184,7 +215,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 clip_text = true
 horizontal_alignment = 2
-text = "No active Design · Local placements only"
+text = "No active Design · Create or open a Design"
 theme_override_font_sizes/font_size = 12
 text_overrun_behavior = 3
 mouse_filter = 1
@@ -266,6 +297,7 @@ disabled = true
 tooltip_text = "Open the existing Cloud Storage configuration dialog. Saving configuration does not deploy."
 
 [node name="SpeedDial" parent="Body/Center" instance=ExtResource("6_dial")]
+visible = false
 
 [node name="ResourcesOverlay" type="Control" parent="."]
 visible = false

@@ -80,6 +80,12 @@ void checkEditorFraming(Node scene) {
           'All four labelled resource tools are fully visible in the open Library.');
     }
   }
+  final gridRoot = scene.getNodeT<Node3D>('GridRoot')!;
+  if (!gridRoot.isVisibleInTree()) {
+    _check(!scene.getNodeT<Node3D>('ResourceRoot')!.isVisibleInTree(),
+        'Inactive workspace hides all design visuals while retaining the full canvas.');
+    return;
+  }
   void point(Vector3 world) {
     final screen = camera.unprojectPosition(world);
     _check(

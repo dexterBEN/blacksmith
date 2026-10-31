@@ -17,6 +17,14 @@ import 'isometric_3d_framing_checks.dart';
 Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     {required int Function() tileEvents,
     required int Function() placementEvents}) async {
+  design.open();
+  design.changeName(
+      'Toolbar validation ${List.filled(12, 'long name').join(' ')}');
+  await design.submit();
+  await _settle();
+  final active = design.state.active;
+  _check(active != null, 'One explicit fake Design creation, without HTTP.');
+
   await openWorkspaceAction(scene, Workspace3D.libraryToggle);
   for (final visual in resourceVisuals3D.values) {
     final button =
@@ -28,14 +36,6 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
         'Existing resource choices remain disabled until a tile is selected.');
   }
   await dismissWorkspaceMenus(scene);
-  design.open();
-  design.changeName(
-      'Toolbar validation ${List.filled(12, 'long name').join(' ')}');
-  await design.submit();
-  await _settle();
-  final active = design.state.active;
-  _check(active != null, 'One explicit fake Design creation, without HTTP.');
-
   final summary = scene.getNodeT<Label>(Workspace3D.status)!;
   _check(
       summary.getText().contains(active!.name) &&

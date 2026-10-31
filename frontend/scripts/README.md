@@ -11,7 +11,7 @@ compatible Godot/Dart libraries and generated bindings.
 | `./scripts/dev.sh host-build` | Remove generated `src/.dart_tool`, resolve dependencies and regenerate bindings for the host |
 | `./scripts/dev.sh reset` | Clear generated `src/.dart_tool`, then rebuild using the configured Dart executable |
 | `./scripts/dev.sh run [Godot arguments]` | Open the Godot editor through the canonical `run_local.sh` launcher |
-| `./scripts/dev.sh test [options]` | Run `tests/test-godot.py`; default is the existing legacy 2D check |
+| `./scripts/dev.sh test [options]` | Run `tests/test-godot.py`; default is the legacy 2D check; `--empty-workspace` validates the 3D welcome/lifecycle flow |
 | `./scripts/dev.sh check [options]` | Validate resource cube dependencies (`--require-tracked` checks the Git index) |
 | `./scripts/dev.sh preview [options]` | Run the isolated Dart 3D scene; supports `--check`, `--headless`, focused `--toolbar-overlay` / `--speed-dial` / `--resources-modal` checks and material variants |
 | `./scripts/dev.sh preview-cubes [options]` | Preview/check native resource cubes without Dart |
@@ -43,6 +43,7 @@ containing spaces. Other build commands use `dart` from PATH unless overridden:
 DART_BIN=/usr/lib/dart/bin/dart ./scripts/dev.sh build
 ./scripts/dev.sh run --verbose
 ./scripts/dev.sh test --application --trace-network --timeout 600 --output /tmp/blacksmith-startup
+./scripts/dev.sh test --empty-workspace --trace-network --timeout 600 --output /tmp/blacksmith-empty
 ./scripts/dev.sh preview --check --timeout 600 --output /tmp/blacksmith-placement
 ./scripts/dev.sh preview --toolbar-overlay --check --timeout 600 --output /tmp/blacksmith-toolbar
 ```
@@ -90,7 +91,7 @@ scripts/
     deployment-test-backend/
 ```
 
-The Dart 3D preview retains headless placement/framing checks, material experiments
+The Dart 3D preview explicitly supplies a local fixture Design and retains headless placement/framing checks, material experiments
 and interactive use without a backend. The native cube preview has no Dart
 requirement. Neither is fully replaced by application-startup tests. Fixture copy
 and process checks stay specialized because their native bootstraps and success

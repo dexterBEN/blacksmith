@@ -88,12 +88,17 @@ class DesignEditor3D {
     _new.setDisabled(_cubit == null || blocked);
     _open.setDisabled(!(_cubit?.supportsPersistence ?? false) || blocked);
     _save
-      ..setDisabled(!state.canSave || blocked)
+      ..setDisabled(state.active == null || !state.canSave || blocked)
       ..setText(state.saveUncertain ? 'Check Save' : 'Save')
       ..setTooltipText(state.persistenceMessage);
-    _copy.setDisabled(state.active == null || blocked);
+    _copy.setDisabled(
+        state.active == null || state.active!.id.isEmpty || blocked);
     _active.setText(state.active == null
-        ? 'No active Design · ${state.persistenceMessage}'
+        ? state.pending
+            ? (state.status == DesignStatus.loading
+                ? 'Opening Design…'
+                : 'Creating Design…')
+            : 'No active Design · Create or open a Design'
         : '${state.active!.name} · ${state.persistenceMessage}');
     _active.setTooltipText(state.active == null
         ? _active.getText()

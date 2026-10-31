@@ -23,6 +23,11 @@ class TileClicked extends IsomapGridEvent {
   List<Object?> get props => [pos];
 }
 
+/// Deselect without discarding resources, for example when leaving a Design.
+class ClearTileSelection extends IsomapGridEvent {
+  const ClearTileSelection();
+}
+
 /// A semantic palette choice, independent of its Godot texture.
 class PlaceResource extends IsomapGridEvent {
   final ResourceKind kind;

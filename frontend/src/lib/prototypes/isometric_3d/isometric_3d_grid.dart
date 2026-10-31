@@ -59,27 +59,11 @@ class Isometric3DGrid extends Node3D {
         Vector2i.fromXY(Workspace3D.minimumWidth, Workspace3D.minimumHeight));
     installRuntimeShutdownHook(window);
     Workspace3D.attach(this);
-    final grid = getNodeT<Node3D>('GridRoot')!;
-    final scene = ResourceLoader.singleton
-        .load('res://scenes/isometric_3d/tile.tscn')! as PackedScene;
-    _selectionMaterial = ResourceLoader.singleton
-        .load('res://scenes/isometric_3d/selection_material.tres')! as Material;
-    for (var row = 0; row < layout.rows; row++) {
-      for (var col = 0; col < layout.cols; col++) {
-        final position = layout.worldPosition(GridPos(row, col));
-        final tile = scene.instantiate()! as MeshInstance3D;
-        tile
-          ..setName('Tile_${row}_$col')
-          ..setPosition(Vector3(x: position.x, y: position.y, z: position.z));
-        grid.addChild(tile);
-        _baseMaterial ??= tile.getMaterialOverride();
-        _tiles[GridPos(row, col)] = tile;
-      }
-    }
     _resourceRoot = getNodeT<Node3D>('ResourceRoot')!;
     _palette = ResourcePalette3D(this, (kind, target) async {
       final bloc = _bloc;
       if (!_active ||
+          !_hasActiveDesign ||
           (_designEditor?.isOpen ?? false) ||
           bloc == null ||
           bloc.isClosed ||
@@ -138,9 +122,14 @@ class Isometric3DGrid extends Node3D {
     _designEditor = DesignEditor3D(
         this, di.sl.isRegistered<DesignCubit>() ? di.sl<DesignCubit>() : null,
         (open) {
-      _renderPalette(bloc.state, blocked: open);
+      if (getNodeT<Node3D>('GridRoot')!.isVisible() != _hasActiveDesign) {
+        _renderState(bloc.state, blocked: open);
+      } else {
+        _renderPalette(bloc.state, blocked: open);
+      }
     });
     _workspace = Workspace3D(this,
+        hasActiveDesign: () => _hasActiveDesign,
         onResourcesOpened: () => _palette?.open(),
         onResourcesClosed: () => _palette?.close(),
         configureStorage: () {
@@ -157,7 +146,9 @@ class Isometric3DGrid extends Node3D {
     _renderState(bloc.state);
     setProcessUnhandledInput(true);
     setProcessInput(true);
-    GD.print(Variant('[Isometric3DGrid] 36 shared beveled tiles ready. '
+    GD.print(Variant(
+        '[Isometric3DGrid] ${_tiles.length} shared beveled tiles ready. '
+        'active_design=$_hasActiveDesign '
         'bloc=${_ownsBloc ? "local" : "shared"} resources=${_resources.length}'));
   }
 
@@ -182,6 +173,7 @@ class Isometric3DGrid extends Node3D {
   void vUnhandledInput(InputEvent? event) {
     final bloc = _bloc;
     if (!_active ||
+        !_hasActiveDesign ||
         (_designEditor?.isOpen ?? false) ||
         bloc == null ||
         bloc.isClosed ||
@@ -231,9 +223,41 @@ class Isometric3DGrid extends Node3D {
     GD.print(Variant('[Isometric3DGrid] Selected tile: ${selected ?? "none"}'));
   }
 
-  void _renderState(IsomapGridState state) {
-    _renderSelection(state.selected);
-    _renderPalette(state, blocked: _designEditor?.isOpen ?? false);
+  bool get _hasActiveDesign =>
+      di.sl.isRegistered<DesignCubit>() &&
+      di.sl<DesignCubit>().state.active != null;
+
+  void _ensureTiles() {
+    if (_tiles.isNotEmpty) return;
+    final grid = getNodeT<Node3D>('GridRoot')!;
+    final scene = ResourceLoader.singleton
+        .load('res://scenes/isometric_3d/tile.tscn')! as PackedScene;
+    _selectionMaterial = ResourceLoader.singleton
+        .load('res://scenes/isometric_3d/selection_material.tres')! as Material;
+    for (var row = 0; row < layout.rows; row++) {
+      for (var col = 0; col < layout.cols; col++) {
+        final position = layout.worldPosition(GridPos(row, col));
+        final tile = scene.instantiate()! as MeshInstance3D;
+        tile
+          ..setName('Tile_${row}_$col')
+          ..setPosition(Vector3(x: position.x, y: position.y, z: position.z));
+        grid.addChild(tile);
+        _baseMaterial ??= tile.getMaterialOverride();
+        _tiles[GridPos(row, col)] = tile;
+      }
+    }
+  }
+
+  void _renderState(IsomapGridState state, {bool? blocked}) {
+    final available = _hasActiveDesign;
+    if (available) _ensureTiles();
+    getNodeT<Node3D>('GridRoot')!.setVisible(available);
+    _resourceRoot!.setVisible(available);
+    if (!available && state.selected != null) {
+      _bloc?.add(const ClearTileSelection());
+    }
+    _renderSelection(available ? state.selected : null);
+    _renderPalette(state, blocked: blocked ?? (_designEditor?.isOpen ?? false));
     final root = _resourceRoot!;
     for (final position in _resources.keys.toList()) {
       if (state.tiles[position] != _resources[position]!.kind) {
@@ -242,6 +266,7 @@ class Isometric3DGrid extends Node3D {
         previous.node.queueFree();
       }
     }
+    if (!available) return;
     for (final entry in state.tiles.entries) {
       if (_resources.containsKey(entry.key) || !_tiles.containsKey(entry.key)) {
         continue;
@@ -268,7 +293,8 @@ class Isometric3DGrid extends Node3D {
         di.sl.isRegistered<DesignCubit>() ? di.sl<DesignCubit>() : null;
     final canConfigure =
         cubit?.state.active != null && (cubit?.supportsPersistence ?? false);
-    _palette?.render(state, blocked: blocked, canConfigure: canConfigure);
+    _palette?.render(state,
+        blocked: blocked || !_hasActiveDesign, canConfigure: canConfigure);
     _workspace?.render(state, blocked: blocked, canConfigure: canConfigure);
   }
 

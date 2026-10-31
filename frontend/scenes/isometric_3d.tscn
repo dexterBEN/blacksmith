@@ -20,6 +20,7 @@ size = Vector2(30, 30)
 script = ExtResource("1_script")
 
 [node name="GridRoot" type="Node3D" parent="."]
+visible = false
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.573576, 0.627507, -0.526541, 0, 0.642788, 0.766044, 0.819152, -0.439385, 0.368688, 0, 0, 0)
@@ -51,6 +52,7 @@ mesh = SubResource("PlaneMesh_ground")
 [node name="SurfaceFinishReflection" parent="." instance=ExtResource("2_reflection")]
 
 [node name="ResourceRoot" type="Node3D" parent="."]
+visible = false
 
 [node name="DesignLayer" type="CanvasLayer" parent="."]
 layer = 2

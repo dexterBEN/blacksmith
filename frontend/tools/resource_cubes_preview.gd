@@ -19,6 +19,7 @@ func _ready() -> void:
 	camera.make_current()
 	$WorkspaceLayer.queue_free()
 	$DesignLayer.queue_free()
+	$GridRoot.show()
 	var tile_scene: PackedScene = load("res://scenes/isometric_3d/tile.tscn")
 	for row in range(6):
 		for col in range(6):

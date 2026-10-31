@@ -139,6 +139,17 @@ Future<void> checkToolbarOverlay(Node scene, IsomapGridBloc bloc,
       await workspaceClick(scene, target);
       _check(tileEvents() == events,
           'Every toolbar button, including disabled actions, blocks tile picking.');
+      final shade =
+          scene.getNodeT<Control>('DesignLayer/DesignControls/Shade')!;
+      if (shade.isVisibleInTree()) {
+        await workspaceClick(
+            scene,
+            scene
+                .getNodeT<Button>(
+                    'DesignLayer/DesignControls/Shade/Dialog/Cancel')!
+                .getGlobalRect()
+                .getCenter());
+      }
       header.setPosition(original);
     }
     _check(
