@@ -4,6 +4,7 @@ import 'dart:async' as async;
 import 'dart:convert';
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
+import 'workspace_test_input.dart';
 import 'package:http/http.dart' as http;
 import '../lib/core/di/service_locator.dart' as di;
 import '../lib/data/repositories/cloud_storage_repository.dart';
@@ -504,6 +505,7 @@ Node3D _cube(Node scene, [GridPos position = _position]) {
 }
 
 Future<void> _select(Node scene, [GridPos position = _position]) async {
+  await dismissWorkspaceMenus(scene);
   final p = const GridLayout3D().worldPosition(position);
   await _click(
       scene,
@@ -514,12 +516,7 @@ Future<void> _select(Node scene, [GridPos position = _position]) async {
 Future<void> _choose(Node scene, String group, ResourceKind kind) async {
   if (group == Workspace3D.catalog &&
       !scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
-    await _click(
-        scene,
-        scene
-            .getNodeT<Button>(Workspace3D.libraryToggle)!
-            .getGlobalRect()
-            .getCenter());
+    await openWorkspaceAction(scene, Workspace3D.libraryToggle);
   }
   await _click(
       scene,

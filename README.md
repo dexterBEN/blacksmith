@@ -137,19 +137,17 @@ the existing Dart bindings and native libraries separately as described below.
 Normal Godot project startup opens `scenes/isometric_3d.tscn`. The existing 3D
 scene supports selecting a tile and placing or replacing Cloud Storage,
 Compute Engine, Cloud VPN and Cloud Load Balancing cubes through a native palette.
-The dark workspace starts with a compact Design header and navigation rail,
-leaving both optional docks closed. Open **Library** on the left rail to access
-the four labelled resource placement tools. The 3D viewport fills the available
-body height. **Inspect** opens selected tile/resource details and the existing Cloud
-Storage configuration entry point. Selected coordinates and resource/deployment
-details live in the Inspector; the existing header and dialogs keep save/deployment
-feedback accessible with it closed. Both docks reserve layout space beside the
-real `SubViewportContainer`; neither floats over the map. Drag their inner edge
-to resize, or use their close controls without deselecting. At narrow widths,
-the last requested dock takes priority; widening restores both requested docks.
+The workspace keeps the existing Design header and fills the available width
+below it. A compact **+** Speed Dial floats at the bottom-left. Open it to show
+**Resources** and **Inspect** vertically above **×**. Resources opens the existing
+four-item picker; select a tile before choosing a resource. Inspect shows current
+tile/resource details and the existing Cloud Storage configuration entry point.
+Both panels float over the map without changing viewport dimensions. Only one
+panel is open at a time; Escape, its close button, or an outside click dismisses
+it without clearing the current selection. The dial collapses when an action or
+modal is opened. Transparent overlay areas keep normal grid input.
 The catalog retains full service labels and tooltips. The workspace and New Design
-dialog share one dark UI theme. Ordinary selection does not open a dock or change
-the camera framing. Configuration/deployment dialogs retain their existing modal behavior.
+dialog share one dark UI theme. Configuration/deployment dialogs retain their existing modal behavior.
 Other resource kinds stay in `IsomapGridBloc` memory and require no backend.
 Cloud Storage configuration requires an active Design, the API and PostgreSQL;
 GCP credentials are not needed. Cancel and rejected saves preserve the original
@@ -207,10 +205,10 @@ optional Linux `strace` tool. See [the Dart workflow](frontend/src/README.md) fo
 source-generation prerequisites.
 
 The 3D window follows actual window dimensions, with a minimum size of
-960 × 640, with at least 480 × 320 reserved for the map. Library width defaults to
-216 pixels (200–304); Inspector defaults to 240 (216–304). Native containers reserve
-the header, rail, visible docks and quick strip; camera framing uses the actual central render viewport and
-includes the maximum cube height even on an empty board, so placement does not
+960 × 640, with at least 480 × 320 available for the map. The render viewport
+fills the body inside the existing outer margins. Floating controls and popups
+reserve no layout width or height; camera framing uses the actual render viewport
+and includes maximum cube height even on an empty board, so placement does not
 change the zoom. Full application restart clears in-memory placements
 and active Design selection; use Open to load a previously saved Design. See
 [the Issue #44 report](issue_44_report.md) for contracts, safeguards and the real

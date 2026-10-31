@@ -2,6 +2,8 @@
 // ignore_for_file: avoid_relative_lib_imports
 import 'dart:async' as async;
 import 'dart:io';
+import 'speed_dial_checks.dart';
+import 'workspace_test_input.dart';
 import 'package:bloc/bloc.dart' as bloc_core;
 import 'package:godot_dart/godot_dart.dart';
 import '../lib/prototypes/isometric_3d/workspace_3d.dart';
@@ -13,6 +15,7 @@ import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_state.dart';
 import '../lib/domain/models/grid_position.dart';
+import '../lib/domain/models/resource_kind.dart';
 import '../lib/prototypes/isometric_3d/grid_layout.dart';
 import 'isometric_3d_placement_checks.dart';
 
@@ -97,12 +100,71 @@ class SelectionFixture {
 
   IsomapGridState get state => _bloc.state;
 
+  Future<void> checkSpeedDialOnly(SceneTree tree,
+      {required bool capture}) async {
+    final scene = tree.getCurrentScene()!;
+    scene.getViewport()!
+      ..setDisableInput(false)
+      ..call('notify_mouse_entered');
+    await openWorkspaceAction(scene, Workspace3D.libraryToggle);
+    for (final name in [
+      'CloudStorage',
+      'ComputeEngine',
+      'CloudVpn',
+      'CloudLoadBalancing'
+    ]) {
+      _check(
+          scene.getNodeT<Button>('${Workspace3D.catalog}/$name')!.isDisabled(),
+          'Resources still require a selected tile.');
+    }
+    await dismissWorkspaceMenus(scene);
+    const cells = [GridPos(3, 1), GridPos(1, 2), GridPos(2, 4), GridPos(4, 3)];
+    for (var i = 0; i < cells.length; i++) {
+      _bloc.add(TileClicked(cells[i]));
+      _bloc.add(PlaceResource(ResourceKind.values[i]));
+      await _pause();
+    }
+    await checkSpeedDial(scene, _bloc,
+        tileEvents: () => _bloc.tileEvents,
+        capture: capture,
+        output: Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']);
+    final selected = _bloc.state.selected;
+    final selections = _bloc.tileEvents;
+    await openWorkspaceAction(scene, Workspace3D.libraryToggle);
+    await workspaceClick(
+        scene,
+        scene
+            .getNodeT<Button>('${Workspace3D.catalog}/ComputeEngine')!
+            .getGlobalRect()
+            .getCenter());
+    _check(
+        _bloc.state.selected == selected &&
+            _bloc.tileEvents == selections &&
+            _bloc.state.tiles[selected] == ResourceKind.computeEngine,
+        'Resource choice still places on the previously selected tile.');
+    await dismissWorkspaceMenus(scene);
+    await openWorkspaceAction(scene, Workspace3D.inspectorToggle);
+    _check(
+        scene.getNodeT<Label>('${Workspace3D.details}/Kind')!.getText() ==
+            'Compute Engine',
+        'Inspect reads the same selected resource.');
+    await dismissWorkspaceMenus(scene);
+    _check(_repository.calls == 0 && _client.requests == 0,
+        'Menu interactions never provision or issue HTTP requests.');
+    GD.print(Variant(
+        'BLACKSMITH_ISSUE73_FLOW_PASSED tile_first=true picker=true inspect=true repository_calls=0 http_requests=0'));
+  }
+
   Future<Node> checkPlacement(SceneTree tree, {required bool capture}) async {
     final scene = await check3DPlacement(tree, _bloc,
         restore: _bloc.restore,
         tileEvents: () => _bloc.tileEvents,
         listeners: () => _bloc.listeners,
         capture: capture);
+    await checkSpeedDial(scene, _bloc,
+        tileEvents: () => _bloc.tileEvents,
+        capture: capture,
+        output: Platform.environment['BLACKSMITH_ISSUE17_OUTPUT']);
     _check(_repository.calls == 0 && _client.requests == 0,
         'Placement/replay/reload must never call provisioning or HTTP.');
     GD.print(Variant('BLACKSMITH_ISSUE33_PLACEMENT_PASSED kinds=4 '

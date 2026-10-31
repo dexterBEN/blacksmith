@@ -42,35 +42,32 @@ godot --path frontend res://main.tscn
 The first command imports Godot's resources after a fresh checkout. Opening the
 project in the editor performs the same import before Run Project (F5).
 
-The 3D workspace uses native containers for its compact header, navigation rail,
-optional GCP Library/Inspector docks. The header contains Design actions; all
-four labelled resource placement controls live in the left Library. Open it via
-the always-visible Library rail button.
-There is no bottom toolbar or reserved footer height. Its `SubViewportContainer`
-renders the existing world inside the remaining area. Camera fitting uses that viewport's real dimensions;
-main-window pointer coordinates are mapped to the canvas before ray picking.
-The resource palette helper connects the four Library buttons to the existing
-placement action and derives enabled state from `IsomapGridBloc`.
+The 3D workspace keeps the existing compact Design header and a full-width
+`SubViewportContainer` below it. A bottom-left floating Speed Dial starts collapsed
+as **+**; expanding it shows **Resources** and **Inspect** in one upward stack.
+Its 160 ms animation is authored in the native `AnimationPlayer` scene.
 
-The workspace and New Design dialog use the same `workspace_dark.tres` theme.
-Both docks start closed. The Library defaults to 216 pixels (200–304), and the
-Inspector to 240 (216–304); their inner-edge grips resize them. Full service
-labels and resource tooltips remain accessible. Tile/resource details are
-projected into the Inspector from the current selection, including after reopening.
-Save/deployment feedback remains available in the existing header and dialogs. The native window minimum is
-960 × 640 and the map minimum is 480 × 320. When both requested docks cannot fit,
-the last opened/resized dock wins; widening restores the requested pair. Closing
-Inspector preserves selection. Selection alone never opens a dock. Presentation
-preferences are scene-local, with no database writes. The existing configuration
-form remains modal; Save & Deploy requires explicit consent but no deployment token.
+Resources reuses the four existing placement buttons, enabled from `IsomapGridBloc`.
+Inspect reuses the current details/configuration controls. Their panels now float
+above the canvas instead of reserving dock width. One popup is visible at a time.
+Escape, outside clicks, close controls, modals and selection reset dismiss the
+appropriate UI. Popup close returns focus to the main button. Selection/placement,
+configuration, persistence and deployment retain their existing state owners.
+The native window minimum remains 960 × 640; the map minimum is 480 × 320.
 
-`test-godot.py --application --trace-network --output OUTPUT --timeout 600`
-checks the single Library placement palette, four panel states at native 960×640,
-1280×720, 1600×900 and 1920×1080, grip clamps, maximize/restore, minimum size,
-state preservation, exactly-once placement, default Enter activation, Inspector
-reopening, reclaimed canvas height and native screenshots (`workspace_WIDTHxHEIGHT_closed.png`
-and `workspace_WIDTHxHEIGHT_docked.png`) plus `workspace_matrix.json`. It also saves and reloads the workspace and parent
-scenes twice using Godot's editor ownership rules before running the application.
+Add `--speed-dial` to `preview --check` or `preview --headless` to run only the
+focused menu/placement checks, without the longer grid regression matrix.
+
+The isolated `preview --headless` / `preview --check` regressions exercise full-width
+layout, upward expansion, Resources/Inspect, Escape, outside clicks, click-through
+prevention, transparent row gaps, native resizing at 1152×648 and 960×640, and the
+existing selection/placement/framing/lifecycle checks. Graphical mode writes
+`speed_dial_WIDTH_collapsed.png`, `_expanded.png` and `_resources.png` from the real
+viewport. `test-godot.py --application` additionally exercises the production
+bootstrap, disabled choices without a selection, keyboard activation, inspector
+reopening and the original Cloud Storage configuration entry point with fail-closed
+repositories. See [the Issue #73 report](../../issue_73_report.md).
+
 The workspace scene owns its `WorldViewport` and `Camera3D`, so saving the parent
 cannot discard children injected into a non-editable scene instance.
 Its explicit fixture Design is local to

@@ -3,6 +3,7 @@
 import 'dart:async' as async;
 import 'package:bloc/bloc.dart' as bloc_core;
 import 'package:godot_dart/godot_dart.dart';
+import 'workspace_test_input.dart';
 import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import 'package:http/http.dart' as http;
 import '../lib/core/di/service_locator.dart' as di;
@@ -137,12 +138,7 @@ void afterStartup() {
           'A new application starts without selection or saved resources.');
       Future<void> library() async {
         if (!scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
-          await _click(
-              scene,
-              scene
-                  .getNodeT<Button>(Workspace3D.libraryToggle)!
-                  .getGlobalRect()
-                  .getCenter());
+          await openWorkspaceAction(scene, Workspace3D.libraryToggle);
         }
       }
 
@@ -154,12 +150,7 @@ void afterStartup() {
       }
       _check(bloc.state.selected == null && bloc.state.tiles.isEmpty,
           'Disabled buttons cannot place or select.');
-      await _click(
-          scene,
-          scene
-              .getNodeT<Button>(Workspace3D.libraryToggle)!
-              .getGlobalRect()
-              .getCenter());
+      await openWorkspaceAction(scene, Workspace3D.libraryToggle);
       await checkWorkspace(scene, bloc, di.sl<DesignCubit>(),
           tileEvents: () => _observer.tileEvents,
           placementEvents: () => _observer.placementEvents);
@@ -167,6 +158,7 @@ void afterStartup() {
           'Only explicit fixture Design creation may call its repository.');
 
       Future<void> select(GridPos position) async {
+        await dismissWorkspaceMenus(scene);
         final point = const GridLayout3D().worldPosition(position);
         final screen = Workspace3D.project(
             scene,

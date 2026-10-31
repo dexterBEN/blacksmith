@@ -2,6 +2,7 @@
 // ignore_for_file: avoid_relative_lib_imports
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
+import 'workspace_test_input.dart';
 import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_event.dart';
@@ -21,12 +22,7 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
   var scene = tree.getCurrentScene()!;
   Future<void> library() async {
     if (!scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
-      await _click(
-          scene,
-          scene
-              .getNodeT<Button>(Workspace3D.libraryToggle)!
-              .getGlobalRect()
-              .getCenter());
+      await openWorkspaceAction(scene, Workspace3D.libraryToggle);
     }
   }
 
@@ -44,6 +40,7 @@ Future<Node> check3DPlacement(SceneTree tree, IsomapGridBloc bloc,
   if (capture) await _capture(scene, '01_empty.jpg');
 
   Future<void> select(GridPos position) async {
+    await dismissWorkspaceMenus(scene);
     final center = const GridLayout3D().worldPosition(position);
     final point = Workspace3D.project(
         scene,

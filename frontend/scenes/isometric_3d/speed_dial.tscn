@@ -1,0 +1,172 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Texture2D" path="res://scenes/isometric_3d/icons/resources.svg" id="1_resources"]
+[ext_resource type="Texture2D" path="res://scenes/isometric_3d/icons/inspect.svg" id="2_inspect"]
+
+[sub_resource type="StyleBoxFlat" id="Main"]
+bg_color = Color(0.035, 0.28, 0.65, 1)
+border_color = Color(0.10, 0.49, 0.94, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_left = 24
+corner_radius_bottom_right = 24
+
+[sub_resource type="StyleBoxFlat" id="MainHover"]
+bg_color = Color(0.06, 0.36, 0.77, 1)
+border_color = Color(0.24, 0.65, 1, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_left = 24
+corner_radius_bottom_right = 24
+
+[sub_resource type="StyleBoxFlat" id="Action"]
+content_margin_left = 10.0
+content_margin_right = 12.0
+bg_color = Color(0.025, 0.08, 0.16, 0.96)
+border_color = Color(0.09, 0.27, 0.48, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_left = 24
+corner_radius_bottom_right = 24
+
+[sub_resource type="StyleBoxFlat" id="Focus"]
+bg_color = Color(0.08, 0.19, 0.32, 0)
+border_color = Color(0.36, 0.76, 1, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_left = 24
+corner_radius_bottom_right = 24
+
+[sub_resource type="StyleBoxEmpty" id="Empty"]
+content_margin_left = 10.0
+content_margin_right = 10.0
+
+[sub_resource type="Animation" id="Expand"]
+resource_name = "expand"
+length = 0.16
+tracks/0/type = "value"
+tracks/0/path = NodePath("Actions:modulate")
+tracks/0/interp = 1
+tracks/0/keys = {"times": PackedFloat32Array(0, 0.16), "transitions": PackedFloat32Array(1, 1), "update": 0, "values": [Color(1, 1, 1, 0), Color(1, 1, 1, 1)]}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Actions:position")
+tracks/1/interp = 1
+tracks/1/keys = {"times": PackedFloat32Array(0, 0.16), "transitions": PackedFloat32Array(1, 1), "update": 0, "values": [Vector2(0, 8), Vector2(0, 0)]}
+
+[sub_resource type="AnimationLibrary" id="Animations"]
+_data = {"expand": SubResource("Expand")}
+
+[node name="SpeedDial" type="Control"]
+layout_mode = 1
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = -174.0
+offset_right = 192.0
+offset_bottom = -18.0
+mouse_filter = 2
+z_index = 1
+
+[node name="Actions" type="Control" parent="."]
+visible = false
+layout_mode = 0
+offset_right = 174.0
+offset_bottom = 96.0
+mouse_filter = 2
+
+[node name="LibraryToggle" type="Button" parent="Actions"]
+mouse_default_cursor_shape = 2
+layout_mode = 0
+offset_top = 0.0
+offset_right = 148.0
+offset_bottom = 42.0
+text = "Resources"
+tooltip_text = "Open Resources"
+alignment = 0
+theme_override_constants/outline_size = 2
+theme_override_colors/font_outline_color = Color(0.01, 0.025, 0.05, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_hover_color = Color(0.48, 0.82, 1, 1)
+theme_override_colors/icon_hover_color = Color(0.48, 0.82, 1, 1)
+theme_override_constants/h_separation = 12
+icon = ExtResource("1_resources")
+theme_override_constants/icon_max_width = 22
+icon_alignment = 0
+expand_icon = true
+theme_override_styles/normal = SubResource("Empty")
+theme_override_styles/hover = SubResource("Empty")
+theme_override_styles/pressed = SubResource("Empty")
+theme_override_styles/focus = SubResource("Focus")
+
+[node name="Circle" type="Panel" parent="Actions/LibraryToggle"]
+show_behind_parent = true
+layout_mode = 0
+offset_right = 42.0
+offset_bottom = 42.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Action")
+
+[node name="InspectorToggle" type="Button" parent="Actions"]
+mouse_default_cursor_shape = 2
+layout_mode = 0
+offset_top = 54.0
+offset_right = 124.0
+offset_bottom = 96.0
+text = "Inspect"
+tooltip_text = "Open tile and resource Inspector"
+alignment = 0
+theme_override_constants/outline_size = 2
+theme_override_colors/font_outline_color = Color(0.01, 0.025, 0.05, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_hover_color = Color(0.48, 0.82, 1, 1)
+theme_override_colors/icon_hover_color = Color(0.48, 0.82, 1, 1)
+theme_override_constants/h_separation = 12
+icon = ExtResource("2_inspect")
+theme_override_constants/icon_max_width = 22
+icon_alignment = 0
+expand_icon = true
+theme_override_styles/normal = SubResource("Empty")
+theme_override_styles/hover = SubResource("Empty")
+theme_override_styles/pressed = SubResource("Empty")
+theme_override_styles/focus = SubResource("Focus")
+
+[node name="Circle" type="Panel" parent="Actions/InspectorToggle"]
+show_behind_parent = true
+layout_mode = 0
+offset_right = 42.0
+offset_bottom = 42.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Action")
+
+[node name="Toggle" type="Button" parent="."]
+mouse_default_cursor_shape = 2
+layout_mode = 0
+offset_top = 108.0
+offset_right = 48.0
+offset_bottom = 156.0
+text = "+"
+tooltip_text = "Open workspace actions"
+theme_override_font_sizes/font_size = 30
+theme_override_styles/normal = SubResource("Main")
+theme_override_styles/hover = SubResource("MainHover")
+theme_override_styles/pressed = SubResource("MainHover")
+theme_override_styles/focus = SubResource("Focus")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {&"": SubResource("Animations")}

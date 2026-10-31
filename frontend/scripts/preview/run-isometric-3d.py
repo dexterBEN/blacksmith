@@ -24,6 +24,8 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--check', action='store_true')
     mode.add_argument('--headless', action='store_true')
+    parser.add_argument('--speed-dial', action='store_true',
+                        help='Run only the focused floating-menu regression; combine with --check or --headless.')
     parser.add_argument('--godot', default='godot')
     parser.add_argument('--timeout', type=int, default=300)
     parser.add_argument('--output', type=Path)
@@ -34,6 +36,8 @@ def main():
                         default='opaque',
                         help='Isolated material comparison; transparent variants never change production assets.')
     args = parser.parse_args()
+    if args.speed_dial and not (args.check or args.headless):
+        parser.error('--speed-dial requires --check or --headless')
     source = FRONTEND_DIR
     dependencies = validate_assets(source)
     print(f'Resource dependencies: PASS ({len(dependencies)} files)', flush=True)
@@ -86,6 +90,7 @@ def main():
     env['BLACKSMITH_ISSUE17_MODE'] = (
         'headless' if args.headless else 'check' if args.check else 'interactive')
     env['BLACKSMITH_ISSUE17_OUTPUT'] = str(output)
+    env['BLACKSMITH_ISSUE73_ONLY'] = '1' if args.speed_dial else '0'
     env['BLACKSMITH_ISSUE25_VARIANT'] = args.material_variant
     env['BLACKSMITH_ISSUE17_GODOT_VERSION'] = subprocess.check_output(
         [args.godot, '--version'], text=True).strip()
@@ -104,10 +109,12 @@ def main():
             if (any(line.startswith(('ERROR:', 'SCRIPT ERROR:', 'SHADER ERROR:'))
                     for line in contents.splitlines()) or
                     'ObjectDB instances leaked at exit' in contents or
-                    ((args.check or args.headless) and
+                    (args.speed_dial and
+                     'BLACKSMITH_ISSUE73_FLOW_PASSED' not in contents) or
+                    ((args.check or args.headless) and not args.speed_dial and
                      ('BLACKSMITH_ISSUE33_PLACEMENT_PASSED' not in contents or
                       'BLACKSMITH_ISSUE35_FRAMING_PASSED' not in contents)) or
-                    (args.check and
+                    (args.check and not args.speed_dial and
                      'BLACKSMITH_ISSUE35_WINDOW_RESIZE_PASSED' not in contents)):
                 raise RuntimeError(f'{name} interactive placement failed; inspect {log}')
         print(f'{name}: PASS ({marker})', flush=True)
@@ -121,7 +128,8 @@ def main():
     arguments = ['--headless'] if args.headless else [
         '--display-driver', 'x11', '--rendering-method', 'gl_compatibility',
         '--resolution', '1152x648', '--max-fps', '60']
-    marker = ('BLACKSMITH_ISSUE17_RENDER_PASSED' if args.check else
+    marker = ('BLACKSMITH_ISSUE73_SPEED_DIAL_PASSED' if args.speed_dial else
+              'BLACKSMITH_ISSUE17_RENDER_PASSED' if args.check else
               'BLACKSMITH_ISSUE17_SELECTION_PASSED' if args.headless else
               'BLACKSMITH_ISSUE17_SCENE_PASSED')
     run('scene', arguments, marker,
