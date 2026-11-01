@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:godot_dart/godot_dart.dart';
 import 'workspace_test_input.dart';
+import '../lib/prototypes/isometric_3d/design_browser_3d.dart';
 import 'package:http/http.dart' as http;
 import '../lib/core/di/service_locator.dart' as di;
 import '../lib/data/repositories/cloud_storage_repository.dart';
@@ -469,9 +470,13 @@ void afterStartup() {
 
 Future<void> _open(Node scene, DesignCubit cubit, String id) async {
   await _click(scene, _header(scene, 'OpenDesign').getGlobalRect().getCenter());
-  _enter(scene, id);
-  await _settle(scene);
-  await _click(scene, _dialogButton(scene).getGlobalRect().getCenter());
+  await selectDesignInBrowser(scene, cubit, id);
+  await _click(
+      scene,
+      scene
+          .getNodeT<Button>(DesignBrowser3D.confirm)!
+          .getGlobalRect()
+          .getCenter());
   await _until(() =>
       !cubit.state.dialogOpen &&
       cubit.state.active?.id == id &&

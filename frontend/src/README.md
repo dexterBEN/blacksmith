@@ -168,12 +168,30 @@ just to suppress that warning. See the root issue report for executed checks.
 
 ## Explicit multi-resource persistence
 
-The 3D header adds Save, Open-by-ID and Copy ID. DesignCubit coordinates a snapshot
+The 3D header adds Save, an Open Design browser and Copy ID. DesignCubit coordinates a snapshot
 of the existing grid with ResourceRepository and DesignRepository. Save supports
 multiple Cloud Storage representations (`gcp.storage.bucket`, generic catalog code
 `storage`), with `x = column` and `y = row`. Each immutable grid entry keeps its
 local intent key, server ID, configuration, revision and ETag; `tiles` is only a
 derived kind projection for the existing renderers.
+
+The Open toolbar action uses `DesignBrowser3D → DesignCubit → DesignRepository`
+and the existing `GET /designs` collection. Search is case-insensitive by name;
+metadata is sorted by `updatedAtUtc` descending, with missing dates last. Blank
+names display **Untitled design**. Dates are displayed in UTC, without inventing
+resource counts or fetching each Design's resources. The existing endpoint returns
+all metadata in one request; client-side pages limit rendered rows to 50, not the
+HTTP payload size. This API currently exposes a global collection without user
+filtering; the frontend does not add authentication or claim account isolation.
+
+The browser starts without stale results or a selection. Cancel, × and Escape
+leave the workspace intact; in-flight list responses are ignored after dismissal
+or replacement. A selection and any required discard consent enable **Open Design**.
+Opening locks duplicate actions and uses the existing canonical Design/resource
+load. Failure preserves the current grid and keeps the browser available for retry.
+The internal ID-based application entry point remains for compatibility, while
+the normal UI has no ID input. The native regression fixture is available through
+`../scripts/dev.sh test --design-browser --trace-network --timeout 600 --output /tmp/blacksmith-browser`.
 
 Cloud Storage now requires an active Design. Selecting an empty tile and either
 Cloud Storage palette entry opens one native scrollable JSON editor. Save configuration

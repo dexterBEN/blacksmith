@@ -12,6 +12,7 @@ import '../lib/prototypes/isometric_3d/resource_visuals_3d.dart';
 import '../lib/prototypes/isometric_3d/workspace_3d.dart';
 import 'speed_dial_checks.dart';
 import 'workspace_test_input.dart';
+import '../lib/prototypes/isometric_3d/design_browser_3d.dart';
 import 'isometric_3d_framing_checks.dart';
 
 Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
@@ -58,7 +59,9 @@ Future<void> checkWorkspace(Node scene, IsomapGridBloc grid, DesignCubit design,
     await workspaceClick(
         scene,
         scene
-            .getNodeT<Button>('DesignLayer/DesignControls/Shade/Dialog/Cancel')!
+            .getNodeT<Button>(name == 'OpenDesign'
+                ? DesignBrowser3D.cancel
+                : 'DesignLayer/DesignControls/Shade/Dialog/Cancel')!
             .getGlobalRect()
             .getCenter());
     _check(!design.state.modalOpen && design.state.active == active,

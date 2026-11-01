@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Theme" path="res://scenes/isometric_3d/workspace_dark.tres" id="1_theme"]
+
+[ext_resource type="PackedScene" path="res://scenes/isometric_3d/design_browser.tscn" id="2_browser"]
 
 [node name="DesignControls" type="Control"]
 layout_mode = 3
@@ -50,3 +52,5 @@ text = "Cancel"
 [node name="Create" type="Button" parent="Shade/Dialog"]
 text = "Create"
 disabled = true
+
+[node name="DesignBrowser" parent="." instance=ExtResource("2_browser")]
