@@ -1,0 +1,216 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="StyleBox" path="res://scenes/isometric_3d/modal_row.tres" id="1_row"]
+[ext_resource type="StyleBox" path="res://scenes/isometric_3d/modal_row_selected.tres" id="2_selected"]
+[ext_resource type="StyleBox" path="res://scenes/isometric_3d/modal_primary.tres" id="3_primary"]
+[ext_resource type="Texture2D" path="res://scenes/isometric_3d/icons/resources.svg" id="4_icon"]
+
+[node name="DesignBrowser" type="Control"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 0
+
+[node name="Shade" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 0
+color = Color(0.005, 0.012, 0.028, 0.68)
+
+[node name="Dialog" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_right = 600.0
+offset_bottom = 560.0
+mouse_filter = 0
+
+[node name="Content" type="VBoxContainer" parent="Dialog"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="Heading" type="HBoxContainer" parent="Dialog/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Icon" type="TextureRect" parent="Dialog/Content/Heading"]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+texture = ExtResource("4_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Title" type="Label" parent="Dialog/Content/Heading"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Open Design"
+theme_override_font_sizes/font_size = 22
+mouse_filter = 2
+
+[node name="Close" type="Button" parent="Dialog/Content/Heading"]
+custom_minimum_size = Vector2(36, 36)
+layout_mode = 2
+text = "×"
+tooltip_text = "Cancel opening a Design"
+
+[node name="Description" type="Label" parent="Dialog/Content"]
+layout_mode = 2
+text = "Select a design to open."
+mouse_filter = 2
+
+[node name="Search" type="LineEdit" parent="Dialog/Content"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+placeholder_text = "Search designs…"
+clear_button_enabled = true
+max_length = 200
+
+[node name="Scroll" type="ScrollContainer" parent="Dialog/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="Rows" type="VBoxContainer" parent="Dialog/Content/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="Status" type="Label" parent="Dialog/Content"]
+layout_mode = 2
+text = "Loading designs…"
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Recovery" type="HBoxContainer" parent="Dialog/Content"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Retry" type="Button" parent="Dialog/Content/Recovery"]
+layout_mode = 2
+text = "Retry"
+visible = false
+
+[node name="NewDesign" type="Button" parent="Dialog/Content/Recovery"]
+layout_mode = 2
+text = "New Design"
+visible = false
+
+[node name="Pagination" type="HBoxContainer" parent="Dialog/Content"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Count" type="Label" parent="Dialog/Content/Pagination"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+text = "0 designs available"
+
+[node name="Previous" type="Button" parent="Dialog/Content/Pagination"]
+layout_mode = 2
+text = "Previous"
+visible = false
+
+[node name="Next" type="Button" parent="Dialog/Content/Pagination"]
+layout_mode = 2
+text = "Next"
+visible = false
+
+[node name="Discard" type="CheckButton" parent="Dialog/Content"]
+layout_mode = 2
+visible = false
+text = "Replace unsaved placements after a successful load"
+tooltip_text = "Your current workspace is preserved unless the selected Design loads successfully."
+
+[node name="Feedback" type="Label" parent="Dialog/Content"]
+layout_mode = 2
+visible = false
+custom_minimum_size = Vector2(0, 42)
+theme_override_colors/font_color = Color(1, 0.65, 0.5, 1)
+autowrap_mode = 3
+max_lines_visible = 3
+text_overrun_behavior = 3
+mouse_filter = 2
+
+[node name="Footer" type="HBoxContainer" parent="Dialog/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Spacer" type="Control" parent="Dialog/Content/Footer"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Cancel" type="Button" parent="Dialog/Content/Footer"]
+custom_minimum_size = Vector2(96, 40)
+layout_mode = 2
+text = "Cancel"
+
+[node name="Open" type="Button" parent="Dialog/Content/Footer"]
+custom_minimum_size = Vector2(148, 40)
+layout_mode = 2
+text = "Open Design"
+disabled = true
+theme_override_styles/normal = ExtResource("3_primary")
+theme_override_styles/hover = ExtResource("3_primary")
+
+[node name="RowTemplate" type="Button" parent="."]
+visible = false
+custom_minimum_size = Vector2(0, 72)
+toggle_mode = true
+theme_override_styles/normal = ExtResource("1_row")
+theme_override_styles/hover = ExtResource("1_row")
+theme_override_styles/pressed = ExtResource("2_selected")
+theme_override_styles/hover_pressed = ExtResource("2_selected")
+
+[node name="Margin" type="MarginContainer" parent="RowTemplate"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_bottom = 10
+mouse_filter = 2
+
+[node name="Content" type="HBoxContainer" parent="RowTemplate/Margin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 16
+
+[node name="Icon" type="TextureRect" parent="RowTemplate/Margin/Content"]
+layout_mode = 2
+custom_minimum_size = Vector2(28, 28)
+size_flags_vertical = 4
+mouse_filter = 2
+texture = ExtResource("4_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Labels" type="VBoxContainer" parent="RowTemplate/Margin/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Name" type="Label" parent="RowTemplate/Margin/Content/Labels"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+clip_text = true
+text_overrun_behavior = 3
+mouse_filter = 2
+
+[node name="Updated" type="Label" parent="RowTemplate/Margin/Content/Labels"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.68, 0.76, 0.88, 1)
+mouse_filter = 2

@@ -175,8 +175,13 @@ configured resources and retains transitional metadata Save for older unconfigur
 local snapshots. A lost configured-write response exposes **Check Save**, which
 reconciles the original Resource UUID without another write. Closing the form keeps
 this session guard; no durable journal is provided for a crash during an unknown write.
-Use **Copy ID**, completely quit, relaunch, then **Open** and paste that ID to restore
-the saved cubes. Unsaved local changes require confirmation before Open replaces them.
+Use **Open** to browse the Designs returned by the backend, search by name, select
+a row and restore its saved cubes. The browser shows available update dates, sorts
+recent Designs first, and renders 50 rows per page. Copy ID remains available for
+diagnostics; normal opening requires no identifier input. Unsaved local changes
+require confirmation, and the current workspace is replaced only after a successful
+canonical load. Loading, empty results and errors stay inside the browser with
+Cancel, New Design or Retry as appropriate.
 See [the Dart workflow](frontend/src/README.md) for the isolated persistence test.
 
 Prepare the Dart sources and generated bindings once, with the existing compatible

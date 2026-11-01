@@ -14,6 +14,8 @@ import '../lib/domain/bloc/design/design_cubit.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../lib/domain/models/design.dart';
+import '../lib/domain/models/design_summary.dart';
+import '../lib/prototypes/isometric_3d/design_browser_3d.dart';
 import '../lib/domain/models/grid_position.dart';
 import '../lib/domain/models/persisted_resource.dart';
 import '../lib/domain/models/resource_kind.dart';
@@ -42,6 +44,9 @@ class _Designs extends DesignRepository {
     return createResult.future;
   }
 
+  @override
+  Future<List<DesignSummary>> listDesigns() async =>
+      [const DesignSummary(id: _id, name: 'Restored Design')];
   @override
   Future<Design> getById(String id) {
     reads++;
@@ -243,13 +248,13 @@ void afterStartup() {
       await click('$dialog/Cancel');
 
       await click(action('OpenDesign'));
-      await click('$dialog/Cancel');
+      await click(DesignBrowser3D.cancel);
       _check(_designs.reads == 0, 'Cancel Open does not start a read.');
       empty(initial: true);
       await click(action('OpenDesign'));
-      enter(_id);
+      await selectDesignInBrowser(scene, _design, _id);
       await _pause();
-      await click('$dialog/Create');
+      await click(DesignBrowser3D.confirm);
       await _pause();
       empty(initial: true);
       _designs.readResult
@@ -257,18 +262,18 @@ void afterStartup() {
       await _until(() => _design.state.status == DesignStatus.failure);
       _check(
           scene
-              .getNodeT<Label>('$dialog/Feedback')!
+              .getNodeT<Label>('${DesignBrowser3D.content}/Feedback')!
               .getText()
               .contains('not found'),
           'Open failure retains the existing visible feedback.');
       empty(initial: true);
-      await click('$dialog/Cancel');
+      await click(DesignBrowser3D.cancel);
 
       _designs.readResult = async.Completer<Design>();
       await click(action('OpenDesign'));
-      enter(_id);
+      await selectDesignInBrowser(scene, _design, _id);
       await _pause();
-      await click('$dialog/Create');
+      await click(DesignBrowser3D.confirm);
       _designs.readResult
           .complete(const Design(id: _id, name: 'Restored Design'));
       await _until(() => _resources.reads == 1);
@@ -329,13 +334,13 @@ void afterStartup() {
       await dismissWorkspaceMenus(scene);
       final beforeReplace = _grid.state;
       await click(action('OpenDesign'));
-      enter(_id);
+      await selectDesignInBrowser(scene, _design, _id);
       await _pause();
       _check(
           _design.state.requiresDiscard &&
-              button('$dialog/Create').isDisabled(),
+              button(DesignBrowser3D.confirm).isDisabled(),
           'Unsaved-change consent still protects active placements.');
-      await click('$dialog/Cancel');
+      await click(DesignBrowser3D.cancel);
       _check(_grid.state == beforeReplace && _design.state.active?.id == _id,
           'Canceled replacement preserves the Design and unsaved grid.');
       final clipboard = DisplayServer.singleton.clipboardGet();

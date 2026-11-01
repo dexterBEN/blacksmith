@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:godot_dart/godot_dart.dart';
 import '../../domain/bloc/design/design_cubit.dart';
 import 'workspace_3d.dart';
+import 'design_browser_3d.dart';
 import 'resource_configuration_editor_3d.dart';
 
 /// Presentation only: native controls and the scene-owned state subscription.
@@ -18,7 +19,9 @@ class DesignEditor3D {
         .getNodeT<Button>('${Workspace3D.header}/Rows/Actions/SaveDesign')!;
     _copy = owner
         .getNodeT<Button>('${Workspace3D.header}/Rows/Actions/CopyDesignId')!;
-    _open.pressed.connect(owner, () => _cubit?.openExisting());
+    _open.pressed.connect(owner, () {
+      if (_cubit != null) async.unawaited(_cubit.browseDesigns());
+    });
     _save.pressed.connect(owner, () {
       if (_cubit != null) async.unawaited(_cubit.save());
     });
@@ -40,13 +43,7 @@ class DesignEditor3D {
       final cubit = _cubit;
       if (cubit != null) async.unawaited(cubit.submit());
     });
-    _name.textChanged.connect(owner, (name) {
-      if (_cubit?.state.mode == DesignDialogMode.open) {
-        _cubit?.changeOpenId(name);
-      } else {
-        _cubit?.changeName(name);
-      }
-    });
+    _name.textChanged.connect(owner, (name) => _cubit?.changeName(name));
     _name.textSubmitted.connect(owner, (_) {
       final cubit = _cubit;
       if (cubit != null && cubit.state.canSubmit) {
@@ -56,6 +53,7 @@ class DesignEditor3D {
     _discard.toggled
         .connect(owner, (approved) => _cubit?.approveDiscard(approved));
     _configuration = ResourceConfigurationEditor3D(owner, _cubit);
+    _browser = DesignBrowser3D(owner, _cubit);
     _subscription = _cubit?.stream.listen(_render);
     _render(_cubit?.state ?? const DesignState());
     if (_cubit == null) {
@@ -75,11 +73,14 @@ class DesignEditor3D {
   late final LineEdit _name;
   late final CheckButton _discard;
   late final ResourceConfigurationEditor3D _configuration;
+  late final DesignBrowser3D _browser;
   bool _wasOpen = false;
   bool _disposed = false;
   bool get isOpen =>
       (_cubit?.state.modalOpen ?? false) || (_cubit?.state.pending ?? false);
-  bool handleInput(InputEvent? event) => _configuration.handleInput(event);
+  bool handleInput(InputEvent? event) => _browser.isOpen
+      ? _browser.handleInput(event)
+      : _configuration.handleInput(event);
 
   void _render(DesignState state) {
     if (_disposed) return;
@@ -103,19 +104,12 @@ class DesignEditor3D {
     _active.setTooltipText(state.active == null
         ? _active.getText()
         : '${_active.getText()}\nDesign ID: ${state.active!.id}');
-    _shade.setVisible(state.dialogOpen);
+    final creating = state.dialogOpen && !opening;
+    _shade.setVisible(creating);
+    _browser.render(state);
     _configuration.render(state);
     _onModalChanged(blocked);
-    _dialog
-        .getNodeT<Label>('Title')!
-        .setText(opening ? 'Open an existing Design' : 'Create a new Design');
-    _dialog
-        .getNodeT<Label>('NameLabel')!
-        .setText(opening ? 'Design ID' : 'Design name (1–200 characters)');
-    _name.setPlaceholder(
-        opening ? 'Paste the saved Design ID' : 'My infrastructure design');
-    final input = opening ? state.openId : state.name;
-    if (_name.getText() != input) _name.setText(input);
+    if (_name.getText() != state.name) _name.setText(state.name);
     _name.setEditable(!state.pending);
     _discard
       ..setText(opening
@@ -142,13 +136,14 @@ class DesignEditor3D {
                 : (opening
                     ? 'Loads all supported Cloud Storage placements and existing configurations. No GCP operations.'
                     : 'The new Design starts empty. Save Cloud Storage placements explicitly; no bucket settings are invented.')));
-    if (state.dialogOpen && !_wasOpen) _name.grabFocus();
-    if (!state.dialogOpen && _wasOpen) _new.grabFocus();
-    _wasOpen = state.dialogOpen;
+    if (creating && !_wasOpen) _name.grabFocus();
+    if (!state.modalOpen && _wasOpen) _new.grabFocus();
+    _wasOpen = creating;
   }
 
   void resize(Vector2 viewport) {
     _configuration.resize(viewport);
+    _browser.resize();
     final width = math.min(520.0, viewport.x - 32);
     const height = 300.0;
     _dialog

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../domain/models/design.dart';
+import '../../domain/models/design_summary.dart';
 
 /// Only safe, locally authored messages cross the data/UI boundary.
 class DesignFailure implements Exception {
@@ -74,7 +75,45 @@ class DesignRepository {
     return design;
   }
 
-  /// Read-back for integration verification; no Design browser is introduced.
+  /// Existing lightweight backend collection. No per-Design resource reads.
+  Future<List<DesignSummary>> listDesigns() async {
+    final response = await _send(
+        () => _client.get(Uri.parse('$_baseUrl/designs')),
+        creating: false);
+    if (response.statusCode != 200) {
+      throw DesignFailure(
+          'Unable to list Designs (HTTP ${response.statusCode}).');
+    }
+    try {
+      final data = jsonDecode(response.body);
+      if (data is! List) throw const FormatException();
+      final ids = <String>{};
+      final entries = <DesignSummary>[];
+      for (final item in data) {
+        if (item is! Map<String, dynamic> ||
+            item['id'] is! String ||
+            !_id.hasMatch(item['id'] as String) ||
+            item['id'] == '00000000-0000-0000-0000-000000000000' ||
+            item['name'] != null && item['name'] is! String) {
+          throw const FormatException();
+        }
+        final id = (item['id'] as String).toLowerCase();
+        final name = (item['name'] as String? ?? '').trim();
+        if (!ids.add(id) || name.length > 200) throw const FormatException();
+        final date = item['updatedAtUtc'];
+        entries.add(DesignSummary(
+            id: id,
+            name: name,
+            updatedAtUtc:
+                date is String ? DateTime.tryParse(date)?.toUtc() : null));
+      }
+      return List.unmodifiable(entries);
+    } on FormatException {
+      throw const DesignFailure('The backend returned an invalid Design list.');
+    }
+  }
+
+  /// Used by the existing atomic open/hydration workflow.
   Future<Design> getById(String id) async {
     if (!_id.hasMatch(id)) {
       throw const DesignFailure('Invalid Design identifier.');

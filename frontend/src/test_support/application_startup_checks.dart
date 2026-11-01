@@ -13,6 +13,7 @@ import '../lib/data/repositories/design_repository.dart';
 import '../lib/data/repositories/resource_repository.dart';
 import '../lib/domain/bloc/design/design_cubit.dart';
 import '../lib/domain/models/design.dart';
+import '../lib/domain/models/design_summary.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../lib/domain/models/grid_position.dart';
@@ -25,10 +26,16 @@ import 'workspace_checks.dart';
 class _FixtureDesignRepository extends DesignRepository {
   _FixtureDesignRepository() : super(baseUrl: 'http://forbidden.invalid');
   int calls = 0;
+  Design? created;
+  @override
+  Future<List<DesignSummary>> listDesigns() async => [
+        if (created != null) DesignSummary(id: created!.id, name: created!.name)
+      ];
   @override
   Future<Design> create(String name) async {
     calls++;
-    return Design(id: '12345678-1234-1234-1234-123456789abc', name: name);
+    return created =
+        Design(id: '12345678-1234-1234-1234-123456789abc', name: name);
   }
 }
 

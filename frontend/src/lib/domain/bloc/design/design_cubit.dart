@@ -5,6 +5,7 @@ import 'package:equatable/equatable.dart';
 import '../../../data/repositories/design_repository.dart';
 import '../../../data/repositories/resource_repository.dart';
 import '../../models/design.dart';
+import '../../models/design_browser_state.dart';
 import '../../models/grid_position.dart';
 import '../../models/persisted_resource.dart';
 import '../../models/resource_kind.dart';
@@ -30,6 +31,7 @@ class DesignState extends Equatable {
       this.discardApproved = false,
       this.mode = DesignDialogMode.create,
       this.openId = '',
+      this.browser = const DesignBrowserState(),
       this.canSave = false,
       this.saved = false,
       this.saveUncertain = false,
@@ -44,6 +46,7 @@ class DesignState extends Equatable {
   final bool requiresDiscard, discardApproved;
   final DesignDialogMode mode;
   final String openId;
+  final DesignBrowserState browser;
   final bool canSave, saved, saveUncertain;
   final String persistenceMessage;
   bool get pending =>
@@ -55,7 +58,11 @@ class DesignState extends Equatable {
       !pending &&
       (mode == DesignDialogMode.create
           ? Design.validateName(name) == null
-          : PersistedResource.validId(openId.trim())) &&
+          : PersistedResource.validId(openId.trim()) &&
+              (browser.status == DesignListStatus.idle ||
+                  browser.status == DesignListStatus.ready &&
+                      browser.pageEntries
+                          .any((d) => d.id == openId.toLowerCase()))) &&
       (!requiresDiscard || discardApproved);
 
   DesignState copyWith(
@@ -70,6 +77,7 @@ class DesignState extends Equatable {
           bool? discardApproved,
           DesignDialogMode? mode,
           String? openId,
+          DesignBrowserState? browser,
           bool? canSave,
           bool? saved,
           bool? saveUncertain,
@@ -87,6 +95,7 @@ class DesignState extends Equatable {
           discardApproved: discardApproved ?? this.discardApproved,
           mode: mode ?? this.mode,
           openId: openId ?? this.openId,
+          browser: browser ?? this.browser,
           canSave: canSave ?? this.canSave,
           saved: saved ?? this.saved,
           saveUncertain: saveUncertain ?? this.saveUncertain,
@@ -103,6 +112,7 @@ class DesignState extends Equatable {
         discardApproved,
         mode,
         openId,
+        browser,
         canSave,
         saved,
         saveUncertain,
@@ -126,6 +136,7 @@ class DesignCubit extends Cubit<DesignState> {
   }
   final DesignRepository _repository;
   final ResourceRepository? _resources;
+  int _listGeneration = 0;
   final IsomapGridBloc _grid;
   late final StreamSubscription<IsomapGridState> _subscription;
   late Map<GridPos, PlacedResource> _observed;
@@ -257,9 +268,11 @@ class DesignCubit extends Cubit<DesignState> {
 
   void open() {
     if (isClosed || state.pending || state.configurationDraft != null) return;
+    _listGeneration++;
     emit(state.copyWith(
         dialogOpen: true,
         name: '',
+        browser: const DesignBrowserState(),
         error: null,
         mode: DesignDialogMode.create,
         status: DesignStatus.editing,
@@ -268,6 +281,8 @@ class DesignCubit extends Cubit<DesignState> {
     _feedback();
   }
 
+  /// Internal ID-based loading remains available for existing application callers.
+  /// The normal UI uses browseDesigns and can select only returned metadata.
   void openExisting() {
     if (isClosed ||
         state.pending ||
@@ -275,15 +290,103 @@ class DesignCubit extends Cubit<DesignState> {
         _resources == null) {
       return;
     }
+    _listGeneration++;
     emit(state.copyWith(
         dialogOpen: true,
         openId: '',
+        browser: const DesignBrowserState(),
         error: null,
         mode: DesignDialogMode.open,
         status: DesignStatus.editing,
         requiresDiscard: _dirty,
         discardApproved: false));
     _feedback();
+  }
+
+  Future<void> browseDesigns() async {
+    if (isClosed ||
+        state.pending ||
+        state.configurationDraft != null ||
+        _resources == null ||
+        state.dialogOpen) {
+      return;
+    }
+    openExisting();
+    await refreshDesigns();
+  }
+
+  Future<void> refreshDesigns() async {
+    if (isClosed ||
+        !state.dialogOpen ||
+        state.mode != DesignDialogMode.open ||
+        state.pending ||
+        state.browser.status == DesignListStatus.loading) {
+      return;
+    }
+    final generation = ++_listGeneration;
+    emit(state.copyWith(
+        openId: '',
+        discardApproved: false,
+        browser: state.browser.copyWith(
+            status: DesignListStatus.loading, entries: const [], page: 0)));
+    try {
+      final entries = await _repository.listDesigns();
+      if (!_currentList(generation)) return;
+      emit(state.copyWith(
+          browser: state.browser.copyWith(
+              status: DesignListStatus.ready,
+              entries: DesignBrowserState.sorted(entries))));
+    } on Exception catch (failure) {
+      if (!_currentList(generation)) return;
+      emit(state.copyWith(
+          browser: state.browser.copyWith(
+              status: DesignListStatus.failure,
+              error: failure is DesignFailure
+                  ? failure.message
+                  : 'Unable to load Designs. Please retry.')));
+    }
+  }
+
+  bool _currentList(int generation) =>
+      !isClosed &&
+      generation == _listGeneration &&
+      state.dialogOpen &&
+      state.mode == DesignDialogMode.open;
+
+  void searchDesigns(String value) {
+    if (!_editableBrowser) return;
+    emit(state.copyWith(
+        openId: '',
+        discardApproved: false,
+        browser: state.browser
+            .copyWith(query: value, page: 0, error: state.browser.error)));
+  }
+
+  void changeDesignPage(int page) {
+    if (!_editableBrowser || page < 0 || page >= state.browser.pageCount) {
+      return;
+    }
+    emit(state.copyWith(
+        openId: '',
+        discardApproved: false,
+        browser: state.browser.copyWith(page: page)));
+  }
+
+  bool get _editableBrowser =>
+      !isClosed &&
+      state.dialogOpen &&
+      state.mode == DesignDialogMode.open &&
+      !state.pending &&
+      state.browser.status != DesignListStatus.idle;
+
+  void selectDesign(String id) {
+    if (!_editableBrowser ||
+        state.browser.status != DesignListStatus.ready ||
+        !state.browser.pageEntries.any((d) => d.id == id)) {
+      return;
+    }
+    emit(state.copyWith(
+        openId: id, discardApproved: false, status: DesignStatus.editing));
   }
 
   void changeName(String value) {
@@ -295,6 +398,10 @@ class DesignCubit extends Cubit<DesignState> {
   }
 
   void changeOpenId(String value) {
+    if (state.browser.status != DesignListStatus.idle) {
+      selectDesign(value.toLowerCase());
+      return;
+    }
     if (isClosed || !state.dialogOpen || state.pending) return;
     emit(state.copyWith(
         openId: value,
@@ -312,13 +419,23 @@ class DesignCubit extends Cubit<DesignState> {
 
   void cancel() {
     if (isClosed || state.pending) return;
-    emit(state.copyWith(dialogOpen: false, status: DesignStatus.editing));
+    _listGeneration++;
+    emit(state.copyWith(
+        dialogOpen: false,
+        status: DesignStatus.editing,
+        openId: '',
+        browser: const DesignBrowserState()));
     _feedback();
   }
 
   Future<void> submit() async {
     if (isClosed || !state.dialogOpen || state.pending) return;
-    if (state.mode == DesignDialogMode.open) return _load();
+    if (state.mode == DesignDialogMode.open) {
+      if (state.browser.status != DesignListStatus.idle && !state.canSubmit) {
+        return;
+      }
+      return _load();
+    }
     final invalid = Design.validateName(state.name);
     final placements = _grid.state.resources.isNotEmpty;
     if (invalid != null || placements && !state.discardApproved) {
@@ -885,6 +1002,7 @@ class DesignCubit extends Cubit<DesignState> {
 
   @override
   Future<void> close() async {
+    _listGeneration++;
     await _subscription.cancel();
     return super.close();
   }

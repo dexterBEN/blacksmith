@@ -31,6 +31,8 @@ def main():
                         help='Maximum seconds per Godot process (cold Dart compilation can be slow).')
     parser.add_argument('--application', action='store_true',
                         help='Validate production bootstrap/default 3D, then capture clean 3D and explicit 2D launches.')
+    parser.add_argument('--design-browser', action='store_true',
+                        help='Validate the Open Design browser with controlled metadata HTTP, lifecycle and native screenshots.')
     parser.add_argument('--empty-workspace', action='store_true',
                         help='Exercise no-Design startup, asynchronous creation/open and active workspace transitions without HTTP.')
     parser.add_argument('--design', action='store_true',
@@ -50,8 +52,8 @@ def main():
     parser.add_argument('--local-editor', action='store_true',
                         help='For a deployment fixture, import with the real host run_local.sh launcher before the player cycles (no deployment token required).')
     args = parser.parse_args()
-    if sum(bool(mode) for mode in [args.design, args.application, args.empty_workspace, args.persistence, args.deployment]) > 1:
-        parser.error('Choose one application, empty-workspace, design, persistence or deployment mode.')
+    if sum(bool(mode) for mode in [args.design, args.application, args.design_browser, args.empty_workspace, args.persistence, args.deployment]) > 1:
+        parser.error('Choose one application, design-browser, empty-workspace, design, persistence or deployment mode.')
     if args.design_live and not args.design:
         parser.error('--design-live requires --design and a dedicated test database.')
     if args.persistence_phase and not (args.persistence or args.deployment):
@@ -102,14 +104,14 @@ def main():
     shutil.copytree(source / 'assets/models/resource_cubes',
                     project / 'assets/models/resource_cubes',
                     ignore=shutil.ignore_patterns('*.import', '*.uid'))
-    if not args.application and not args.empty_workspace and not args.design and not (args.persistence or args.deployment):
+    if not args.application and not args.design_browser and not args.empty_workspace and not args.design and not (args.persistence or args.deployment):
         (project / 'src/main.dart').write_text(
             "import 'test_support/godot_smoke_main.dart' as smoke;\n"
             "void main() => smoke.main();\n")
     # Confine Godot's editor/runtime caches; never copy env or credential files.
     env = isolated_environment(project)
     # Clean application launches must not depend on any old fixture environment.
-    if args.application or args.empty_workspace or args.design or args.persistence or args.deployment:
+    if args.application or args.design_browser or args.empty_workspace or args.design or args.persistence or args.deployment:
         env = {key: value for key, value in env.items()
                if not key.startswith('BLACKSMITH_')}
     if args.design:
@@ -117,7 +119,7 @@ def main():
         if args.design_live:
             env['BLACKSMITH_BACKEND_URL'] = args.design_live
             env['BLACKSMITH_DESIGN_LIVE'] = '1'
-    if args.application or args.empty_workspace:
+    if args.application or args.design_browser or args.empty_workspace:
         env['BLACKSMITH_WORKSPACE_OUTPUT'] = str(output)
     if journey:
         env['BLACKSMITH_BACKEND_URL'] = journey
@@ -128,7 +130,7 @@ def main():
     def run(name, arguments, marker, local=False, headless=True, trace=False, launcher=False):
         log = output / f'{name}.log'
         run_env = env.copy()
-        if not args.application and not args.empty_workspace and not args.design and not (args.persistence or args.deployment):
+        if not args.application and not args.design_browser and not args.empty_workspace and not args.design and not (args.persistence or args.deployment):
             run_env['BLACKSMITH_SMOKE_LOCAL'] = '1' if local else '0'
         command = [args.godot, *(['--headless'] if headless else []),
                    '--path', str(project), *arguments]
@@ -154,7 +156,7 @@ def main():
                                 'SCRIPT ERROR:', 'SHADER ERROR:'))
                for line in contents.splitlines()):
             raise RuntimeError(f'{name} Dart/native failure; inspect {log}')
-        if (args.application or args.empty_workspace or args.design or args.persistence or args.deployment) and (any(line.startswith(
+        if (args.application or args.design_browser or args.empty_workspace or args.design or args.persistence or args.deployment) and (any(line.startswith(
                 ('ERROR:', 'SCRIPT ERROR:', 'SHADER ERROR:'))
                 for line in contents.splitlines()) or
                 'ObjectDB instances leaked at exit' in contents):
@@ -181,6 +183,26 @@ def main():
                 raise RuntimeError(f'{name} attempted an outgoing IP connection; inspect {network}')
         print(f'{name}: PASS ({marker})', flush=True)
         return contents
+
+    if args.design_browser:
+        graphical = ['--display-driver', 'x11', '--rendering-method',
+                     'gl_compatibility', '--resolution', '1600x900']
+        run('browser-import', ['--editor', '--import', *graphical],
+            '[main] Dart scripts attached.', headless=False)
+        original_main = (project / 'src/main.dart').read_bytes()
+        (project / 'src/production_main.dart').write_bytes(original_main)
+        (project / 'src/main.dart').write_text(
+            "import 'production_main.dart' as application;\n"
+            "import 'test_support/design_browser_checks.dart' as checks;\n"
+            'void main() { checks.beforeStartup(); application.main(); checks.afterStartup(); }\n')
+        try:
+            run('browser-interactions', [*graphical, '--max-fps', '60'],
+                'BLACKSMITH_ISSUE81_BROWSER_PASSED', headless=False,
+                trace=args.trace_network)
+        finally:
+            (project / 'src/main.dart').write_bytes(original_main)
+            (project / 'src/production_main.dart').unlink()
+        return
 
     if args.empty_workspace:
         graphical = ['--display-driver', 'x11', '--rendering-method',
