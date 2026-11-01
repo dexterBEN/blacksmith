@@ -142,15 +142,16 @@ void afterStartup() {
         }
       }
 
-      await library();
-      for (final kind in ResourceKind.values) {
-        final button = _button(scene, kind);
-        _check(button.isDisabled(), 'Placement requires a selected tile.');
-        await _click(scene, button.getGlobalRect().getCenter());
-      }
-      _check(bloc.state.selected == null && bloc.state.tiles.isEmpty,
-          'Disabled buttons cannot place or select.');
-      await openWorkspaceAction(scene, Workspace3D.libraryToggle);
+      _check(
+          !scene.getNodeT<Node3D>('GridRoot')!.isVisibleInTree() &&
+              scene.getNodeT<Node3D>('GridRoot')!.getChildCount() == 0 &&
+              !scene
+                  .getNodeT<Control>(Workspace3D.speedDial)!
+                  .isVisibleInTree() &&
+              scene
+                  .getNodeT<Control>(Workspace3D.emptyState)!
+                  .isVisibleInTree(),
+          'Fresh startup is a non-editable empty workspace, with no tile allocation.');
       await checkWorkspace(scene, bloc, di.sl<DesignCubit>(),
           tileEvents: () => _observer.tileEvents,
           placementEvents: () => _observer.placementEvents);

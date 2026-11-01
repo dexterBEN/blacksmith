@@ -56,6 +56,8 @@ class IsomapGridBloc extends Bloc<IsomapGridEvent, IsomapGridState> {
       } on ArgumentError {/* Do not overwrite an incompatible snapshot. */}
       event.applied.complete(accepted);
     });
+    on<ClearTileSelection>(
+        (event, emit) => emit(state.copyWith(clearSelection: true)));
     on<TileClicked>(_onTileClicked);
     on<PlaceResource>(_onPlaceResource);
     on<ResetGridForNewDesign>((event, emit) =>

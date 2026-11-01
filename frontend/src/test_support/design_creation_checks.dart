@@ -13,6 +13,7 @@ import '../lib/data/repositories/cloud_storage_repository.dart';
 import '../lib/data/services/cloud_services_api.dart';
 import '../lib/domain/bloc/design/design_cubit.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
+import '../lib/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../lib/domain/models/grid_position.dart';
 import '../lib/domain/models/resource_kind.dart';
 import '../lib/prototypes/isometric_3d/grid_layout.dart';
@@ -150,6 +151,16 @@ void afterStartup() {
       }
 
       Future<void> place() async {
+        if (cubit.state.active == null) {
+          // Legacy unattached data exercises existing discard protection without
+          // allowing the empty welcome screen to issue placement commands.
+          final snapshot = RestoreDesignResources(
+              {const GridPos(0, 0): ResourceKind.computeEngine});
+          grid.add(snapshot);
+          _check(
+              await snapshot.applied.future, 'Seed a legacy unsaved snapshot.');
+          return;
+        }
         await select(const GridPos(0, 0));
         if (!scene.getNodeT<Control>(Workspace3D.sidebar)!.isVisibleInTree()) {
           await openWorkspaceAction(scene, Workspace3D.libraryToggle);

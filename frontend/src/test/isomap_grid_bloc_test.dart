@@ -54,6 +54,20 @@ void main() {
     expect(bloc.state.tiles, isEmpty);
   });
 
+  test('clearing selection retains placements and is idempotent', () async {
+    await select(const GridPos(1, 2));
+    await place(ResourceKind.computeEngine);
+    final resources = bloc.state.resources;
+    bloc.add(const ClearTileSelection());
+    await until((state) => state.selected == null);
+    expect(bloc.state.resources, resources);
+    bloc.add(const PlaceResource(ResourceKind.cloudVpn));
+    bloc.add(const ClearTileSelection());
+    await tick();
+    expect(bloc.state.selected, isNull);
+    expect(bloc.state.resources, resources);
+  });
+
   test('invalid tile events preserve a valid selection', () async {
     await select(const GridPos(1, 2));
     for (final position in [

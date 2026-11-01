@@ -48,7 +48,16 @@ one row; long status text elides with the complete text and Design ID in a toolt
 The toolbar reserves no viewport height. Decorative regions pass input through;
 actual action buttons block tile picking, including when disabled.
 
-A bottom-left floating Speed Dial starts collapsed
+Fresh startup shows **No design open** over the background. `DesignState.active`
+is the visibility/input authority: no tile nodes are created and no tile picking
+or resource action is possible until a Design is active. New/Open use their
+existing asynchronous workflows; failure/cancel never reveals a fallback grid.
+An active Design can show the board without a persisted ID. Save and Copy ID
+retain their own target/eligibility rules. Clearing active state hides the board
+and design overlays and clears selection without discarding resource data.
+There is no new Close Design command.
+
+For an active Design, a bottom-left floating Speed Dial starts collapsed
 as **+**; expanding it shows **Resources** and **Inspect** in one upward stack.
 Its 160 ms animation is authored in the native `AnimationPlayer` scene.
 
@@ -64,6 +73,14 @@ that keeps the dialog open; an invalidated tile disables confirmation and shows
 feedback. Opening an existing Design/configuration modal hands control to it. Popup close returns focus to the main button. Selection/placement,
 configuration, persistence and deployment retain their existing state owners.
 The native window minimum remains 960 × 640; the map minimum is 480 × 320.
+
+Use `test --empty-workspace --trace-network` for the production bootstrap and
+welcome/lifecycle regression, with actual screenshots at **1600×900** (visual
+reference), 1152×648 and 960×640, controlled asynchronous repository results,
+frame checks against grid flashes and a clean uninstrumented startup.
+
+The isolated visual preview explicitly seeds a fixture-only active Design with
+no persisted ID; it does not bypass production lifecycle checks or call an API.
 
 Use `preview --toolbar-overlay --check` for real-window checks at 1152×648,
 960×640 and 1600×900, including full-window geometry, map centering, status
@@ -96,16 +113,18 @@ Separate clean launches still use
 the unchanged production entrypoint. The existing `--design --trace-network`
 scenario checks New Design dialog behavior without a live backend.
 
-Both commands use the production bootstrap. There is no dependency on
-`test_support/`, a test launcher, a test environment variable, backend services,
-database access or GCP credentials for local placement. Native libraries and
+Both commands use the production bootstrap with no dependency on `test_support/`,
+a test launcher or a test environment variable. The 3D welcome screen needs no
+backend; activating a Design uses the existing API/PostgreSQL flow. Subsequent
+local placement sends no HTTP request and requires no GCP credentials. Native libraries and
 package caches remain development prerequisites and are not committed.
 
 The 3D editor's **New Design** button uses the existing `POST /designs` API.
 Set `BLACKSMITH_BACKEND_URL` before launching Godot to override
 `http://localhost:5100`, for example when the backend runs at a Dev Container IP.
 The API and PostgreSQL must be running for this action; no GCP credentials are
-needed. Startup and local cube placement still work without a backend.
+needed. The welcome screen works without a backend. Activating a production Design
+uses the API; subsequent local cube placement requires no additional HTTP call.
 
 Names are trimmed and must have 1–200 UTF-16 code units, matching the backend.
 If the grid contains unsaved placements, explicitly confirm clearing them after

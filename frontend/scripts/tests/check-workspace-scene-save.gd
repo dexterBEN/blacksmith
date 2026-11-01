@@ -26,6 +26,15 @@ func _initialize():
 				scene.free()
 				quit(1)
 				return
+			var welcome = scene.get_node_or_null(prefix + "EmptyState")
+			var invalid_defaults = dial.visible or not welcome is Control or not welcome.visible
+			if path == SCENE:
+				invalid_defaults = invalid_defaults or scene.get_node("GridRoot").visible or scene.get_node("ResourceRoot").visible
+			if invalid_defaults:
+				push_error("Empty workspace defaults changed after editor save: " + path)
+				scene.free()
+				quit(1)
+				return
 			var saved = PackedScene.new()
 			var result = saved.pack(scene)
 			if result == OK:
@@ -35,5 +44,5 @@ func _initialize():
 				push_error("Could not save workspace regression fixture: " + path)
 				quit(1)
 				return
-	print("BLACKSMITH_WORKSPACE_SCENE_SAVE_PASSED cycles=2 viewport=true camera=true dial_margins=true")
+	print("BLACKSMITH_WORKSPACE_SCENE_SAVE_PASSED cycles=2 viewport=true camera=true dial_margins=true empty_defaults=true")
 	quit()

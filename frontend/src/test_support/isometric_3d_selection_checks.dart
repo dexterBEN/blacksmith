@@ -14,6 +14,9 @@ import '../lib/core/di/service_locator.dart' as di;
 import '../lib/data/repositories/cloud_storage_repository.dart';
 import '../lib/data/services/cloud_services_api.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_bloc.dart';
+import '../lib/domain/bloc/design/design_cubit.dart';
+import '../lib/data/repositories/design_repository.dart';
+import '../lib/domain/models/design.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_event.dart';
 import '../lib/domain/bloc/isomap_grid/isomap_grid_state.dart';
 import '../lib/domain/models/grid_position.dart';
@@ -75,6 +78,22 @@ class _ObservedBloc extends IsomapGridBloc {
   }
 }
 
+// Explicit visual-preview context. No production bypass or implicit Design.
+class _PreviewDesignRepository extends DesignRepository {
+  _PreviewDesignRepository() : super(baseUrl: 'http://forbidden.invalid');
+  @override
+  Future<Design> create(String name) async => Design(id: '', name: name);
+}
+
+class _PreviewDesignCubit extends DesignCubit {
+  _PreviewDesignCubit(DesignRepository repository, IsomapGridBloc grid)
+      : super(repository, grid) {
+    // ignore: invalid_use_of_visible_for_testing_member
+    emit(const DesignState(
+        active: Design(id: '', name: 'Local visual preview')));
+  }
+}
+
 class _LocalBlocObserver extends bloc_core.BlocObserver {
   IsomapGridBloc? created;
 
@@ -92,6 +111,8 @@ class SelectionFixture {
     _api = CloudServicesApi(baseUrl: 'http://fake.invalid', client: _client);
     _repository = _NoProvisioningRepository(_api);
     _bloc = _ObservedBloc();
+    _designRepository = _PreviewDesignRepository();
+    _design = _PreviewDesignCubit(_designRepository, _bloc);
     _register();
   }
 
@@ -99,6 +120,8 @@ class SelectionFixture {
   late final CloudServicesApi _api;
   late final _NoProvisioningRepository _repository;
   late final _ObservedBloc _bloc;
+  late final _PreviewDesignRepository _designRepository;
+  late final _PreviewDesignCubit _design;
   final _originalMaterialColors = <String, List<double>>{};
   bool _disposed = false;
 
@@ -209,7 +232,7 @@ class SelectionFixture {
     final scene = await check3DPlacement(tree, _bloc,
         restore: _bloc.restore,
         tileEvents: () => _bloc.tileEvents,
-        listeners: () => _bloc.listeners,
+        listeners: () => _bloc.listeners - 1,
         capture: capture);
     await checkSpeedDial(scene, _bloc,
         tileEvents: () => _bloc.tileEvents,
@@ -227,12 +250,15 @@ class SelectionFixture {
     di.sl.registerSingleton<CloudServicesApi>(_api);
     di.sl.registerSingleton<CloudStorageRepository>(_repository);
     di.sl.registerSingleton<IsomapGridBloc>(_bloc);
+    di.sl.registerSingleton<DesignCubit>(_design);
   }
 
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
     await di.sl.reset(dispose: false);
+    await _design.close();
+    _designRepository.close();
     await _bloc.close();
     _api.close();
   }
@@ -243,7 +269,8 @@ class SelectionFixture {
     viewport
       ..setDisableInput(false)
       ..call('notify_mouse_entered');
-    _check(_bloc.listeners == 1, 'One initial scene subscription.');
+    _check(_bloc.listeners == 2,
+        'One scene subscription plus the Design coordinator.');
     _check(_bloc.state.selected == null, 'No initial selection.');
 
     // Deliberately change names: picking must use logical coordinates.
@@ -356,7 +383,7 @@ class SelectionFixture {
       await _until(() =>
           tree.getCurrentScene() != null &&
           tree.getCurrentScene()!.getInstanceId() != previous &&
-          _bloc.listeners == 1);
+          _bloc.listeners == 2);
       await _pause();
       scene = tree.getCurrentScene()!;
       _check(!_bloc.isClosed, 'A scene must not close the shared BLoC.');
@@ -365,7 +392,7 @@ class SelectionFixture {
 
     // No scene listener may survive unload or receive a later state update.
     tree.unloadCurrentScene();
-    await _until(() => _bloc.listeners == 0);
+    await _until(() => _bloc.listeners == 1);
     _check(!_bloc.isClosed, 'Shared BLoC survives scene exit.');
     _bloc.add(const TileClicked(GridPos(2, 3)));
     await _until(() => _bloc.state.selected == const GridPos(2, 3));
@@ -384,8 +411,13 @@ class SelectionFixture {
       scene = tree.getCurrentScene()!;
       await _click(scene, _project(scene, const GridPos(1, 4)));
       final local = observer.created!;
-      await _until(() => local.state.selected == const GridPos(1, 4));
-      _checkHighlight(scene, const GridPos(1, 4));
+      _check(
+          local.state.selected == null &&
+              !scene.getNodeT<Node3D>('GridRoot')!.isVisibleInTree() &&
+              scene
+                  .getNodeT<Control>(Workspace3D.emptyState)!
+                  .isVisibleInTree(),
+          'Missing Design services leave the local fallback non-editable.');
       tree.unloadCurrentScene();
       await _until(() => local.isClosed);
     } finally {
@@ -394,13 +426,13 @@ class SelectionFixture {
     await di.sl.reset(dispose: false);
     _register();
     tree.changeSceneToFile('res://scenes/isometric_3d.tscn');
-    await _until(() => tree.getCurrentScene() != null && _bloc.listeners == 1);
+    await _until(() => tree.getCurrentScene() != null && _bloc.listeners == 2);
     await _pause();
     scene = tree.getCurrentScene()!;
     _checkHighlight(scene, const GridPos(2, 3));
     final beforeFinal = _bloc.tileEvents;
     await _click(scene, _project(scene, const GridPos(2, 3)));
-    _check(_bloc.tileEvents == beforeFinal + 1 && _bloc.listeners == 1,
+    _check(_bloc.tileEvents == beforeFinal + 1 && _bloc.listeners == 2,
         'Reopened scene must handle each click exactly once.');
     _check(
         _repository.calls == 0 &&

@@ -8,9 +8,11 @@ import 'workspace_layout.dart';
 class Workspace3D {
   Workspace3D(this._scene,
       {required void Function() configureStorage,
+      required bool Function() hasActiveDesign,
       required void Function() onResourcesOpened,
       required void Function() onResourcesClosed})
-      : _onResourcesOpened = onResourcesOpened,
+      : _hasActiveDesign = hasActiveDesign,
+        _onResourcesOpened = onResourcesOpened,
         _onResourcesClosed = onResourcesClosed {
     _button(speedToggle).pressed.connect(_scene, () {
       _closePanels(focusMain: false);
@@ -44,6 +46,7 @@ class Workspace3D {
   }
 
   final Node _scene;
+  final bool Function() _hasActiveDesign;
   final void Function() _onResourcesOpened, _onResourcesClosed;
   final layout = WorkspaceLayout();
   bool _dialOpen = false;
@@ -59,6 +62,7 @@ class Workspace3D {
   }
 
   static const root = 'WorkspaceLayer/Workspace';
+  static const emptyState = '$root/EmptyState';
   static const header = '$root/Header';
   static const status = '$header/Rows/Actions/ActiveDesign';
   static const toolbarButtons = [
@@ -94,7 +98,7 @@ class Workspace3D {
   Button _button(String path) => _scene.getNodeT<Button>(path)!;
 
   void _setDial(bool open, {bool focusMain = false}) {
-    _dialOpen = open && !_blocked;
+    _dialOpen = open && !_blocked && _hasActiveDesign();
     _control(speedActions).setVisible(_dialOpen);
     _button(speedToggle)
       ..setText(_dialOpen ? '×' : '+')
@@ -107,7 +111,9 @@ class Workspace3D {
     } else {
       animation.stop();
     }
-    if (focusMain && !_blocked) _button(speedToggle).grabFocus();
+    if (focusMain && !_blocked && _hasActiveDesign()) {
+      _button(speedToggle).grabFocus();
+    }
   }
 
   void _closePanels({bool focusMain = false}) {
@@ -116,7 +122,9 @@ class Workspace3D {
     if (resourcesWereOpen) _onResourcesClosed();
     layout.request(WorkspacePanel.inspector, false);
     resize();
-    if (focusMain && !_blocked) _button(speedToggle).grabFocus();
+    if (focusMain && !_blocked && _hasActiveDesign()) {
+      _button(speedToggle).grabFocus();
+    }
   }
 
   bool get isResourcesOpen => _control(resourceOverlay).isVisible();
@@ -124,6 +132,7 @@ class Workspace3D {
   void dismissResources() => _request(WorkspacePanel.library, false);
 
   void _request(WorkspacePanel panel, bool open) {
+    if (open && !_hasActiveDesign()) return;
     _setDial(false);
     final resourcesWereOpen = isResourcesOpen;
     layout.request(panel, open);
@@ -133,7 +142,7 @@ class Workspace3D {
       _onResourcesClosed();
     }
     if (!open) {
-      if (!_blocked) _button(speedToggle).grabFocus();
+      if (!_blocked && _hasActiveDesign()) _button(speedToggle).grabFocus();
       return;
     }
     var target = '$inspector/Content/Heading/Close';
@@ -162,7 +171,8 @@ class Workspace3D {
       ..setSize(Vector2(x: layout.inspectorWidth, y: inspectorHeight));
     _control(resourceOverlay).setVisible(result.library);
     for (final path in [speedToggle, libraryToggle, inspectorToggle]) {
-      _button(path).setDisabled(_blocked || result.library);
+      _button(path)
+          .setDisabled(!_hasActiveDesign() || _blocked || result.library);
     }
     final canvasBounds = canvasRect(_scene);
     final width = 520.0
@@ -235,7 +245,7 @@ class Workspace3D {
       }
       return false;
     }
-    if (_blocked) return false;
+    if (_blocked || !_hasActiveDesign()) return false;
     final panel = layout.resolve(_scene.getViewport()!.getVisibleRect().size.x);
     if (event is InputEventKey &&
         event.isPressed() &&
@@ -261,13 +271,17 @@ class Workspace3D {
   void render(IsomapGridState state,
       {required bool blocked, required bool canConfigure}) {
     _blocked = blocked;
-    if (blocked ||
+    final available = _hasActiveDesign();
+    _control(emptyState).setVisible(!available);
+    _control(speedDial).setVisible(available);
+    if (!available ||
+        blocked ||
         (_hadSelection && state.selected == null && !isResourcesOpen)) {
       _setDial(false);
       _closePanels();
     }
     for (final path in [speedToggle, libraryToggle, inspectorToggle]) {
-      _button(path).setDisabled(blocked || isResourcesOpen);
+      _button(path).setDisabled(!available || blocked || isResourcesOpen);
     }
     if (!isResourcesOpen) {
       _button('$sidebar/Content/Heading/Close').setDisabled(blocked);

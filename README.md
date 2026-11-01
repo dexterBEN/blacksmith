@@ -134,8 +134,16 @@ directory and preserves existing `LD_LIBRARY_PATH` entries. The same script can 
 invoked by its path from any working directory. It performs no build or deployment; prepare
 the existing Dart bindings and native libraries separately as described below.
 
-Normal Godot project startup opens `scenes/isometric_3d.tscn`. The existing 3D
-scene supports selecting a tile and placing or replacing Cloud Storage,
+Normal Godot project startup opens `scenes/isometric_3d.tscn` with a centered
+**No design open** welcome message. The full-window background and toolbar remain
+visible; tiles, resource visuals and Speed Dial are hidden and tile input is blocked.
+Use **New Design** or **Open** to activate a Design through the existing API flow.
+Creation/loading failures and cancellation keep the welcome screen; no blank
+Design is invented. Grid visibility follows `DesignState.active`, independently
+of its persistence ID or resource-save status. Tiles are created lazily on first
+activation; an active Design keeps the established camera framing.
+
+With an active Design, the existing 3D scene supports selecting a tile and placing or replacing Cloud Storage,
 Compute Engine, Cloud VPN and Cloud Load Balancing cubes through a native palette.
 The 3D viewport and background fill the entire window. A compact, translucent
 Design toolbar overlays the top edge with actions on the left and dynamic status
@@ -150,7 +158,8 @@ keeps it open and never reaches the grid. Neither UI changes viewport dimensions
 modal is opened. Transparent overlay areas keep normal grid input.
 The catalog retains full service labels and tooltips. The workspace and New Design
 dialog share one dark UI theme. Configuration/deployment dialogs retain their existing modal behavior.
-Other resource kinds stay in `IsomapGridBloc` memory and require no backend.
+Once a Design is active, other resource kinds stay in `IsomapGridBloc` memory
+and placement makes no backend request.
 Cloud Storage configuration requires an active Design, the API and PostgreSQL;
 GCP credentials are not needed. Cancel and rejected saves preserve the original
 grid and JSON draft. New templates use clearly labelled example identifiers;
@@ -193,6 +202,7 @@ godot --path frontend res://main.tscn
 
 # Production-bootstrap checks, clean-launch captures and optional Linux tracing.
 python3 frontend/scripts/tests/test-godot.py --application --trace-network --timeout 600 --output /tmp/blacksmith-startup
+frontend/scripts/dev.sh test --empty-workspace --trace-network --timeout 600 --output /tmp/blacksmith-empty
 
 # Existing detailed 3D and explicit legacy 2D regression fixtures.
 python3 frontend/scripts/preview/run-isometric-3d.py --check --timeout 600 --output /tmp/blacksmith-placement
@@ -290,7 +300,7 @@ From another terminal in that container:
 curl -i http://localhost:5100/cloud_services/ping
 ```
 
-**Port alignment:** The retained explicit cloud client defaults to `http://localhost:5100`, matching the documented manual devcontainer smoke test. Set the API bind address and client URL consistently before explicit frontend-to-backend tests. Local editor placement does not require the backend; the previous bucket smoke test did not validate Godot connectivity.
+**Port alignment:** The retained explicit cloud client defaults to `http://localhost:5100`, matching the documented manual devcontainer smoke test. Set the API bind address and client URL consistently before explicit frontend-to-backend tests. Placement makes no backend request after a Design is active; the previous bucket smoke test did not validate Godot connectivity.
 
 ---
 
